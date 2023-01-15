@@ -1,20 +1,18 @@
-Return-Path: <elena.dwell@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
- h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
- :date:message-id:reply-to;
- bh=dQsmeEsrCQnDVCVMTOQqv7eMXueY6baolxwMf4jR/Aw=;
- b=f0LFBkDpdLEEGRTTxB1sFmxmf818Mtswm7+9ZWaqRPQh5taCbdDsFwqpQogjda3tK7
- cCA7AXFlDisO7xBIw9FO0eAdfR73NrY/6fWzI2M0Yf68vv3i7g8Q/wyK63acRtPDhb91
- 9I7v1FGMhvkXnyhiRcFOdg8vlJaFgPghOlE+Hvbybix6qbzaCs7lOdlb7cF05G6tcqLr
- uO4Rt0HzJf1MGpEfWwEVHjDasM2mYNmYLvLViC922YjLIDT5lGJ+L9tlUj+rwOR7I6hg
- d5R/CkCKKWbbzgFEysYs6ajLB+kp3B0OfpReihNEYx7pNJo19fRmgSF/ZFoYQJ20X5Ho
- 1ByQ==
+Return-Path: <antonkuchin@yandex-team.ru>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+ s=default; 
+ t=1673802564; bh=gYBigg0oZoGfpt5W5DeIaCno9S/czkxTzwzpov2eMTQ=;
+ h=Message-Id:Date:Cc:Subject:To:From;
+ b=A5Lgc5q07ISAmQwKstUoLUdcwRRgqvuHXxQbg6/hW82UsqFThYwgjnEg7B9fZxHs5
+ 9JG45l3qTLOBCl7F/bBHCE4pf6PLsvS0R3qR3THAh4BIh/mEUhySxCxolAQ482eVl/
+ h+/ohCI+2P45mEATci5l2Dkr/hwo4oqcHPhvtQBo=
+From: Anton Kuchin <antonkuchin@yandex-team.ru>
+Date: Sun, 15 Jan 2023 19:09:03 +0200
+Message-Id: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
 MIME-Version: 1.0
-From: Elena DE <elena.dwell@gmail.com>
-Date: Wed, 11 Jan 2023 15:35:16 +0800
-Message-ID: <CAManXSKocUvKoDM-uz2heaSUXyCFqrmBfuRuj4qb6kPehZ7XyA@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="000000000000562d4505f1f80bec"
-Subject: [Virtio-fs] Custom Made T-Shirts & Socks
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Subject: [Virtio-fs] [PATCH] vhost-user-fs: add capability to allow migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,349 +21,108 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
-
---000000000000562d4505f1f80bec
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-Dear Sir/Madman,
-
-
-
-This is Elena Ding of WELLSUCCEED EMBROIDERY(Dong Guan) Ltd, established in
-2001.
-
-We can supply you all kinds of *T-shirts* with *all over printed patterns,
-embroidery patterns, and screen printing patterns* and of *Socks* like
-*sublimation,
-knitting and embroidery socks*.
-
-
-
-*Why choose us?*
-
-   1. Low MOQ or Big orders;
-   2. Custom made styles;
-   3. Competitive price;
-   4. Guaranteed after-sale service;
-   5. Paypal & Wire Transfer(T/T) Accepted
-
-Sample time 7-9 working days, bulk production 10-15 working days, shipping
-days 3-5 working days.
-
-
-
-Quotes can be offered if you=E2=80=99d like to send me your designs. A
-non-disclosure agreement can be signed if required.
-
-Samples can be made for approval.
-
-
-
-Look forward to your reply.
-
-
-
-Best regards,
-------------------------------
-
-*Elena Ding*
-
-Sales Department
-
-Cell/WhatsApp/Skype: +86 13101269050
-
-E-mail: elena.wellhifi@gmail.com
-<https://signal3domain.com/click?redirect=3D%23inbox%2F_blank&dID=3D1645534=
-067703&linkName=3DE-mail:%20Elena.Ding@wellsucceed.com>
-
-
-
-*WELLSUCCEED EMBROIDERY LIMITED*
-
-*(One-stop sourcing of **Clothing / Headwear / Bags / Toys / Flags /
-Patches / Keychains / Wristbands / **Puzzles / Umbrellas / Gloves / Helmets
-/ Lanyards / Masks / Mugs **and etc.)*
-
-
-
-Tel: +86 769 86180188
-
-
-
-ADD: 4/F, 38 SOUTH XIHU 3RD ROAD,
-
-         SHILONG, DONGGUAN,
-
-         GUANGDONG. 523325. CHINA.
-
---000000000000562d4505f1f80bec
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">
-
-
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dgb2312">
-<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered)">
-<style>
-<!--
- /* Font Definitions */
- @font-face
- {font-family:Helvetica;
- panose-1:2 11 6 4 2 2 2 2 2 4;}
-@font-face
- {font-family:"Cambria Math";
- panose-1:2 4 5 3 5 4 6 3 2 4;}
-@font-face
- {font-family:=E7=AD=89=E7=BA=BF;
- panose-1:2 1 6 0 3 1 1 1 1 1;}
-@font-face
- {font-family:"\@=E7=AD=89=E7=BA=BF";
- panose-1:2 1 6 0 3 1 1 1 1 1;}
- /* Style Definitions */
- p.MsoNormal, li.MsoNormal, div.MsoNormal
- {margin:0cm;
- margin-bottom:.0001pt;
- text-align:justify;
- text-justify:inter-ideograph;
- font-size:10.5pt;
- font-family:=E7=AD=89=E7=BA=BF;}
-p.MsoHeader, li.MsoHeader, div.MsoHeader
- {mso-style-link:"=E9=A1=B5=E7=9C=89 =E5=AD=97=E7=AC=A6";
- margin:0cm;
- margin-bottom:.0001pt;
- text-align:center;
- layout-grid-mode:char;
- border:none;
- padding:0cm;
- font-size:9.0pt;
- font-family:=E7=AD=89=E7=BA=BF;}
-p.MsoFooter, li.MsoFooter, div.MsoFooter
- {mso-style-link:"=E9=A1=B5=E8=84=9A =E5=AD=97=E7=AC=A6";
- margin:0cm;
- margin-bottom:.0001pt;
- layout-grid-mode:char;
- font-size:9.0pt;
- font-family:=E7=AD=89=E7=BA=BF;}
-span.15
- {mso-style-name:15;}
-span.a
- {mso-style-name:"=E9=A1=B5=E7=9C=89 =E5=AD=97=E7=AC=A6";
- mso-style-link:=E9=A1=B5=E7=9C=89;}
-span.a0
- {mso-style-name:"=E9=A1=B5=E8=84=9A =E5=AD=97=E7=AC=A6";
- mso-style-link:=E9=A1=B5=E8=84=9A;}
-.MsoChpDefault
- {font-size:10.0pt;
- font-family:=E7=AD=89=E7=BA=BF;}
- /* Page Definitions */
- @page WordSection1
- {size:595.3pt 841.9pt;
- margin:72.0pt 90.0pt 72.0pt 90.0pt;
- layout-grid:15.6pt;}
-div.WordSection1
- {page:WordSection1;}
- /* List Definitions */
- ol
- {margin-bottom:0cm;}
-ul
- {margin-bottom:0cm;}
--->
-</style>
-
-
-
-
-
-<div class=3D"WordSection1" style=3D"layout-grid:15.6pt">
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">Dear Sir/M=
-adman,</span></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">=C2=A0</sp=
-an></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">This is=C2=
-=A0Elena Ding=C2=A0of
-WELLSUCCEED EMBROIDERY(Dong Guan)=C2=A0Ltd,=C2=A0established in 2001.=C2=A0=
-</span></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">We can sup=
-ply you all kinds of=C2=A0</span><b><span lang=3D"EN-US" style=3D"font-fami=
-ly:&quot;Helvetica&quot;,sans-serif;color:blue">T-shirts</span></b><span la=
-ng=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#6=
-66666">=C2=A0with </span><b><span lang=3D"EN-US" style=3D"font-family:&quot=
-;Helvetica&quot;,sans-serif;color:blue">all
-over=C2=A0printed patterns, embroidery patterns, and screen printing patter=
-ns</span></b><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot=
-;,sans-serif;color:#666666">=C2=A0and
-of=C2=A0</span><b><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica=
-&quot;,sans-serif;color:blue">Socks</span></b><span lang=3D"EN-US" style=3D=
-"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">=C2=A0like=C2=
-=A0</span><b><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot=
-;,sans-serif;color:blue">sublimation, knitting and
-embroidery=C2=A0socks</span></b><span lang=3D"EN-US" style=3D"font-family:&=
-quot;Helvetica&quot;,sans-serif;color:#666666">.</span></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">=C2=A0</sp=
-an></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><b><span lang=3D"EN-US" s=
-tyle=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">Why cho=
-ose us?</span></b></p>
-
-<ol start=3D"1" type=3D"1">
- <li class=3D"MsoNormal" style=3D"color:#666666;text-align:left;background:=
-white"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans=
--serif">Low
-     MOQ=C2=A0or=C2=A0Big orders;=C2=A0</span></li>
- <li class=3D"MsoNormal" style=3D"color:#666666;text-align:left;background:=
-white"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans=
--serif">Custom made styles;</span></li>
- <li class=3D"MsoNormal" style=3D"color:#666666;text-align:left;background:=
-white"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans=
--serif">Competitive price;</span></li>
- <li class=3D"MsoNormal" style=3D"color:#666666;text-align:left;background:=
-white"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans=
--serif">Guaranteed=C2=A0after-sale
-     service;</span></li>
- <li class=3D"MsoNormal" style=3D"color:#666666;text-align:left;background:=
-white"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans=
--serif">Paypal &amp; Wire
-     Transfer(T/T) Accepted</span></li>
-</ol>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666;background:white">Sample time 7-9 working days, bulk pr=
-oduction 10-15 working days,
-shipping days 3-5 working days.</span></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">=C2=A0</sp=
-an></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">Quotes can=
- be offered if you=E2=80=99d like to
-send me your designs. A non-disclosure agreement can be signed if required.=
-</span></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">Samples ca=
-n be made for approval.</span></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">=C2=A0</sp=
-an></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">Look forwa=
-rd to your reply.</span></p>
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">=C2=A0</sp=
-an></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">Best
-regards,</span></p>
-
-<div class=3D"MsoNormal" align=3D"left" style=3D"text-align:left"><span lan=
-g=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#66=
-6666">
-
-<hr size=3D"1" width=3D"210" style=3D"width:157.5pt" noshade align=3D"left"=
->
-
-</span></div>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><b><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sa=
-ns-serif;color:#666666">Elena Ding</span></b></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">Sales
-Department</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">Cell/WhatsApp/Skype:
-+86=C2=A013101269050</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US"><a href=3D"https://signal3domain.com/click?redir=
-ect=3D%23inbox%2F_blank&amp;dID=3D1645534067703&amp;linkName=3DE-mail:%20El=
-ena.Ding@wellsucceed.com" target=3D"_blank"><span style=3D"font-family:&quo=
-t;Helvetica&quot;,sans-serif;color:#666666;text-decoration:none">E-mail: el=
-ena.wellhifi@gmail.com</span></a></span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><b><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sa=
-ns-serif;color:#666666">WELLSUCCEED
-EMBROIDERY LIMITED</span></b></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><b><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sa=
-ns-serif;color:#666666">(One-stop
-sourcing of=C2=A0</span></b><b><span lang=3D"EN-US" style=3D"font-family:&q=
-uot;Helvetica&quot;,sans-serif;color:#7030a0">Clothing / Headwear / Bags / =
-Toys / Flags / Patches / Keychains
-/ Wristbands / </span></b><b><span lang=3D"EN-US" style=3D"font-family:&quo=
-t;Helvetica&quot;,sans-serif;color:#7030a0">Puzzles / Umbrellas / Gloves / =
-Helmets / Lanyards / Masks / Mugs
-</span></b><b><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quo=
-t;,sans-serif;color:#666666">and etc.)</span></b></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">Tel: +86
-769 86180188=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">ADD: 4/F,
-38 SOUTH XIHU 3RD ROAD,=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">=C2=A0
-=C2=A0 =C2=A0 =C2=A0 =C2=A0SHILONG, DONGGUAN,=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">=C2=A0
-=C2=A0 =C2=A0 =C2=A0 =C2=A0GUANGDONG. 523325. CHINA.</span></p>
-
-<p class=3D"MsoNormal"><span lang=3D"EN-US">=C2=A0</span></p>
-
-</div>
-
-
-
-
-</div>
-
---000000000000562d4505f1f80bec--
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, yc-core@yandex-team.ru, "Michael S. Tsirkin" <mst@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
+
+Now any vhost-user-fs device makes VM unmigratable, that also prevents
+qemu update without stopping the VM. In most cases that makes sense
+because qemu has no way to transfer FUSE session state.
+
+But we can give an option to orchestrator to override this if it can
+guarantee that state will be preserved (e.g. it uses migration to
+update qemu and dst will run on the same host as src and use the same
+socket endpoints).
+
+This patch keeps default behavior that prevents migration with such devices
+but adds migration capability 'vhost-user-fs' to explicitly allow migration=
+.
+
+Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
+---
+ hw/virtio/vhost-user-fs.c | 25 ++++++++++++++++++++++++-
+ qapi/migration.json       |  7 ++++++-
+ 2 files changed, 30 insertions(+), 2 deletions(-)
+
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index f5049735ac..13d920423e 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -24,6 +24,7 @@
+ #include "hw/virtio/vhost-user-fs.h"
+ #include "monitor/monitor.h"
+ #include "sysemu/sysemu.h"
++#include "migration/migration.h"
+=20
+ static const int user_feature_bits[] =3D {
+     VIRTIO_F_VERSION_1,
+@@ -298,9 +299,31 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice *v=
+dev)
+     return &fs->vhost_dev;
+ }
+=20
++static int vhost_user_fs_pre_save(void *opaque)
++{
++    MigrationState *s =3D migrate_get_current();
++
++    if (!s->enabled_capabilities[MIGRATION_CAPABILITY_VHOST_USER_FS]) {
++        error_report("Migration of vhost-user-fs devices requires internal=
+ FUSE "
++                     "state of backend to be preserved. If orchestrator ca=
+n "
++                     "guarantee this (e.g. dst connects to the same backen=
+d "
++                     "instance or backend state is migrated) set 'vhost-us=
+er-fs' "
++                     "migration capability to true to enable migration.");
++        return -1;
++    }
++
++    return 0;
++}
++
+ static const VMStateDescription vuf_vmstate =3D {
+     .name =3D "vhost-user-fs",
+-    .unmigratable =3D 1,
++    .minimum_version_id =3D 0,
++    .version_id =3D 0,
++    .fields =3D (VMStateField[]) {
++        VMSTATE_VIRTIO_DEVICE,
++        VMSTATE_END_OF_LIST()
++    },
++   .pre_save =3D vhost_user_fs_pre_save,
+ };
+=20
+ static Property vuf_properties[] =3D {
+diff --git a/qapi/migration.json b/qapi/migration.json
+index 88ecf86ac8..9a229ea884 100644
+--- a/qapi/migration.json
++++ b/qapi/migration.json
+@@ -477,6 +477,11 @@
+ #                    will be handled faster.  This is a performance featur=
+e and
+ #                    should not affect the correctness of postcopy migrati=
+on.
+ #                    (since 7.1)
++# @vhost-user-fs: If enabled, the migration process will allow migration o=
+f
++#                 vhost-user-fs devices, this should be enabled only when
++#                 backend can preserve local FUSE state e.g. for qemu upda=
+te
++#                 when dst reconects to the same endpoints after migration=
+.
++#                 (since 8.0)
+ #
+ # Features:
+ # @unstable: Members @x-colo and @x-ignore-shared are experimental.
+@@ -492,7 +497,7 @@
+            'dirty-bitmaps', 'postcopy-blocktime', 'late-block-activate',
+            { 'name': 'x-ignore-shared', 'features': [ 'unstable' ] },
+            'validate-uuid', 'background-snapshot',
+-           'zero-copy-send', 'postcopy-preempt'] }
++           'zero-copy-send', 'postcopy-preempt', 'vhost-user-fs'] }
+=20
+ ##
+ # @MigrationCapabilityStatus:
+--=20
+2.34.1
 

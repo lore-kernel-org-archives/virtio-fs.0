@@ -1,11 +1,14 @@
 Return-Path: <dgilbert@redhat.com>
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 18 Jan 2023 15:38:30 +0000
-Message-Id: <20230118153833.102731-1-dgilbert@redhat.com>
+Date: Wed, 18 Jan 2023 15:38:33 +0000
+Message-Id: <20230118153833.102731-4-dgilbert@redhat.com>
+In-Reply-To: <20230118153833.102731-1-dgilbert@redhat.com>
+References: <20230118153833.102731-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-type: text/plain
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/3] Remove C virtiofsd
+Subject: [Virtio-fs] [PATCH 3/3] virtiofsd: Swing deprecated message to
+ removed-features
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,85 +21,64 @@ To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, hczenczek@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-We deprecated the C virtiofsd in commit 34deee7b6a1418f3d62a
-in v7.0 in favour of the Rust implementation at
+Move the deprecation message, since it's now gone.
 
-  https://gitlab.com/virtio-fs/virtiofsd
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ docs/about/deprecated.rst       | 18 ------------------
+ docs/about/removed-features.rst | 13 +++++++++++++
+ 2 files changed, 13 insertions(+), 18 deletions(-)
 
-since then, the Rust version has had more development and
-has held up well.  It's time to say goodbye to the C version
-that got us going.
-
-The only thing I've not cleaned up here is
-  tests/avocado/virtiofs_submounts.py
-
-which I guess needs to figure out where the virtiofsd implementation
-is and use it; suggestions welcome.
-
-Dave
-
-
-Dr. David Alan Gilbert (3):
-  virtiofsd: Remove build and docs glue
-  virtiofsd: Remove source
-  virtiofsd: Swing deprecated message to removed-features
-
- MAINTAINERS                                   |    2 -
- docs/about/deprecated.rst                     |   18 -
- docs/about/removed-features.rst               |   13 +
- docs/conf.py                                  |    4 -
- docs/meson.build                              |    1 -
- docs/tools/index.rst                          |    1 -
- docs/tools/virtiofsd.rst                      |  403 --
- meson.build                                   |    1 -
- meson_options.txt                             |    2 -
- .../ci/org.centos/stream/8/x86_64/configure   |    2 -
- scripts/coverity-scan/COMPONENTS.md           |    3 -
- scripts/meson-buildoptions.sh                 |    3 -
- tools/meson.build                             |   13 -
- tools/virtiofsd/50-qemu-virtiofsd.json.in     |    5 -
- tools/virtiofsd/buffer.c                      |  350 --
- tools/virtiofsd/fuse_common.h                 |  837 ---
- tools/virtiofsd/fuse_i.h                      |  107 -
- tools/virtiofsd/fuse_log.c                    |   40 -
- tools/virtiofsd/fuse_log.h                    |   75 -
- tools/virtiofsd/fuse_lowlevel.c               | 2732 ----------
- tools/virtiofsd/fuse_lowlevel.h               | 1988 --------
- tools/virtiofsd/fuse_misc.h                   |   59 -
- tools/virtiofsd/fuse_opt.c                    |  446 --
- tools/virtiofsd/fuse_opt.h                    |  272 -
- tools/virtiofsd/fuse_signals.c                |   93 -
- tools/virtiofsd/fuse_virtio.c                 | 1081 ----
- tools/virtiofsd/fuse_virtio.h                 |   33 -
- tools/virtiofsd/helper.c                      |  409 --
- tools/virtiofsd/meson.build                   |   18 -
- tools/virtiofsd/passthrough_helpers.h         |   51 -
- tools/virtiofsd/passthrough_ll.c              | 4521 -----------------
- tools/virtiofsd/passthrough_seccomp.c         |  182 -
- tools/virtiofsd/passthrough_seccomp.h         |   14 -
- 33 files changed, 13 insertions(+), 13766 deletions(-)
- delete mode 100644 docs/tools/virtiofsd.rst
- delete mode 100644 tools/virtiofsd/50-qemu-virtiofsd.json.in
- delete mode 100644 tools/virtiofsd/buffer.c
- delete mode 100644 tools/virtiofsd/fuse_common.h
- delete mode 100644 tools/virtiofsd/fuse_i.h
- delete mode 100644 tools/virtiofsd/fuse_log.c
- delete mode 100644 tools/virtiofsd/fuse_log.h
- delete mode 100644 tools/virtiofsd/fuse_lowlevel.c
- delete mode 100644 tools/virtiofsd/fuse_lowlevel.h
- delete mode 100644 tools/virtiofsd/fuse_misc.h
- delete mode 100644 tools/virtiofsd/fuse_opt.c
- delete mode 100644 tools/virtiofsd/fuse_opt.h
- delete mode 100644 tools/virtiofsd/fuse_signals.c
- delete mode 100644 tools/virtiofsd/fuse_virtio.c
- delete mode 100644 tools/virtiofsd/fuse_virtio.h
- delete mode 100644 tools/virtiofsd/helper.c
- delete mode 100644 tools/virtiofsd/meson.build
- delete mode 100644 tools/virtiofsd/passthrough_helpers.h
- delete mode 100644 tools/virtiofsd/passthrough_ll.c
- delete mode 100644 tools/virtiofsd/passthrough_seccomp.c
- delete mode 100644 tools/virtiofsd/passthrough_seccomp.h
-
+diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
+index 9f1bbc495d..8543fa3285 100644
+--- a/docs/about/deprecated.rst
++++ b/docs/about/deprecated.rst
+@@ -325,24 +325,6 @@ versions, aliases will point to newer CPU model versions
+ depending on the machine type, so management software must
+ resolve CPU model aliases before starting a virtual machine.
+ 
+-Tools
+------
+-
+-virtiofsd
+-'''''''''
+-
+-There is a new Rust implementation of ``virtiofsd`` at
+-``https://gitlab.com/virtio-fs/virtiofsd``;
+-since this is now marked stable, new development should be done on that
+-rather than the existing C version in the QEMU tree.
+-The C version will still accept fixes and patches that
+-are already in development for the moment, but will eventually
+-be deleted from this tree.
+-New deployments should use the Rust version, and existing systems
+-should consider moving to it.  The command line and feature set
+-is very close and moving should be simple.
+-
+-
+ QEMU guest agent
+ ----------------
+ 
+diff --git a/docs/about/removed-features.rst b/docs/about/removed-features.rst
+index 6c3aa5097f..9b0a212cfe 100644
+--- a/docs/about/removed-features.rst
++++ b/docs/about/removed-features.rst
+@@ -865,3 +865,16 @@ The VXHS code did not compile since v2.12.0. It was removed in 5.1.
+ The corresponding upstream server project is no longer maintained.
+ Users are recommended to switch to an alternative distributed block
+ device driver such as RBD.
++
++Tools
++-----
++
++virtiofsd (removed in 8.0)
++''''''''''''''''''''''''''
++
++There is a newer Rust implementation of ``virtiofsd`` at
++``https://gitlab.com/virtio-fs/virtiofsd``; this has been
++stable for some time and is now widely used.
++The command line and feature set is very close to the removed
++C implementation.
++
 -- 
 2.39.0
 

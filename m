@@ -1,21 +1,23 @@
-Return-Path: <antonkuchin@yandex-team.ru>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
- s=default; 
- t=1674135910; bh=velUYGUD+tT4dnfKdzOS3WCghZFVJW6KK4bfWPhXgNI=;
- h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
- b=aJobTjYC7fcVjVHPQkPiNTLuS5YUQ8zHfYGMR/jv8M0UwZG2m+CAchG9VPMF3+za/
- aPjl5CMb/G2igVsjs9AgVLEr7fmwCrTVFecGOnrCRbXuXRtpk8NVFEtvFo53PKWgGu
- ryIBWk9UldzQz2RyOXInBjp6BALKUK8bUQFIfVy4=
-Message-ID: <f9993404-f8b8-7a23-37f8-530313783466@yandex-team.ru>
-Date: Thu, 19 Jan 2023 15:45:06 +0200
+Return-Path: <stefanha@gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+ h=cc:to:subject:message-id:date:from:in-reply-to:references
+ :mime-version:from:to:cc:subject:date:message-id:reply-to;
+ bh=xwZnN2aNk8cZiaVT6tfuC7X21prFted7/pCREMsk8Gc=;
+ b=c/nb1oiW1uZLftSz+ApJdkVIN1F+jctZFH+Zb/+J6Y9BUBUv8VfkgZeH+i5NMo4S+/
+ 234Z7301zaJsSerR4cOnr7ZONE6gyaYxm6WYqGmOx7iOX9CEcv8mxQOnr9Lwiuucf7sh
+ 4RipXJKY9/nT9rbJDwlf/IQwt5B0VEBU5AAozLBOx2gkgnyfcq7gepjhQqYptl+sGWOB
+ MeyJU5unRjuGb6aFpcaGZJiDNCNoqGXiT1BIodjZoCkQ12POwaOsg1cpxF2EqRTCWjqT
+ F/yNiWyP7VYsgKuHYXJx7YxzbbMBy/DPyrAagNe3uW/1vxGIEtliQmGXYLMP0o3G8Njn
+ 6GiA==
 MIME-Version: 1.0
 References: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
- <20230119074602-mutt-send-email-mst@kernel.org>
-From: Anton Kuchin <antonkuchin@yandex-team.ru>
-In-Reply-To: <20230119074602-mutt-send-email-mst@kernel.org>
-Content-Language: en-US, ru-RU
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
+ <CAJSP0QVKUKgkBMw1PiN8-L8Ykhq=gfvNTTs4sf1tuzoqHu+GXw@mail.gmail.com>
+ <0d57cc40-693b-b36c-a135-fdac60dd00ec@yandex-team.ru>
+In-Reply-To: <0d57cc40-693b-b36c-a135-fdac60dd00ec@yandex-team.ru>
+From: Stefan Hajnoczi <stefanha@gmail.com>
+Date: Thu, 19 Jan 2023 09:30:53 -0500
+Message-ID: <CAJSP0QUXB0kgsCSsmi8dpnJFYho2cR_2Liep=pGmp6WzDZ_7pw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: add capability to allow
  migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -26,128 +28,180 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, yc-core@yandex-team.ru
+To: Anton Kuchin <antonkuchin@yandex-team.ru>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, yc-core@yandex-team.ru, "Michael S. Tsirkin" <mst@redhat.com>
 
-On 19/01/2023 14:51, Michael S. Tsirkin wrote:
-> On Sun, Jan 15, 2023 at 07:09:03PM +0200, Anton Kuchin wrote:
->> Now any vhost-user-fs device makes VM unmigratable, that also prevents
->> qemu update without stopping the VM. In most cases that makes sense
->> because qemu has no way to transfer FUSE session state.
->>
->> But we can give an option to orchestrator to override this if it can
->> guarantee that state will be preserved (e.g. it uses migration to
->> update qemu and dst will run on the same host as src and use the same
->> socket endpoints).
->>
->> This patch keeps default behavior that prevents migration with such devices
->> but adds migration capability 'vhost-user-fs' to explicitly allow migration.
->>
->> Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
->> ---
->>   hw/virtio/vhost-user-fs.c | 25 ++++++++++++++++++++++++-
->>   qapi/migration.json       |  7 ++++++-
->>   2 files changed, 30 insertions(+), 2 deletions(-)
->>
->> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
->> index f5049735ac..13d920423e 100644
->> --- a/hw/virtio/vhost-user-fs.c
->> +++ b/hw/virtio/vhost-user-fs.c
->> @@ -24,6 +24,7 @@
->>   #include "hw/virtio/vhost-user-fs.h"
->>   #include "monitor/monitor.h"
->>   #include "sysemu/sysemu.h"
->> +#include "migration/migration.h"
->>   
->>   static const int user_feature_bits[] = {
->>       VIRTIO_F_VERSION_1,
->> @@ -298,9 +299,31 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
->>       return &fs->vhost_dev;
->>   }
->>   
->> +static int vhost_user_fs_pre_save(void *opaque)
->> +{
->> +    MigrationState *s = migrate_get_current();
->> +
->> +    if (!s->enabled_capabilities[MIGRATION_CAPABILITY_VHOST_USER_FS]) {
->> +        error_report("Migration of vhost-user-fs devices requires internal FUSE "
->> +                     "state of backend to be preserved. If orchestrator can "
->> +                     "guarantee this (e.g. dst connects to the same backend "
->> +                     "instance or backend state is migrated) set 'vhost-user-fs' "
->> +                     "migration capability to true to enable migration.");
-> Isn't it possible that some backends are same and some are not?
-> Shouldn't this be a device property then?
-If some are not the same it is not guaranteed that correct FUSE
-state is present there, so orchestrator shouldn't set the capability
-because this can result in destination devices being broken (they'll
-be fine after the remount in guest, but this is guest visible and is
-not acceptable).
+On Thu, 19 Jan 2023 at 07:43, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
+>
+> On 18/01/2023 17:52, Stefan Hajnoczi wrote:
+> > On Sun, 15 Jan 2023 at 12:21, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
+> >> Now any vhost-user-fs device makes VM unmigratable, that also prevents
+> >> qemu update without stopping the VM. In most cases that makes sense
+> >> because qemu has no way to transfer FUSE session state.
+> >>
+> >> But we can give an option to orchestrator to override this if it can
+> >> guarantee that state will be preserved (e.g. it uses migration to
+> >> update qemu and dst will run on the same host as src and use the same
+> >> socket endpoints).
+> >>
+> >> This patch keeps default behavior that prevents migration with such devices
+> >> but adds migration capability 'vhost-user-fs' to explicitly allow migration.
+> >>
+> >> Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
+> >> ---
+> >>   hw/virtio/vhost-user-fs.c | 25 ++++++++++++++++++++++++-
+> >>   qapi/migration.json       |  7 ++++++-
+> >>   2 files changed, 30 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> >> index f5049735ac..13d920423e 100644
+> >> --- a/hw/virtio/vhost-user-fs.c
+> >> +++ b/hw/virtio/vhost-user-fs.c
+> >> @@ -24,6 +24,7 @@
+> >>   #include "hw/virtio/vhost-user-fs.h"
+> >>   #include "monitor/monitor.h"
+> >>   #include "sysemu/sysemu.h"
+> >> +#include "migration/migration.h"
+> >>
+> >>   static const int user_feature_bits[] = {
+> >>       VIRTIO_F_VERSION_1,
+> >> @@ -298,9 +299,31 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
+> >>       return &fs->vhost_dev;
+> >>   }
+> >>
+> >> +static int vhost_user_fs_pre_save(void *opaque)
+> >> +{
+> >> +    MigrationState *s = migrate_get_current();
+> >> +
+> >> +    if (!s->enabled_capabilities[MIGRATION_CAPABILITY_VHOST_USER_FS]) {
+> >> +        error_report("Migration of vhost-user-fs devices requires internal FUSE "
+> >> +                     "state of backend to be preserved. If orchestrator can "
+> >> +                     "guarantee this (e.g. dst connects to the same backend "
+> >> +                     "instance or backend state is migrated) set 'vhost-user-fs' "
+> >> +                     "migration capability to true to enable migration.");
+> >> +        return -1;
+> >> +    }
+> >> +
+> >> +    return 0;
+> >> +}
+> >> +
+> >>   static const VMStateDescription vuf_vmstate = {
+> >>       .name = "vhost-user-fs",
+> >> -    .unmigratable = 1,
+> >> +    .minimum_version_id = 0,
+> >> +    .version_id = 0,
+> >> +    .fields = (VMStateField[]) {
+> >> +        VMSTATE_VIRTIO_DEVICE,
+> >> +        VMSTATE_END_OF_LIST()
+> >> +    },
+> >> +   .pre_save = vhost_user_fs_pre_save,
+> >>   };
+> > Will it be possible to extend this vmstate when virtiofsd adds support
+> > for stateful migration without breaking migration compatibility?
+> >
+> > If not, then I think a marker field should be added to the vmstate:
+> > 0 - stateless/reconnect migration (the approach you're adding in this patch)
+> > 1 - stateful migration (future virtiofsd feature)
+> >
+> > When the field is 0 there are no further vmstate fields and we trust
+> > that the destination vhost-user-fs server already has the necessary
+> > state.
+> >
+> > When the field is 1 there are additional vmstate fields that contain
+> > the virtiofsd state.
+> >
+> > The goal is for QEMU to support 3 migration modes, depending on the
+> > vhost-user-fs server:
+> > 1. No migration support.
+> > 2. Stateless migration.
+> > 3. Stateful migration.
+>
+> Sure. These vmstate fields are very generic and mandatory for any
+> virtio device. If in future more state can be transfer in migration
+> stream the vmstate can be extended with additional fields. This can
+> be done with new subsections and/or bumping version_id.
 
-I can imagine smart orchestrator and backend that can transfer
-internal FUSE state, but we are not there yet, and this would be
-their responsibility then to ensure endpoint compatibility between src
-and dst and set the capability (that's why I put "e.g." and "or" in
-the error description).
+My concern is that the vmstate introduced in this patch may be
+unusable when stateful migration is added. So additional compatibility
+code will need to be introduced to make your stateless migration
+continue working with extended vmstate.
+
+By adding a marker field in this patch it should be possible to
+continue using the same vmstate for stateless migration without adding
+extra compatibility code in the future.
+
+> The main purpose of this patch is to allow update VM to newer version
+> of qemu via local migration without disruption to guest. And future
+> versions hopefully could pack more state from external environment
+> to migration stream.
+>
+>
+> >
+> >>   static Property vuf_properties[] = {
+> >> diff --git a/qapi/migration.json b/qapi/migration.json
+> >> index 88ecf86ac8..9a229ea884 100644
+> >> --- a/qapi/migration.json
+> >> +++ b/qapi/migration.json
+> >> @@ -477,6 +477,11 @@
+> >>   #                    will be handled faster.  This is a performance feature and
+> >>   #                    should not affect the correctness of postcopy migration.
+> >>   #                    (since 7.1)
+> >> +# @vhost-user-fs: If enabled, the migration process will allow migration of
+> >> +#                 vhost-user-fs devices, this should be enabled only when
+> >> +#                 backend can preserve local FUSE state e.g. for qemu update
+> >> +#                 when dst reconects to the same endpoints after migration.
+> >> +#                 (since 8.0)
+> > This is global but a guest can have multiple vhost-user-fs devices
+> > connected to different servers.
+> AFAIK vhost-user requires unix socket and memory shared from guest so
+> devices can't be connected to different servers, just to different
+> endpoints on current host.
+
+Different vhost-user-fs server software. vhost-user-fs is a protocol,
+there can be multiple server implementations. These implementations
+may have different capabilities (some may not support stateless
+migration). So I think stateless migration should be a per-instance
+setting, not global.
 
 >
->
->
->> +        return -1;
->> +    }
->> +
->> +    return 0;
->> +}
->> +
->>   static const VMStateDescription vuf_vmstate = {
->>       .name = "vhost-user-fs",
->> -    .unmigratable = 1,
->> +    .minimum_version_id = 0,
->> +    .version_id = 0,
->> +    .fields = (VMStateField[]) {
->> +        VMSTATE_VIRTIO_DEVICE,
->> +        VMSTATE_END_OF_LIST()
->> +    },
->> +   .pre_save = vhost_user_fs_pre_save,
->>   };
->>   
->>   static Property vuf_properties[] = {
->> diff --git a/qapi/migration.json b/qapi/migration.json
->> index 88ecf86ac8..9a229ea884 100644
->> --- a/qapi/migration.json
->> +++ b/qapi/migration.json
->> @@ -477,6 +477,11 @@
->>   #                    will be handled faster.  This is a performance feature and
->>   #                    should not affect the correctness of postcopy migration.
->>   #                    (since 7.1)
->> +# @vhost-user-fs: If enabled, the migration process will allow migration of
->> +#                 vhost-user-fs devices, this should be enabled only when
->> +#                 backend can preserve local FUSE state e.g. for qemu update
->> +#                 when dst reconects to the same endpoints after migration.
->> +#                 (since 8.0)
->>   #
->>   # Features:
->>   # @unstable: Members @x-colo and @x-ignore-shared are experimental.
->> @@ -492,7 +497,7 @@
->>              'dirty-bitmaps', 'postcopy-blocktime', 'late-block-activate',
->>              { 'name': 'x-ignore-shared', 'features': [ 'unstable' ] },
->>              'validate-uuid', 'background-snapshot',
->> -           'zero-copy-send', 'postcopy-preempt'] }
->> +           'zero-copy-send', 'postcopy-preempt', 'vhost-user-fs'] }
-> I kind of dislike that it's such a specific flag. Is only vhost-user-fs
-> ever going to be affected? Any way to put it in a way that is more generic?
-Here I agree with you: I would prefer less narrow naming too. But I
-didn't manage to come up with one. Looks like many other vhost-user
-devices could benefit from this so maybe "vhost-user-stateless" or
-something like this would be better.
-I'm not sure that other types of devices could handle reconnect to
-the old endpoint as easy as vhost-user-fs, but anyway the support for
-this flag needs to be implemented for each device individually.
-What do you think? Any ideas would be appreciated.
+> >
+> > I would add a qdev property to the device instead of introducing a
+> > migration capability. The property would enable "stateless migration".
+> > When the property is not set, migration would be prohibited.
+> I did thought about that, but this is really not a property of device,
+> this is the capability of management software and applies to exactly one
+> particular migration process that it initiates. It should not persist
+> across migration or be otherwise stored in device.
+
+I disagree. The vhost-user-fs server software must implement stateless
+migration in order for this to work. For example,
+https://gitlab.com/virtio-fs/virtiofsd doesn't support stateless
+migration as far as I know.
 
 >
+> The idea here is that orchestrator can ensure destination qemu will
+> run on the same host, will reconnect to the same unix sockets and only
+> then sets the flag (because inside qemu we can't know anything about
+> the destination).
+> This is somewhat similar to ignore-shared migration capability when
+> qemu avoids saving and loading guest memory that is stores in shmem
+> because it will be picked up by destination process right where source
+> left it.
 >
->>   ##
->>   # @MigrationCapabilityStatus:
->> -- 
->> 2.34.1
+> >>   #
+> >>   # Features:
+> >>   # @unstable: Members @x-colo and @x-ignore-shared are experimental.
+> >> @@ -492,7 +497,7 @@
+> >>              'dirty-bitmaps', 'postcopy-blocktime', 'late-block-activate',
+> >>              { 'name': 'x-ignore-shared', 'features': [ 'unstable' ] },
+> >>              'validate-uuid', 'background-snapshot',
+> >> -           'zero-copy-send', 'postcopy-preempt'] }
+> >> +           'zero-copy-send', 'postcopy-preempt', 'vhost-user-fs'] }
+> >>
+> >>   ##
+> >>   # @MigrationCapabilityStatus:
+> >> --
+> >> 2.34.1
+> >>
+> >>
 

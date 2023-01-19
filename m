@@ -1,25 +1,26 @@
-Return-Path: <stefanha@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=xwZnN2aNk8cZiaVT6tfuC7X21prFted7/pCREMsk8Gc=;
- b=c/nb1oiW1uZLftSz+ApJdkVIN1F+jctZFH+Zb/+J6Y9BUBUv8VfkgZeH+i5NMo4S+/
- 234Z7301zaJsSerR4cOnr7ZONE6gyaYxm6WYqGmOx7iOX9CEcv8mxQOnr9Lwiuucf7sh
- 4RipXJKY9/nT9rbJDwlf/IQwt5B0VEBU5AAozLBOx2gkgnyfcq7gepjhQqYptl+sGWOB
- MeyJU5unRjuGb6aFpcaGZJiDNCNoqGXiT1BIodjZoCkQ12POwaOsg1cpxF2EqRTCWjqT
- F/yNiWyP7VYsgKuHYXJx7YxzbbMBy/DPyrAagNe3uW/1vxGIEtliQmGXYLMP0o3G8Njn
- 6GiA==
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
+ :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=oEtgV5A5TQgE6miITdvQ7MIFydv0OPph3dJHEqU8bmI=;
+ b=uOgBskCVZg9n55V0rrV6AwGbi6KYB+Zjwy/RAS1VzBHB1CPgbO1smZSJ6F3x6KLPFi
+ iG5EkB2DZE2c1j7p/Cbybm/baVTv73fp9gnIzYLc0iPG4bHr5G91ONHCMO3elQPj/+7H
+ ySNPWP4wvfGsKwnKOQnUnm41oDYkyv7hLZn/6O+yzxa6ZzlEYkFhBhKaL2LYnpu/o3t7
+ yKtkb0DcWT0XgyIZHvkVRngEUaoGJ/Pat3iX+WIJc09GqFii2vQf6ZrZG8aAFuriYsyo
+ Nm1Hv/Dj1MELElDTz/afjUSH/EOeiJCdgWW9czm3ISUwJZMJnYnmQ2aXsd3UjhjWBKts
+ qeWg==
+References: <20230118153833.102731-1-dgilbert@redhat.com>
+ <CAJSP0QU+o-R6ZKN8R1MHoUqFwfsQmpKt6KP5hqhyFrK5HJti6w@mail.gmail.com>
+ <9474ce49-979d-f630-5f6a-754999db573a@redhat.com>
+From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Thu, 19 Jan 2023 14:56:38 +0000
+In-reply-to: <9474ce49-979d-f630-5f6a-754999db573a@redhat.com>
+Message-ID: <871qnqzi5c.fsf@linaro.org>
 MIME-Version: 1.0
-References: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
- <CAJSP0QVKUKgkBMw1PiN8-L8Ykhq=gfvNTTs4sf1tuzoqHu+GXw@mail.gmail.com>
- <0d57cc40-693b-b36c-a135-fdac60dd00ec@yandex-team.ru>
-In-Reply-To: <0d57cc40-693b-b36c-a135-fdac60dd00ec@yandex-team.ru>
-From: Stefan Hajnoczi <stefanha@gmail.com>
-Date: Thu, 19 Jan 2023 09:30:53 -0500
-Message-ID: <CAJSP0QUXB0kgsCSsmi8dpnJFYho2cR_2Liep=pGmp6WzDZ_7pw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: add capability to allow
- migration
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH 0/3] Remove C virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,180 +29,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Anton Kuchin <antonkuchin@yandex-team.ru>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, yc-core@yandex-team.ru, "Michael S. Tsirkin" <mst@redhat.com>
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: Stefan Hajnoczi <stefanha@gmail.com>, "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>, Cleber Rosa <crosa@redhat.com>, qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, gmaglione@redhat.com, virtio-fs@redhat.com, pbonzini@redhat.com
 
-On Thu, 19 Jan 2023 at 07:43, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
+
+Hanna Czenczek <hreitz@redhat.com> writes:
+
+> On 18.01.23 16:59, Stefan Hajnoczi wrote:
+>> On Wed, 18 Jan 2023 at 10:40, Dr. David Alan Gilbert (git)
+>> <dgilbert@redhat.com> wrote:
+>>> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>>>
+>>> We deprecated the C virtiofsd in commit 34deee7b6a1418f3d62a
+>>> in v7.0 in favour of the Rust implementation at
+>>>
+>>>    https://gitlab.com/virtio-fs/virtiofsd
+>>>
+>>> since then, the Rust version has had more development and
+>>> has held up well.  It's time to say goodbye to the C version
+>>> that got us going.
+>>>
+>>> The only thing I've not cleaned up here is
+>>>    tests/avocado/virtiofs_submounts.py
+>>>
+>>> which I guess needs to figure out where the virtiofsd implementation
+>>> is and use it; suggestions welcome.
+>> I see something similar in tests/avocado/avocado_qemu/__init__.py:
+>>
+>>          # If qemu-img has been built, use it, otherwise the system wide=
+ one
+>>          # will be used.  If none is available, the test will cancel.
+>>          qemu_img =3D os.path.join(BUILD_DIR, 'qemu-img')
+>>          if not os.path.exists(qemu_img):
+>>              qemu_img =3D find_command('qemu-img', False)
+>>          if qemu_img is False:
+>>              self.cancel('Could not find "qemu-img", which is required t=
+o '
+>>                          'create the bootable image')
+>>
+>> Maybe find_command('virtiofsd', False)?
 >
-> On 18/01/2023 17:52, Stefan Hajnoczi wrote:
-> > On Sun, 15 Jan 2023 at 12:21, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
-> >> Now any vhost-user-fs device makes VM unmigratable, that also prevents
-> >> qemu update without stopping the VM. In most cases that makes sense
-> >> because qemu has no way to transfer FUSE session state.
-> >>
-> >> But we can give an option to orchestrator to override this if it can
-> >> guarantee that state will be preserved (e.g. it uses migration to
-> >> update qemu and dst will run on the same host as src and use the same
-> >> socket endpoints).
-> >>
-> >> This patch keeps default behavior that prevents migration with such devices
-> >> but adds migration capability 'vhost-user-fs' to explicitly allow migration.
-> >>
-> >> Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
-> >> ---
-> >>   hw/virtio/vhost-user-fs.c | 25 ++++++++++++++++++++++++-
-> >>   qapi/migration.json       |  7 ++++++-
-> >>   2 files changed, 30 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> >> index f5049735ac..13d920423e 100644
-> >> --- a/hw/virtio/vhost-user-fs.c
-> >> +++ b/hw/virtio/vhost-user-fs.c
-> >> @@ -24,6 +24,7 @@
-> >>   #include "hw/virtio/vhost-user-fs.h"
-> >>   #include "monitor/monitor.h"
-> >>   #include "sysemu/sysemu.h"
-> >> +#include "migration/migration.h"
-> >>
-> >>   static const int user_feature_bits[] = {
-> >>       VIRTIO_F_VERSION_1,
-> >> @@ -298,9 +299,31 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
-> >>       return &fs->vhost_dev;
-> >>   }
-> >>
-> >> +static int vhost_user_fs_pre_save(void *opaque)
-> >> +{
-> >> +    MigrationState *s = migrate_get_current();
-> >> +
-> >> +    if (!s->enabled_capabilities[MIGRATION_CAPABILITY_VHOST_USER_FS]) {
-> >> +        error_report("Migration of vhost-user-fs devices requires internal FUSE "
-> >> +                     "state of backend to be preserved. If orchestrator can "
-> >> +                     "guarantee this (e.g. dst connects to the same backend "
-> >> +                     "instance or backend state is migrated) set 'vhost-user-fs' "
-> >> +                     "migration capability to true to enable migration.");
-> >> +        return -1;
-> >> +    }
-> >> +
-> >> +    return 0;
-> >> +}
-> >> +
-> >>   static const VMStateDescription vuf_vmstate = {
-> >>       .name = "vhost-user-fs",
-> >> -    .unmigratable = 1,
-> >> +    .minimum_version_id = 0,
-> >> +    .version_id = 0,
-> >> +    .fields = (VMStateField[]) {
-> >> +        VMSTATE_VIRTIO_DEVICE,
-> >> +        VMSTATE_END_OF_LIST()
-> >> +    },
-> >> +   .pre_save = vhost_user_fs_pre_save,
-> >>   };
-> > Will it be possible to extend this vmstate when virtiofsd adds support
-> > for stateful migration without breaking migration compatibility?
-> >
-> > If not, then I think a marker field should be added to the vmstate:
-> > 0 - stateless/reconnect migration (the approach you're adding in this patch)
-> > 1 - stateful migration (future virtiofsd feature)
-> >
-> > When the field is 0 there are no further vmstate fields and we trust
-> > that the destination vhost-user-fs server already has the necessary
-> > state.
-> >
-> > When the field is 1 there are additional vmstate fields that contain
-> > the virtiofsd state.
-> >
-> > The goal is for QEMU to support 3 migration modes, depending on the
-> > vhost-user-fs server:
-> > 1. No migration support.
-> > 2. Stateless migration.
-> > 3. Stateful migration.
+> It was supposed to be a test for virtiofsd, so it doesn=E2=80=99t really =
+make
+> sense to run it with the system-wide daemon, I think.
 >
-> Sure. These vmstate fields are very generic and mandatory for any
-> virtio device. If in future more state can be transfer in migration
-> stream the vmstate can be extended with additional fields. This can
-> be done with new subsections and/or bumping version_id.
+> Maybe there=E2=80=99s some way we can move the test to the Rust repo?=C2=
+=A0 I=E2=80=99ll
+> take a look.
 
-My concern is that the vmstate introduced in this patch may be
-unusable when stateful migration is added. So additional compatibility
-code will need to be introduced to make your stateless migration
-continue working with extended vmstate.
-
-By adding a marker field in this patch it should be possible to
-continue using the same vmstate for stateless migration without adding
-extra compatibility code in the future.
-
-> The main purpose of this patch is to allow update VM to newer version
-> of qemu via local migration without disruption to guest. And future
-> versions hopefully could pack more state from external environment
-> to migration stream.
->
->
-> >
-> >>   static Property vuf_properties[] = {
-> >> diff --git a/qapi/migration.json b/qapi/migration.json
-> >> index 88ecf86ac8..9a229ea884 100644
-> >> --- a/qapi/migration.json
-> >> +++ b/qapi/migration.json
-> >> @@ -477,6 +477,11 @@
-> >>   #                    will be handled faster.  This is a performance feature and
-> >>   #                    should not affect the correctness of postcopy migration.
-> >>   #                    (since 7.1)
-> >> +# @vhost-user-fs: If enabled, the migration process will allow migration of
-> >> +#                 vhost-user-fs devices, this should be enabled only when
-> >> +#                 backend can preserve local FUSE state e.g. for qemu update
-> >> +#                 when dst reconects to the same endpoints after migration.
-> >> +#                 (since 8.0)
-> > This is global but a guest can have multiple vhost-user-fs devices
-> > connected to different servers.
-> AFAIK vhost-user requires unix socket and memory shared from guest so
-> devices can't be connected to different servers, just to different
-> endpoints on current host.
-
-Different vhost-user-fs server software. vhost-user-fs is a protocol,
-there can be multiple server implementations. These implementations
-may have different capabilities (some may not support stateless
-migration). So I think stateless migration should be a per-instance
-setting, not global.
+Do you want to use cargo to install the daemons? If so could we make the
+support generic enough so we could also start using the vhost-device
+daemons for tests?
 
 >
-> >
-> > I would add a qdev property to the device instead of introducing a
-> > migration capability. The property would enable "stateless migration".
-> > When the property is not set, migration would be prohibited.
-> I did thought about that, but this is really not a property of device,
-> this is the capability of management software and applies to exactly one
-> particular migration process that it initiates. It should not persist
-> across migration or be otherwise stored in device.
+> Hanna
 
-I disagree. The vhost-user-fs server software must implement stateless
-migration in order for this to work. For example,
-https://gitlab.com/virtio-fs/virtiofsd doesn't support stateless
-migration as far as I know.
 
->
-> The idea here is that orchestrator can ensure destination qemu will
-> run on the same host, will reconnect to the same unix sockets and only
-> then sets the flag (because inside qemu we can't know anything about
-> the destination).
-> This is somewhat similar to ignore-shared migration capability when
-> qemu avoids saving and loading guest memory that is stores in shmem
-> because it will be picked up by destination process right where source
-> left it.
->
-> >>   #
-> >>   # Features:
-> >>   # @unstable: Members @x-colo and @x-ignore-shared are experimental.
-> >> @@ -492,7 +497,7 @@
-> >>              'dirty-bitmaps', 'postcopy-blocktime', 'late-block-activate',
-> >>              { 'name': 'x-ignore-shared', 'features': [ 'unstable' ] },
-> >>              'validate-uuid', 'background-snapshot',
-> >> -           'zero-copy-send', 'postcopy-preempt'] }
-> >> +           'zero-copy-send', 'postcopy-preempt', 'vhost-user-fs'] }
-> >>
-> >>   ##
-> >>   # @MigrationCapabilityStatus:
-> >> --
-> >> 2.34.1
-> >>
-> >>
+--=20
+Alex Benn=C3=A9e
+Virtualisation Tech Lead @ Linaro
 

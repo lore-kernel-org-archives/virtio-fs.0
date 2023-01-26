@@ -1,13 +1,21 @@
-Return-Path: <stefanha@redhat.com>
-Date: Wed, 25 Jan 2023 14:46:00 -0500
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <Y9GG+EXX03TAvWDS@fedora>
-References: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
+Return-Path: <antonkuchin@yandex-team.ru>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+ s=default; 
+ t=1674742827; bh=usHkwP9CTC23WzDx4Lh0qFG4ZtMXseINEaOo2hr4zpA=;
+ h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
+ b=pNow/AWTSnNRTDkLnQUiOR4EP0vvpYKjMEvSWx+FHxUFmfeuYA87WZdDI+IBkkDwg
+ 31SXPdbC6CaKcCOB83Tpc7RIM7CKUhA0r0D6PaBbWognPNkp8ZtK8y5flOUTq28TcH
+ e7mETdkowDTm/3og2S6OnoXOBvSB0wuoR31WQRYQ=
+Message-ID: <64c249a5-98c2-24a0-d036-c76bb2f0a19a@yandex-team.ru>
+Date: Thu, 26 Jan 2023 16:20:24 +0200
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="ygiLBLz14JAm0xgO"
-Content-Disposition: inline
-In-Reply-To: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
+References: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
+ <Y9GG+EXX03TAvWDS@fedora>
+From: Anton Kuchin <antonkuchin@yandex-team.ru>
+In-Reply-To: <Y9GG+EXX03TAvWDS@fedora>
+Content-Language: en-US, ru-RU
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
 Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: add capability to allow
  migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -18,71 +26,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Anton Kuchin <antonkuchin@yandex-team.ru>
+To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Juan Quintela <quintela@redhat.com>, yc-core@yandex-team.ru, "Michael S. Tsirkin" <mst@redhat.com>
 
+On 25/01/2023 21:46, Stefan Hajnoczi wrote:
+> On Sun, Jan 15, 2023 at 07:09:03PM +0200, Anton Kuchin wrote:
+>> Now any vhost-user-fs device makes VM unmigratable, that also prevents
+>> qemu update without stopping the VM. In most cases that makes sense
+>> because qemu has no way to transfer FUSE session state.
+>>
+>> But we can give an option to orchestrator to override this if it can
+>> guarantee that state will be preserved (e.g. it uses migration to
+>> update qemu and dst will run on the same host as src and use the same
+>> socket endpoints).
+>>
+>> This patch keeps default behavior that prevents migration with such devices
+>> but adds migration capability 'vhost-user-fs' to explicitly allow migration.
+>>
+>> Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
+>> ---
+>>   hw/virtio/vhost-user-fs.c | 25 ++++++++++++++++++++++++-
+>>   qapi/migration.json       |  7 ++++++-
+>>   2 files changed, 30 insertions(+), 2 deletions(-)
+> Hi Anton,
+> Sorry for holding up your work with the discussions that we had. I still
+> feel it's important to agree on command-line and/or vhost-user protocol
+> changes that will be able to support non-migratable, stateless
+> migration/reconnect, and stateful migration vhost-user-fs back-ends. All
+> three will exist.
+>
+> As a next step, could you share your code that implements the QEMU side
+> of stateless migration?
+>
+> I think that will make it clearer whether a command-line option
+> (migration capability or per-device) is sufficient or whether the
+> vhost-user protocol needs to be extended.
+>
+> If the vhost-user protocol is extended then maybe no user-visible
+> changes are necessary. QEMU will know if the vhost-user-fs backend
+> supports migration and which type of migration. It can block migration
+> in cases where it's not possible.
+>
+> Thanks,
+> Stefan
 
---ygiLBLz14JAm0xgO
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
 
-On Sun, Jan 15, 2023 at 07:09:03PM +0200, Anton Kuchin wrote:
-> Now any vhost-user-fs device makes VM unmigratable, that also prevents
-> qemu update without stopping the VM. In most cases that makes sense
-> because qemu has no way to transfer FUSE session state.
->=20
-> But we can give an option to orchestrator to override this if it can
-> guarantee that state will be preserved (e.g. it uses migration to
-> update qemu and dst will run on the same host as src and use the same
-> socket endpoints).
->=20
-> This patch keeps default behavior that prevents migration with such devic=
-es
-> but adds migration capability 'vhost-user-fs' to explicitly allow migrati=
-on.
->=20
-> Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
-> ---
->  hw/virtio/vhost-user-fs.c | 25 ++++++++++++++++++++++++-
->  qapi/migration.json       |  7 ++++++-
->  2 files changed, 30 insertions(+), 2 deletions(-)
+Thank you, Stefan,
 
-Hi Anton,
-Sorry for holding up your work with the discussions that we had. I still
-feel it's important to agree on command-line and/or vhost-user protocol
-changes that will be able to support non-migratable, stateless
-migration/reconnect, and stateful migration vhost-user-fs back-ends. All
-three will exist.
+That's OK. The discussion is very helpful and showed me some parts
+that should to be checked to make sure no harm is done by this feature.
+I needed some time to step back, review my approach to this feature
+with all valuable feedback and ideas that were suggested and check
+what other backend implementations can or can't do.
+I'll answer today the emails with questions that were addressed to me.
 
-As a next step, could you share your code that implements the QEMU side
-of stateless migration?
+This is all the code that QEMU needs to support stateless migration.
+Do you mean backend and/or orchestrator parts?
 
-I think that will make it clearer whether a command-line option
-(migration capability or per-device) is sufficient or whether the
-vhost-user protocol needs to be extended.
+I'll think of how protocol extension can help us make this feature
+transparent to users.
 
-If the vhost-user protocol is extended then maybe no user-visible
-changes are necessary. QEMU will know if the vhost-user-fs backend
-supports migration and which type of migration. It can block migration
-in cases where it's not possible.
-
-Thanks,
-Stefan
-
---ygiLBLz14JAm0xgO
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmPRhvgACgkQnKSrs4Gr
-c8izOgf/byjN54t5uv1VugMSLblTq6dHpjGJDpdmjIb7QjBk/VTe57XFhBOp4VEg
-mlDNTVHBc4lU0NHize5dueoW8wUMKT+gQq8Tb6O5VabHZA1NJVQ2TOrlwWt4Q6bn
-eS3IAIRB+4JoFPlYzJMa9MhkEjbnlJ6yYpVvuo8tNfTOMCHdirDiBWx/P43F0X2W
-6TNkpr56+NixIO5E0wfnKPfkiS083h9PqVYFy7WH6debjBM+IRyBSaRSaLpgJRHt
-a8D4rjb+XFxW71qFFMK3XWa/8sy2MfLCW2oPC1Zc137ItjqxaxRwqiZKsrU79GLi
-WuQcgk2e7RYTUbLRfJXdbrH27j0N8g==
-=VwlJ
------END PGP SIGNATURE-----
-
---ygiLBLz14JAm0xgO--

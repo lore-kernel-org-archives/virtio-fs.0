@@ -1,14 +1,22 @@
-Return-Path: <mst@redhat.com>
-Date: Mon, 30 Jan 2023 14:09:57 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20230130140947-mutt-send-email-mst@kernel.org>
-References: <20230130140225.77964-1-akihiko.odaki@daynix.com>
+Return-Path: <vsementsov@yandex-team.ru>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+ s=default; 
+ t=1675154003; bh=/ZzzXnxJEUhn1s6JzrmNCMDRn/vHMwKPIB2mhIMVEtg=;
+ h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
+ b=UNWvpsrE/NP5qGkRgDHvkICtiAG4GotoGADlg4qZgB1KUoXTKpQBLxJYZlpHXOZvL
+ SfZqo1MfuoDmqNsUmsfE55g/WgnmbQdBsDO5I3oZ8/V2oVCRIP6WDf2XFWgRNwUTN6
+ bCXU6jO6JIEVahr3oVJOAqXPXuUQbigONyMI7yFQ=
+Message-ID: <f37db85a-b0aa-b34a-7d5a-b1ab650f1683@yandex-team.ru>
+Date: Tue, 31 Jan 2023 11:33:22 +0300
 MIME-Version: 1.0
-In-Reply-To: <20230130140225.77964-1-akihiko.odaki@daynix.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: Back up vqs before cleaning
- up vhost_dev
+References: <20230130080608.2100-1-quintela@redhat.com>
+From: Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>
+In-Reply-To: <20230130080608.2100-1-quintela@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v3] migration: Remove res_compatible
+ parameter
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,44 +25,19 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Akihiko Odaki <akihiko.odaki@daynix.com>
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Juan Quintela <quintela@redhat.com>, qemu-devel@nongnu.org
+Cc: Jason Wang <jasowang@redhat.com>, qemu-arm@nongnu.org, Hanna Reitz <hreitz@redhat.com>, Halil Pasic <pasic@linux.ibm.com>, Eric Blake <eblake@redhat.com>, Michael Tokarev <mjt@tls.msk.ru>, Fam Zheng <fam@euphon.net>, David Hildenbrand <david@redhat.com>, Alex Williamson <alex.williamson@redhat.com>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Ilya Leoshkevich <iii@linux.ibm.com>, "Michael S. Tsirkin" <mst@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eric Farman <farman@linux.ibm.com>, qemu-s390x@nongnu.org, Kevin Wolf <kwolf@redhat.com>, qemu-block@nongnu.org, Pavel Dovgalyuk <pavel.dovgaluk@ispras.ru>, Laurent Vivier <lvivier@redhat.com>, Christian Borntraeger <borntraeger@linux.ibm.com>, Gerd Hoffmann <kraxel@redhat.com>, Thomas Huth <thuth@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Peter Maydell <peter.maydell@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, Eduardo Habkost <eduardo@habkost.net>, Klaus Jensen <its@irrelevant.dk>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Laurent Vivier <laurent@vivier.eu>, Xiaojuan Yang <yangxiaojuan@loongson.cn>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Keith Busch <kbusch@kernel.org>, Thomas Huth <huth@tuxfamily.org>, Song Gao <gaosong@loongson.cn>, Richard Henderson <richard.henderson@linaro.org>, Paolo Bonzini <pbonzini@redhat.com>, qemu-trivial@nongnu.org, virtio-fs@redhat.com
 
-On Mon, Jan 30, 2023 at 11:02:25PM +0900, Akihiko Odaki wrote:
-> vhost_dev_cleanup() clears vhost_dev so back up its vqs member to free
-> the memory pointed by the member.
-> 
-> Fixes: 98fc1ada4c ("virtio: add vhost-user-fs base device")
-> Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
+On 1/30/23 11:06, Juan Quintela wrote:
+> It was only used for RAM, and in that case, it means that this amount
+> of data was sent for memory.  Just delete the field in all callers.
 
-Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+Could you describe, why it's safe to change the behavior for RAM?
 
-> ---
->  hw/virtio/vhost-user-fs.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> index f5049735ac..83fc20e49e 100644
-> --- a/hw/virtio/vhost-user-fs.c
-> +++ b/hw/virtio/vhost-user-fs.c
-> @@ -273,6 +273,7 @@ static void vuf_device_unrealize(DeviceState *dev)
->  {
->      VirtIODevice *vdev = VIRTIO_DEVICE(dev);
->      VHostUserFS *fs = VHOST_USER_FS(dev);
-> +    struct vhost_virtqueue *vhost_vqs = fs->vhost_dev.vqs;
->      int i;
->  
->      /* This will stop vhost backend if appropriate. */
-> @@ -288,8 +289,7 @@ static void vuf_device_unrealize(DeviceState *dev)
->      }
->      g_free(fs->req_vqs);
->      virtio_cleanup(vdev);
-> -    g_free(fs->vhost_dev.vqs);
-> -    fs->vhost_dev.vqs = NULL;
-> +    g_free(vhost_vqs);
->  }
->  
->  static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
-> -- 
-> 2.39.1
+Also, I think it would be a lot better to split the change for RAM (s/res_compatible/res_postcopy) in one patch, and then drop the totally unused res_compatible file in the second patch
+
+
+-- 
+Best regards,
+Vladimir
 

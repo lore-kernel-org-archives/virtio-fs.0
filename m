@@ -1,16 +1,18 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-In-Reply-To: <f37db85a-b0aa-b34a-7d5a-b1ab650f1683@yandex-team.ru> (Vladimir
- Sementsov-Ogievskiy's message of "Tue, 31 Jan 2023 11:33:22 +0300")
-References: <20230130080608.2100-1-quintela@redhat.com>
- <f37db85a-b0aa-b34a-7d5a-b1ab650f1683@yandex-team.ru>
-Reply-To: quintela@redhat.com
-Date: Thu, 02 Feb 2023 11:12:45 +0100
-Message-ID: <87v8kktlya.fsf@secure.mitica>
+Return-Path: <alpha754293@hotmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=hotmail.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=kvBgFk4dHSdPl15EuHoHgAxBFb7M4f/SOpOlT6eMgxo=;
+ b=JfGQN3vY3lUn4M9DUuDV3ytNNXbl9NiwFqsZTRDvL8hYVCWb6S/BSKu1bkYN9aJRzzJXz/UWk1AOMbtNE0BBa7V0yjCkN5cIjs9hC4Y1QlPgLVYkQbArBk1zLCdLwdLE9yzcmij9ofNcXtE+vnVCQwJxI+8FRI2PUqUSgAgmIsZ1/CvcOG4TL6xCQuet8tLkmmhWqtQjsaI78hBPqVCyagix++J7KXJKu6cv3JTxprqsRzCjR0cVGdgbqyVirZbm0IvcwMaTv4MpJUSx/Fj05DpjmcZ1ZbKQnUvyFMTK8XEx/68AXbdsLjPqW77S/eEVJwZa7HSBNSsFkw+h/l6rOA==
+From: Ewen Chan <alpha754293@hotmail.com>
+Date: Sun, 5 Feb 2023 03:46:02 +0000
+Message-ID: <SA1P221MB1018DDC00E1C808EE30D19B4B5D59@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH v3] migration: Remove res_compatible
- parameter
+Content-Language: en-CA
+Content-Type: multipart/alternative;
+ boundary="_000_SA1P221MB1018DDC00E1C808EE30D19B4B5D59SA1P221MB1018NAMP_"
+Subject: [Virtio-fs] How do I start the Windows Virtio-FS service with a
+ different, permanent drive letter that isn't Z?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,86 +21,136 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>
-Cc: qemu-devel@nongnu.org, Jason Wang <jasowang@redhat.com>, qemu-arm@nongnu.org, Hanna Reitz <hreitz@redhat.com>, Halil Pasic <pasic@linux.ibm.com>, Eric Blake <eblake@redhat.com>, Michael Tokarev <mjt@tls.msk.ru>, Fam Zheng <fam@euphon.net>, David Hildenbrand <david@redhat.com>, Alex Williamson <alex.williamson@redhat.com>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Ilya Leoshkevich <iii@linux.ibm.com>, "Michael S. Tsirkin" <mst@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eric Farman <farman@linux.ibm.com>, qemu-s390x@nongnu.org, Kevin Wolf <kwolf@redhat.com>, qemu-block@nongnu.org, Pavel Dovgalyuk <pavel.dovgaluk@ispras.ru>, Laurent Vivier <lvivier@redhat.com>, Christian Borntraeger <borntraeger@linux.ibm.com>, Gerd Hoffmann <kraxel@redhat.com>, Thomas Huth <thuth@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Peter Maydell <peter.maydell@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>, Eduardo Habkost <eduardo@habkost.net>, Klaus Jensen <its@irrelevant.dk>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Laurent Vivier <laurent@vivier.eu>, Xiaojuan Yang <yangxiaojuan@loongson.cn>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Keith Busch <kbusch@kernel.org>, Thomas Huth <huth@tuxfamily.org>, Song Gao <gaosong@loongson.cn>, Richard Henderson <richard.henderson@linaro.org>, Paolo Bonzini <pbonzini@redhat.com>, qemu-trivial@nongnu.org, virtio-fs@redhat.com
+To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru> wrote:
-> On 1/30/23 11:06, Juan Quintela wrote:
->> It was only used for RAM, and in that case, it means that this amount
->> of data was sent for memory.  Just delete the field in all callers.
->
-> Could you describe, why it's safe to change the behavior for RAM?
+--_000_SA1P221MB1018DDC00E1C808EE30D19B4B5D59SA1P221MB1018NAMP_
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 
-I will start for the change in migration.c
+To Whom It May Concern:
 
--    uint64_t pend_pre, pend_compat, pend_post;
-+    uint64_t pend_pre, pend_post;
-     bool in_postcopy = s->state == MIGRATION_STATUS_POSTCOPY_ACTIVE;
- 
--    qemu_savevm_state_pending_estimate(&pend_pre, &pend_compat, &pend_post);
--    uint64_t pending_size = pend_pre + pend_compat + pend_post;
+I was following the instructions in regards to getting Virtio-FS running on=
+ a Windows 10 VM in Proxmox 7.3-3 and that part works fine.
 
-Here we add the three to pending_size, so it don't matter.
+However, at the end of those instructions, it says that I can use the "-m" =
+in the command line to explicitly set a drive letter.
 
-+    qemu_savevm_state_pending_estimate(&pend_pre, &pend_post);
-+    uint64_t pending_size = pend_pre + pend_post;
- 
--    trace_migrate_pending_estimate(pending_size,
--                                   pend_pre, pend_compat, pend_post);
-+    trace_migrate_pending_estimate(pending_size, pend_pre, pend_post);
+I tried editing the VirtioFsSvc service in the Windows Registry Editor eith=
+er by changing the ImagePath or trying to add the Parameters registry key a=
+nd neither seemed to work.
 
-Trace, we don't care again.
+Is there a way for me to be able to pass the start parameters so that it wo=
+uld use those the "-m" option automatically?
 
--    if (pend_pre + pend_compat <= s->threshold_size) {
+I even tried creating a really simple batch file, but that leaves a command=
+ prompt window open, where once I close said command prompt window (even if=
+ I run the batch file in background mode), it will close/disconnect the Vir=
+tio-FS connection in said Windows 10 VM.
 
-We do the test on pend_pre + pend_compat.
-So, the only place where we are using pend_compat alone is on trace
-messages.
+Your help is greatly appreciated.
 
-I guess we can agree that changing trace messages don't matter.
+Thank you.
 
+Sincerely,
+Ewen
 
--        qemu_savevm_state_pending_exact(&pend_pre, &pend_compat, &pend_post);
--        pending_size = pend_pre + pend_compat + pend_post;
--        trace_migrate_pending_exact(pending_size,
--                                    pend_pre, pend_compat, pend_post);
-+    if (pend_pre <= s->threshold_size) {
-+        qemu_savevm_state_pending_exact(&pend_pre, &pend_post);
-+        pending_size = pend_pre + pend_post;
-+        trace_migrate_pending_exact(pending_size, pend_pre, pend_post);
+--_000_SA1P221MB1018DDC00E1C808EE30D19B4B5D59SA1P221MB1018NAMP_
+Content-Type: text/html; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
+1">
+<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
+ttom:0;} </style>
+</head>
+<body dir=3D"ltr">
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+To Whom It May Concern:<br>
+<br>
+I was following the instructions in regards to getting Virtio-FS running on=
+ a Windows 10 VM in Proxmox 7.3-3 and that part works fine.</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+However, at the end of those instructions, it says that I can use the &quot=
+;-m&quot; in the command line to explicitly set a drive letter.</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+I tried editing the VirtioFsSvc service in the Windows Registry Editor eith=
+er by changing the ImagePath or trying to add the Parameters registry key a=
+nd neither seemed to work.</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+Is there a way for me to be able to pass the start parameters so that it wo=
+uld use those the &quot;-m&quot; option automatically?</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+I even tried creating a really simple batch file, but that leaves a command=
+ prompt window open, where once I close said command prompt window (even if=
+ I run the batch file in background mode), it will close/disconnect the Vir=
+tio-FS connection in said Windows
+ 10 VM.</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+Your help is greatly appreciated.</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+Thank you.</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+Sincerely,</div>
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0); background-color: rgb(255, 255, 255);" class=3D"eleme=
+ntToProof">
+Ewen<br>
+</div>
+</body>
+</html>
 
-Ok, Now go to ram.c changes:
-
-The only change that we do is that if we are on postcopy, we add the
-
-@@ -3448,9 +3444,9 @@ static void ram_state_pending_exact(void *opaque,
- 
-     if (migrate_postcopy_ram()) {
-         /* We can do postcopy, and all the data is postcopiable */
--        *res_compatible += remaining_size;
-+        *res_postcopy += remaining_size;
-     } else {
--        *res_precopy_only += remaining_size;
-+        *res_precopy += remaining_size;
-     }
- }
-
-The only use of res_compatible was when we were on postocpy, nothing
-else sets it.
-
-But when we are on postcopy, we can send that pages trough postcopy, so
-we add them there and if we are on precopy, res_compatible was already zero.
-
-So I think that is ok, i.e. no behaviour change.
-
-What do you think?
-
-> Also, I think it would be a lot better to split the change for RAM
-> (s/res_compatible/res_postcopy) in one patch, and then drop the
-> totally unused res_compatible file in the second patch
-
-Ok, will do for next version.
-
-Later, Juan.
+--_000_SA1P221MB1018DDC00E1C808EE30D19B4B5D59SA1P221MB1018NAMP_--
 

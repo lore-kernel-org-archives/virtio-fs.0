@@ -1,16 +1,14 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-In-Reply-To: <CAJSP0QUO3i+tLfDE0sdNRePnoaqJ7TL29izmk5sDzRt83Ds8tQ@mail.gmail.com>
- (Stefan Hajnoczi's message of "Mon, 6 Feb 2023 16:16:22 -0500")
+Return-Path: <hreitz@redhat.com>
+Message-ID: <f26dd5ed-fa02-faeb-fadb-0dbfbe7792d3@redhat.com>
+Date: Tue, 7 Feb 2023 10:08:23 +0100
+MIME-Version: 1.0
 References: <fb523956-7a8c-608b-6db1-961686b73e9c@redhat.com>
  <CAJSP0QWnq6av7j6x_n-C2mLSPMYBhMeEthr6ayPN-cmsEB3UnA@mail.gmail.com>
- <87mt5qv76d.fsf@secure.mitica>
- <CAJSP0QUO3i+tLfDE0sdNRePnoaqJ7TL29izmk5sDzRt83Ds8tQ@mail.gmail.com>
-Reply-To: quintela@redhat.com
-Date: Tue, 07 Feb 2023 00:58:27 +0100
-Message-ID: <87ilgeuz18.fsf@secure.mitica>
-MIME-Version: 1.0
-Content-Type: text/plain
+From: Hanna Czenczek <hreitz@redhat.com>
+In-Reply-To: <CAJSP0QWnq6av7j6x_n-C2mLSPMYBhMeEthr6ayPN-cmsEB3UnA@mail.gmail.com>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] vhost-user (virtio-fs) migration: back end state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -21,53 +19,137 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@gmail.com>
-Cc: Hanna Czenczek <hreitz@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, =?utf-8?Q?Marc-Andr?= =?utf-8?Q?=C3=A9?= Lureau <marcandre.lureau@redhat.com>, Eugenio =?utf-8?Q?P=C3=A9rez?= <eperezma@redhat.com>, Jason Wang <jasowang@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Dave Gilbert <dgilbert@redhat.com>
+Cc: Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Jason Wang <jasowang@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Dave Gilbert <dgilbert@redhat.com>, Juan Quintela <quintela@redhat.com>
 
-Stefan Hajnoczi <stefanha@gmail.com> wrote:
-> On Mon, 6 Feb 2023 at 16:02, Juan Quintela <quintela@redhat.com> wrote:
->> The last two bits are on my ToDo list for the near future, but not done.
+On 06.02.23 17:27, Stefan Hajnoczi wrote:
+> On Mon, 6 Feb 2023 at 07:36, Hanna Czenczek <hreitz@redhat.com> wrote:
+>> Hi Stefan,
 >>
->> If we ended having lots of so big devices, we are going to have to think
->> about downtimes in the order of dozens of seconds, not subsecond.
+>> For true virtio-fs migration, we need to migrate the daemon’s (back
+>> end’s) state somehow.  I’m addressing you because you had a talk on this
+>> topic at KVM Forum 2021. :)
 >>
->> So, if you are planning doing this in the near future, this is a good
->> time to discuss this.
+>> As far as I understood your talk, the only standardized way to migrate a
+>> vhost-user back end’s state is via dbus-vmstate.  I believe that
+>> interface is unsuitable for our use case, because we will need to
+>> migrate more than 1 MB of state.  Now, that 1 MB limit has supposedly
+>> been chosen arbitrarily, but the introducing commit’s message says that
+>> it’s based on the idea that the data must be supplied basically
+>> immediately anyway (due to both dbus and qemu migration requirements),
+>> and I don’t think we can meet that requirement.
+> Yes, dbus-vmstate is the available today. It's independent of
+> vhost-user and VIRTIO.
 >
-> Can you explain the dirty bitmap requirement you mentioned further, given that:
-> 1. vhost-user has dirty memory logging already, so DMA is covered.
-> 2. An iterative interface allows the device to keep generating more
-> state, so does QEMU really need to know if parts of the previously
-> emitted binary blob have become dirty? It might allow QEMU to minimize
-> the size of the savevm file, but only if the overwritten data has the
-> same size.
+>> Has there been progress on the topic of standardizing a vhost-user back
+>> end state migration channel besides dbus-vmstate?  I’ve looked around
+>> but didn’t find anything.  If there isn’t anything yet, is there still
+>> interest in the topic?
+> Not that I'm aware of. There are two parts to the topic of VIRTIO
+> device state migration:
+> 1. Defining an interface for migrating VIRTIO/vDPA/vhost/vhost-user
+> devices. It doesn't need to be implemented in all these places
+> immediately, but the design should consider that each of these
+> standards will need to participate in migration sooner or later. It
+> makes sense to choose an interface that works for all or most of these
+> interfaces instead of inventing something vhost-user-specific.
+> 2. Defining standard device state formats so VIRTIO implementations
+> can interoperate.
 >
-> Is a dirty bitmap for the device state necessary?
+>> Of course, we could use a channel that completely bypasses qemu, but I
+>> think we’d like to avoid that if possible.  First, this would require
+>> adding functionality to virtiofsd to configure this channel.  Second,
+>> not storing the state in the central VM state means that migrating to
+>> file doesn’t work (well, we could migrate to a dedicated state file,
+>> but...).  Third, setting up such a channel after virtiofsd has sandboxed
+>> itself is hard.  I guess we should set up the migration channel before
+>> sandboxing, which constrains runtime configuration (basically this would
+>> only allow us to set up a listening server, I believe).  Well, and
+>> finally, it isn’t a standard way, which won’t be great if we’re planning
+>> to add a standard way anyway.
+> Yes, live migration is hard enough. Duplicating it is probably not
+> going to make things better. It would still be necessary to support
+> saving to file as well as live migration.
+>
+> There are two high-level approaches to the migration interface:
+> 1. The whitebox approach where the vhost-user back-end implements
+> device-specific messages to get/set migration state (e.g.
+> VIRTIO_FS_GET_DEVICE_STATE with a struct virtio_fs_device_state
+> containing the state of the FUSE session or multiple fine-grained
+> messages that extract pieces of state). The hypervisor is responsible
+> for the actual device state serialization.
+> 2. The blackbox approach where the vhost-user back-end implements the
+> device state serialization itself and just produces a blob of data.
 
-Not for that.  My fault.  I was talking about a dirty bitmap because
-that is how it is implemented in vfio.  Notice that qemu don't see that
-bitmap.  But the device can enter the iterative stage.
+Implementing this through device-specific messages sounds quite nice to 
+me, and I think this would work for the blackbox approach, too. The 
+virtio-fs device in qemu (the front end stub) would provide that data as 
+its VM state then, right?
 
-The reason that I ask is if you can enter the iterative stage to send
-stuff before the last stage.
+I’m not sure at this point whether it is sensible to define a 
+device-specific standard for the state (i.e. the whitebox approach).  I 
+think that it may be too rigid if we decide to extend it in the future.  
+As far as I understand, the benefit is that it would allow for 
+interoperability between different virtio-fs back end implementations, 
+which isn’t really a concern right now.  If we need this in the future, 
+I’m sure we can extend the protocol further to alternatively use 
+standardized state.  (Which can easily be turned back into a blob if 
+compatibility requires it.)
 
-If you don't have something similar to that, you need to send that in
-one go, and that is going to take really a lot of time.
+I think we’ll probably want a mix of both, where it is standardized that 
+the state consists of information about each FUSE inode and each open 
+handle, but that information itself is treated as a blob.
 
-When we are talking about NVidia GPU's, they have two kinds of state:
-- Frame buffer: they can (or at some point would have) a dirty bitmap
-  and they can enter the iterative stage.
-- They have internal state that is not visible to the user, that state
-  is big (around 1GB) and they can't enter the iterative stage, because
-  they can't know if the guest, the card, or whoever has changed that.
+> An example of the whitebox approach is the existing vhost migration
+> interface - except that it doesn't really support device-specific
+> state, only generic virtqueue state.
+>
+> An example of the blackbox approach is the VFIO v2 migration interface:
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/vfio.h#n867
+>
+> Another aspect to consider is whether save/load is sufficient or if
+> the full iterative migration model needs to be exposed by the
+> interface. VFIO migration is an example of the full iterative model
+> while dbus-vmstate is just save/load. Devices with large amounts of
+> state need the full iterative model while simple devices just need
+> save/load.
 
-For vhost device:
-- what is the "typical" amount of state.
-- if it is more than a few megabytes, is there a way to send parts of it
-  before the ending stage?  That is what I asked for a dirty bitmap for
-  it, but it can be anything else.  Just that vhost-user keep track of
-  what has sent to the other side and then have less state for the last
-  stage?
-  
+Yes, we will probably need an iterative model.  Splitting the state into 
+information about each FUSE inode/handle (so that single inodes/handles 
+can be updated if needed) should help accomplish this.
 
-Later, Juan.
+> Regarding virtiofs, I think the device state is not
+> implementation-specific. Different implementations may have different
+> device states (e.g. in-memory file system implementation versus POSIX
+> file system-backed implementation), but the device state produced by
+> https://gitlab.com/virtio-fs/virtiofsd can probably also be loaded by
+> another implementation.
+
+Difficult to say.  What seems universal to us now may well not be, 
+because we’re just seeing our own implementation.  I think we’ll just 
+serialize it in a way that makes sense to us now, and hope it’ll make 
+sense to others too should the need arise.
+
+> My suggestion is blackbox migration with a full iterative interface.
+> The reason I like the blackbox approach is that a device's device
+> state is encapsulated in the device implementation and does not
+> require coordinating changes across other codebases (e.g. vDPA and
+> vhost kernel interface, vhost-user protocol, QEMU, etc). A blackbox
+> interface only needs to be defined and implemented once. After that,
+> device implementations can evolve without constant changes at various
+> layers.
+
+Agreed.
+
+> So basically, something like VFIO v2 migration but for vhost-user
+> (with an eye towards vDPA and VIRTIO support in the future).
+>
+> Should we schedule a call with Jason, Michael, Juan, David, etc to
+> discuss further? That way there's less chance of spending weeks
+> working on something only to be asked to change the approach later.
+
+Sure, sounds good!  I’ve taken a look into what state we’ll need to 
+migrate already, but I’ll take a more detailed look now so that it’s 
+clear what our requirements are.
+
+Hanna
 

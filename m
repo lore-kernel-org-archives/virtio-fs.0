@@ -1,11 +1,13 @@
 Return-Path: <stefanha@redhat.com>
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu,  9 Feb 2023 10:25:14 -0500
-Message-Id: <20230209152520.434183-1-stefanha@redhat.com>
+Date: Thu,  9 Feb 2023 10:25:15 -0500
+Message-Id: <20230209152520.434183-2-stefanha@redhat.com>
+In-Reply-To: <20230209152520.434183-1-stefanha@redhat.com>
+References: <20230209152520.434183-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 0/6] Block patches
+Subject: [Virtio-fs] [PULL 1/6] vhost-user-fs: Back up vqs before cleaning
+ up vhost_dev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,49 +17,43 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, qemu-block@nongnu.org, Stefan Hajnoczi <stefanha@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, qemu-block@nongnu.org, Stefan Hajnoczi <stefanha@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-The following changes since commit 417296c8d8588f782018d01a317f88957e9786d6:
+From: Akihiko Odaki <akihiko.odaki@daynix.com>
 
-  tests/qtest/netdev-socket: Raise connection timeout to 60 seconds (2023-02-09 11:23:53 +0000)
+vhost_dev_cleanup() clears vhost_dev so back up its vqs member to free
+the memory pointed by the member.
 
-are available in the Git repository at:
+Fixes: 98fc1ada4c ("virtio: add vhost-user-fs base device")
+Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Message-Id: <20230130140225.77964-1-akihiko.odaki@daynix.com>
+---
+ hw/virtio/vhost-user-fs.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-  https://gitlab.com/stefanha/qemu.git tags/block-pull-request
-
-for you to fetch changes up to acbc8aee5b09222dc6a5cb88306b67bcbe37e30b:
-
-  iotests/detect-zeroes-registered-buf: add new test (2023-02-09 10:22:30 -0500)
-
-----------------------------------------------------------------
-Pull request
-
-A few fixes that I've picked up.
-
-----------------------------------------------------------------
-
-Akihiko Odaki (1):
-  vhost-user-fs: Back up vqs before cleaning up vhost_dev
-
-Emanuele Giuseppe Esposito (1):
-  virtio-blk: add missing AioContext lock
-
-Stefan Hajnoczi (4):
-  block: fix detect-zeroes= with BDRV_REQ_REGISTERED_BUF
-  qemu-io: use BdrvRequestFlags instead of int
-  qemu-io: add -r option to register I/O buffer
-  iotests/detect-zeroes-registered-buf: add new test
-
- block/io.c                                    |   3 +
- hw/block/virtio-blk.c                         |   5 +
- hw/virtio/vhost-user-fs.c                     |   4 +-
- qemu-io-cmds.c                                | 215 +++++++++++-------
- .../tests/detect-zeroes-registered-buf        |  58 +++++
- .../tests/detect-zeroes-registered-buf.out    |   7 +
- 6 files changed, 210 insertions(+), 82 deletions(-)
- create mode 100755 tests/qemu-iotests/tests/detect-zeroes-registered-buf
- create mode 100644 tests/qemu-iotests/tests/detect-zeroes-registered-buf.out
-
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index f5049735ac..83fc20e49e 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -273,6 +273,7 @@ static void vuf_device_unrealize(DeviceState *dev)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+     VHostUserFS *fs = VHOST_USER_FS(dev);
++    struct vhost_virtqueue *vhost_vqs = fs->vhost_dev.vqs;
+     int i;
+ 
+     /* This will stop vhost backend if appropriate. */
+@@ -288,8 +289,7 @@ static void vuf_device_unrealize(DeviceState *dev)
+     }
+     g_free(fs->req_vqs);
+     virtio_cleanup(vdev);
+-    g_free(fs->vhost_dev.vqs);
+-    fs->vhost_dev.vqs = NULL;
++    g_free(vhost_vqs);
+ }
+ 
+ static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
 -- 
 2.39.1
 

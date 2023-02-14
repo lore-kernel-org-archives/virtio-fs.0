@@ -1,25 +1,20 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-In-Reply-To: <626f6e7c-07e4-4aa7-3cce-b96d9fd96d33@yandex-team.ru> (Anton
- Kuchin's message of "Fri, 10 Feb 2023 16:09:23 +0200")
-References: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
- <CAJSP0QVKUKgkBMw1PiN8-L8Ykhq=gfvNTTs4sf1tuzoqHu+GXw@mail.gmail.com>
- <0d57cc40-693b-b36c-a135-fdac60dd00ec@yandex-team.ru>
- <CAJSP0QUXB0kgsCSsmi8dpnJFYho2cR_2Liep=pGmp6WzDZ_7pw@mail.gmail.com>
- <d6bf0b9a-a167-817d-2c17-c2e472961155@yandex-team.ru>
- <CAJSP0QXXe6KgLN2PJvi-5GqcELhUKJPB2pUARL2ktO9TQYAq=g@mail.gmail.com>
- <2fb6efb4-9155-99ad-3acd-c274783436ed@yandex-team.ru>
- <87h6w5ea1m.fsf@secure.mitica>
- <ed9832ec-eaf0-68a4-b7c1-9f1691ab149e@yandex-team.ru>
- <874js4v151.fsf@secure.mitica>
- <626f6e7c-07e4-4aa7-3cce-b96d9fd96d33@yandex-team.ru>
-Reply-To: quintela@redhat.com
-Date: Fri, 10 Feb 2023 17:08:16 +0100
-Message-ID: <87mt5ly03z.fsf@secure.mitica>
+Return-Path: <maxhifitech@gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+ h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
+ :date:message-id:reply-to;
+ bh=uCxsCOypNBk5O8K0P4tOUVeUyWg8wK6wr6cO6OnWsH0=;
+ b=cjWWIbpjXW5r5uCEYo6//OjrcKOwmQCdyaLZulsTjnAXlMT46+ih3DPW93e2g1ydQD
+ 11yXjfE+/naysDW8XoFyfCAGfsOaUsfR+Mv7JpVS5G7fxkLoQ4QANYTblFQRd4n1bIKB
+ xj+QRml9Q92VvnU8KFpKgnAv9ygzCIohnsRZ1X1eAYCe/QDPpfaSpvLASeob7Wpxn/qo
+ ophQLvaK34Ml3egetyTpBgumJiwlm759nHEidHzlu4JVB9tJANjpxYQv/gW+1mETayPj
+ Z3d6OOGrKoQ420GqBBNtdSnFDLbludrIQ2iJvqzmP2Zs9UWaivAIh0/sM5MuiVBb5B0k
+ PJvg==
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: add capability to allow
- migration
+From: Max Huang <maxhifitech@gmail.com>
+Date: Tue, 14 Feb 2023 20:39:21 +0800
+Message-ID: <CAAfuB=2waJP+wasx55Vrkiu4-b+9qm_bnTGeH9WGjruGo9Ax_w@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="0000000000007517f505f4a8418e"
+Subject: [Virtio-fs] Custom-made Hats.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,94 +23,267 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Anton Kuchin <antonkuchin@yandex-team.ru>
-Cc: Stefan Hajnoczi <stefanha@gmail.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, yc-core@yandex-team.ru, "Michael
- S. Tsirkin" <mst@redhat.com>
+To: virtio-fs@redhat.com
 
-Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
-> On 02/02/2023 11:59, Juan Quintela wrote:
->> Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>> On 01/02/2023 16:26, Juan Quintela wrote:
->>>> Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>>>> On 19/01/2023 18:02, Stefan Hajnoczi wrote:
->>>>>> On Thu, 19 Jan 2023 at 10:29, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>>>>>> On 19/01/2023 16:30, Stefan Hajnoczi wrote:
->>>>>>>> On Thu, 19 Jan 2023 at 07:43, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>>>>>>>> On 18/01/2023 17:52, Stefan Hajnoczi wrote:
->>>>>>>>>> On Sun, 15 Jan 2023 at 12:21, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>>> Once told that, I think that you are making your live harder in the
->>>> future when you add the other migratable devices.
->>>>
->>>> static const VMStateDescription vuf_vmstate = {
->>>>       .name = "vhost-user-fs",
->>>>       .minimum_version_id = 0,
->>>>       .version_id = 0,
->>>>       .fields = (VMStateField[]) {
->>>>           VMSTATE_INT8(migration_type, struct VHostUserFS),
->>>>           VMSTATE_VIRTIO_DEVICE,
->>>>           VMSTATE_END_OF_LIST()
->>>>       },
->>>>       .pre_save = vhost_user_fs_pre_save,
->>>>       .subsections = (const VMStateDescription*[]) {
->>>>           &vmstate_vhost_user_fs_internal_sub,
->>>>           NULL
->>>>       }
->>>> };
->>>>
->>>> And you are done.
->>>>
->>>> I will propose to use a property to set migration_type, but I didn't
->>>> want to write the code right now.
->
-> I have a little problem with implementation here and need an advice:
->
-> Can we make this property adjustable at runtime after device was realized?
-> There is a statement in qemu wiki [1] that makes me think this is possible
-> but I couldn't find any code for it or example in other devices.
->> "Properties are, by default, locked while the device is
->   realized. Exceptions
->> can be made by the devices themselves in order to implement a way
->   for a user
->> to interact with a device while it is realized."
->
-> Or is your idea just to set this property once at construction and keep it
-> constant for device lifetime?
->
-> [1] https://wiki.qemu.org/Features/QOM
+--0000000000007517f505f4a8418e
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-I have no clue here.  Markus?  Stefan?
+Dear Sir/Madam,
 
->>>>
->>>> I think that this proposal will make Stephan happy, and it is just
->>>> adding and extra uint8_t that is helpul to implement everything.
->>> That is exactly the approach I'm trying to implement it right now. Single
->>> flag can be convenient for orchestrator but makes it too hard to account in
->>> all cases for all devices on qemu side without breaking future
->>> compatibility.
->>> So I'm rewriting it with properties.
->> Nice.  That would be my proposal.  Just a bit complicated for a proof of concetp.
->>
->>> BTW do you think each vhost-user device should have its own enum of
->>> migration
->>> types or maybe we could make them common for all device types?
->> I will put it for vhost-user, because as far as I know nobody else is
->> asking for this functionality.
->
-> I mean do we need it for all vhost-user devices or only for vhost-user-fs
-> that I'm implementing now?
 
-I will put it only for vhost-user-fs, except if there is a central place
-that is used for all vhost-user and its easy to put there.
 
-But I don't know enough about vhost-user to know if there is any common
-struct to put this.
+Hope this email finds you well!
 
->> The most similar device that I can think of right now is vfio devices.
->> But they are implemeting callbacks to save hardware device state, and
->> they go device by device, i.e. there is nothing general there.
->>
->> Later, Juan.
->>
 
-Later, Juan.
+
+Our factory can do snapbacks, dad hats, trucker hats, baseball hats,
+bucket hats, etc., with excellent embroideries, printings and patches.
+Would you like to make some your branded hats?
+
+
+
+*We have:*
+
+Factory price & high quality
+
+Small MOQ of 100pcs
+
+Fast turnaround time
+
+Clients=E2=80=99 copyrights are confidential
+
+One-stop sourcing service saves your energy, time and money.
+
+
+
+Pls feel free to contact us for more information.
+
+
+
+Looking forward to hearing from you!
+
+
+
+Best wishes!
+
+
+
+*Max Huang*
+
+Sales Department
+
+Mobile/Whatsapp/Wechat: +86 18716957471
+
+
+
+*WELLSUCCEED EMBROIDERY LIMITED*
+
+(One stop sourcing of Clothing, Headwears, Bags, Socks, Toys, Flags,
+patches, keychains, etc.)
+
+ADD: 4/F, 38 SOUTH XIHU 3RD ROAD,
+
+         SHILONG, DONGGUAN,
+
+         GUANGDONG. 523325. CHINA.
+
+--0000000000007517f505f4a8418e
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr">
+
+
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dgb2312">
+<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered)">
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+ {font-family:=E5=AE=8B=E4=BD=93;
+ panose-1:2 1 6 0 3 1 1 1 1 1;}
+@font-face
+ {font-family:"Cambria Math";
+ panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+ {font-family:=E7=AD=89=E7=BA=BF;
+ panose-1:2 1 6 0 3 1 1 1 1 1;}
+@font-face
+ {font-family:"\@=E5=AE=8B=E4=BD=93";
+ panose-1:2 1 6 0 3 1 1 1 1 1;}
+@font-face
+ {font-family:"\@=E7=AD=89=E7=BA=BF";
+ panose-1:2 1 6 0 3 1 1 1 1 1;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+ {margin:0cm;
+ text-align:justify;
+ text-justify:inter-ideograph;
+ font-size:10.5pt;
+ font-family:=E7=AD=89=E7=BA=BF;}
+ /* Page Definitions */
+ @page WordSection1
+ {size:595.3pt 841.9pt;
+ margin:72.0pt 90.0pt 72.0pt 90.0pt;
+ layout-grid:15.6pt;}
+div.WordSection1
+ {page:WordSection1;}
+-->
+</style>
+
+
+
+
+
+<div class=3D"WordSection1" style=3D"layout-grid:15.6pt">
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Dear
+Sir/Madam,</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Hope
+this email finds you well!</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Our
+factory can do snapbacks, dad=C2=A0hats, trucker=C2=A0hats, baseball=C2=A0h=
+ats,
+bucket=C2=A0hats, etc.,=C2=A0with excellent embroideries, printings and
+patches. Would you like to make some your branded=C2=A0hats?</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><b><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;A=
+rial&quot;,sans-serif;color:#222222">We
+have:</span></b></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Factory
+price &amp; high quality</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Small
+MOQ of 100pcs</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Fast
+turnaround time</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Clients=E2=80=99
+copyrights are confidential</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">One-stop
+sourcing service saves your energy, time and money.</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Pls
+feel free to contact us for more information. </span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Looking
+forward to hearing from you!</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Best
+wishes!</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><b><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;A=
+rial&quot;,sans-serif;color:#0070c0">Max
+Huang</span></b></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Sales
+Department</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">Mobile/Whatsapp/Wechat:
++86 18716957471</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><b><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;A=
+rial&quot;,sans-serif;color:#0070c0">WELLSUCCEED
+EMBROIDERY LIMITED</span></b></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">(One
+stop sourcing of Clothing, Headwears, Bags, Socks, Toys, Flags, patches,
+keychains, etc.)=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">ADD:
+4/F, 38 SOUTH XIHU 3RD ROAD,=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0
+SHILONG, DONGGUAN,=C2=A0</span></p>
+
+<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
+hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
+l&quot;,sans-serif;color:#222222">=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0
+GUANGDONG. 523325. CHINA.</span></p>
+
+<p class=3D"MsoNormal"><span lang=3D"EN-US">=C2=A0</span></p>
+
+</div>
+
+
+
+
+</div>
+
+--0000000000007517f505f4a8418e--
 

@@ -1,20 +1,11 @@
-Return-Path: <maxhifitech@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
- h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
- :date:message-id:reply-to;
- bh=uCxsCOypNBk5O8K0P4tOUVeUyWg8wK6wr6cO6OnWsH0=;
- b=cjWWIbpjXW5r5uCEYo6//OjrcKOwmQCdyaLZulsTjnAXlMT46+ih3DPW93e2g1ydQD
- 11yXjfE+/naysDW8XoFyfCAGfsOaUsfR+Mv7JpVS5G7fxkLoQ4QANYTblFQRd4n1bIKB
- xj+QRml9Q92VvnU8KFpKgnAv9ygzCIohnsRZ1X1eAYCe/QDPpfaSpvLASeob7Wpxn/qo
- ophQLvaK34Ml3egetyTpBgumJiwlm759nHEidHzlu4JVB9tJANjpxYQv/gW+1mETayPj
- Z3d6OOGrKoQ420GqBBNtdSnFDLbludrIQ2iJvqzmP2Zs9UWaivAIh0/sM5MuiVBb5B0k
- PJvg==
+Return-Path: <dgilbert@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Wed, 15 Feb 2023 18:43:06 +0000
+Message-Id: <20230215184310.161283-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-From: Max Huang <maxhifitech@gmail.com>
-Date: Tue, 14 Feb 2023 20:39:21 +0800
-Message-ID: <CAAfuB=2waJP+wasx55Vrkiu4-b+9qm_bnTGeH9WGjruGo9Ax_w@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="0000000000007517f505f4a8418e"
-Subject: [Virtio-fs] Custom-made Hats.
+Content-type: text/plain
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 0/4] Remove C virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,267 +14,89 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
-
---0000000000007517f505f4a8418e
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-Dear Sir/Madam,
-
-
-
-Hope this email finds you well!
-
-
-
-Our factory can do snapbacks, dad hats, trucker hats, baseball hats,
-bucket hats, etc., with excellent embroideries, printings and patches.
-Would you like to make some your branded hats?
-
-
-
-*We have:*
-
-Factory price & high quality
-
-Small MOQ of 100pcs
-
-Fast turnaround time
-
-Clients=E2=80=99 copyrights are confidential
-
-One-stop sourcing service saves your energy, time and money.
-
-
-
-Pls feel free to contact us for more information.
-
-
-
-Looking forward to hearing from you!
-
-
-
-Best wishes!
-
-
-
-*Max Huang*
-
-Sales Department
-
-Mobile/Whatsapp/Wechat: +86 18716957471
-
-
-
-*WELLSUCCEED EMBROIDERY LIMITED*
-
-(One stop sourcing of Clothing, Headwears, Bags, Socks, Toys, Flags,
-patches, keychains, etc.)
-
-ADD: 4/F, 38 SOUTH XIHU 3RD ROAD,
-
-         SHILONG, DONGGUAN,
-
-         GUANGDONG. 523325. CHINA.
-
---0000000000007517f505f4a8418e
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">
-
-
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dgb2312">
-<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered)">
-<style>
-<!--
- /* Font Definitions */
- @font-face
- {font-family:=E5=AE=8B=E4=BD=93;
- panose-1:2 1 6 0 3 1 1 1 1 1;}
-@font-face
- {font-family:"Cambria Math";
- panose-1:2 4 5 3 5 4 6 3 2 4;}
-@font-face
- {font-family:=E7=AD=89=E7=BA=BF;
- panose-1:2 1 6 0 3 1 1 1 1 1;}
-@font-face
- {font-family:"\@=E5=AE=8B=E4=BD=93";
- panose-1:2 1 6 0 3 1 1 1 1 1;}
-@font-face
- {font-family:"\@=E7=AD=89=E7=BA=BF";
- panose-1:2 1 6 0 3 1 1 1 1 1;}
- /* Style Definitions */
- p.MsoNormal, li.MsoNormal, div.MsoNormal
- {margin:0cm;
- text-align:justify;
- text-justify:inter-ideograph;
- font-size:10.5pt;
- font-family:=E7=AD=89=E7=BA=BF;}
- /* Page Definitions */
- @page WordSection1
- {size:595.3pt 841.9pt;
- margin:72.0pt 90.0pt 72.0pt 90.0pt;
- layout-grid:15.6pt;}
-div.WordSection1
- {page:WordSection1;}
--->
-</style>
-
-
-
-
-
-<div class=3D"WordSection1" style=3D"layout-grid:15.6pt">
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Dear
-Sir/Madam,</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Hope
-this email finds you well!</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Our
-factory can do snapbacks, dad=C2=A0hats, trucker=C2=A0hats, baseball=C2=A0h=
-ats,
-bucket=C2=A0hats, etc.,=C2=A0with excellent embroideries, printings and
-patches. Would you like to make some your branded=C2=A0hats?</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><b><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;A=
-rial&quot;,sans-serif;color:#222222">We
-have:</span></b></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Factory
-price &amp; high quality</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Small
-MOQ of 100pcs</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Fast
-turnaround time</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Clients=E2=80=99
-copyrights are confidential</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">One-stop
-sourcing service saves your energy, time and money.</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Pls
-feel free to contact us for more information. </span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Looking
-forward to hearing from you!</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Best
-wishes!</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><b><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;A=
-rial&quot;,sans-serif;color:#0070c0">Max
-Huang</span></b></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Sales
-Department</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">Mobile/Whatsapp/Wechat:
-+86 18716957471</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><b><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;A=
-rial&quot;,sans-serif;color:#0070c0">WELLSUCCEED
-EMBROIDERY LIMITED</span></b></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">(One
-stop sourcing of Clothing, Headwears, Bags, Socks, Toys, Flags, patches,
-keychains, etc.)=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">ADD:
-4/F, 38 SOUTH XIHU 3RD ROAD,=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0
-SHILONG, DONGGUAN,=C2=A0</span></p>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-size:11.0pt;font-family:&quot;Aria=
-l&quot;,sans-serif;color:#222222">=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0
-GUANGDONG. 523325. CHINA.</span></p>
-
-<p class=3D"MsoNormal"><span lang=3D"EN-US">=C2=A0</span></p>
-
-</div>
-
-
-
-
-</div>
-
---0000000000007517f505f4a8418e--
+To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, hczenczek@redhat.com, gmaglione@redhat.com, virtio-fs@redhat.com
+Cc: pbonzini@redhat.com, alex.bennee@linaro.org
+
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+
+We deprecated the C virtiofsd in commit 34deee7b6a1418f3d62a
+in v7.0 in favour of the Rust implementation at
+ 
+  https://gitlab.com/virtio-fs/virtiofsd
+ 
+since then, the Rust version has had more development and
+has held up well.  It's time to say goodbye to the C version
+that got us going.
+
+v2:
+  After comments on the v1 series, I've removed the Avocado
+test.
+
+Dr. David Alan Gilbert (4):
+  virtiofsd: Remove test
+  virtiofsd: Remove build and docs glue
+  virtiofsd: Remove source
+  virtiofsd: Swing deprecated message to removed-features
+
+ MAINTAINERS                                   |    2 -
+ docs/about/deprecated.rst                     |   18 -
+ docs/about/removed-features.rst               |   13 +
+ docs/conf.py                                  |    4 -
+ docs/meson.build                              |    1 -
+ docs/tools/index.rst                          |    1 -
+ docs/tools/virtiofsd.rst                      |  403 --
+ meson.build                                   |    1 -
+ meson_options.txt                             |    2 -
+ .../ci/org.centos/stream/8/x86_64/configure   |    2 -
+ .../org.centos/stream/8/x86_64/test-avocado   |    7 -
+ scripts/coverity-scan/COMPONENTS.md           |    3 -
+ scripts/meson-buildoptions.sh                 |    3 -
+ tests/avocado/virtiofs_submounts.py           |  217 -
+ tools/meson.build                             |   13 -
+ tools/virtiofsd/50-qemu-virtiofsd.json.in     |    5 -
+ tools/virtiofsd/buffer.c                      |  350 --
+ tools/virtiofsd/fuse_common.h                 |  837 ---
+ tools/virtiofsd/fuse_i.h                      |  107 -
+ tools/virtiofsd/fuse_log.c                    |   40 -
+ tools/virtiofsd/fuse_log.h                    |   75 -
+ tools/virtiofsd/fuse_lowlevel.c               | 2732 ----------
+ tools/virtiofsd/fuse_lowlevel.h               | 1988 --------
+ tools/virtiofsd/fuse_misc.h                   |   59 -
+ tools/virtiofsd/fuse_opt.c                    |  446 --
+ tools/virtiofsd/fuse_opt.h                    |  272 -
+ tools/virtiofsd/fuse_signals.c                |   93 -
+ tools/virtiofsd/fuse_virtio.c                 | 1081 ----
+ tools/virtiofsd/fuse_virtio.h                 |   33 -
+ tools/virtiofsd/helper.c                      |  409 --
+ tools/virtiofsd/meson.build                   |   18 -
+ tools/virtiofsd/passthrough_helpers.h         |   51 -
+ tools/virtiofsd/passthrough_ll.c              | 4521 -----------------
+ tools/virtiofsd/passthrough_seccomp.c         |  182 -
+ tools/virtiofsd/passthrough_seccomp.h         |   14 -
+ 35 files changed, 13 insertions(+), 13990 deletions(-)
+ delete mode 100644 docs/tools/virtiofsd.rst
+ delete mode 100644 tests/avocado/virtiofs_submounts.py
+ delete mode 100644 tools/virtiofsd/50-qemu-virtiofsd.json.in
+ delete mode 100644 tools/virtiofsd/buffer.c
+ delete mode 100644 tools/virtiofsd/fuse_common.h
+ delete mode 100644 tools/virtiofsd/fuse_i.h
+ delete mode 100644 tools/virtiofsd/fuse_log.c
+ delete mode 100644 tools/virtiofsd/fuse_log.h
+ delete mode 100644 tools/virtiofsd/fuse_lowlevel.c
+ delete mode 100644 tools/virtiofsd/fuse_lowlevel.h
+ delete mode 100644 tools/virtiofsd/fuse_misc.h
+ delete mode 100644 tools/virtiofsd/fuse_opt.c
+ delete mode 100644 tools/virtiofsd/fuse_opt.h
+ delete mode 100644 tools/virtiofsd/fuse_signals.c
+ delete mode 100644 tools/virtiofsd/fuse_virtio.c
+ delete mode 100644 tools/virtiofsd/fuse_virtio.h
+ delete mode 100644 tools/virtiofsd/helper.c
+ delete mode 100644 tools/virtiofsd/meson.build
+ delete mode 100644 tools/virtiofsd/passthrough_helpers.h
+ delete mode 100644 tools/virtiofsd/passthrough_ll.c
+ delete mode 100644 tools/virtiofsd/passthrough_seccomp.c
+ delete mode 100644 tools/virtiofsd/passthrough_seccomp.h
+
+-- 
+2.39.1
 

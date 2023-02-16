@@ -1,19 +1,14 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-In-Reply-To: <20230216111134-mutt-send-email-mst@kernel.org> (Michael
- S. Tsirkin's message of "Thu, 16 Feb 2023 11:13:04 -0500")
-References: <20230216140003.1103681-1-antonkuchin@yandex-team.ru>
- <20230216140003.1103681-2-antonkuchin@yandex-team.ru>
- <87v8k1itoy.fsf@secure.mitica>
- <20230216110952-mutt-send-email-mst@kernel.org>
- <20230216111134-mutt-send-email-mst@kernel.org>
-Reply-To: quintela@redhat.com
-Date: Thu, 16 Feb 2023 17:22:32 +0100
-Message-ID: <87zg9dfulz.fsf@secure.mitica>
+Return-Path: <dgilbert@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Thu, 16 Feb 2023 18:26:28 +0000
+Message-Id: <20230216182628.126139-5-dgilbert@redhat.com>
+In-Reply-To: <20230216182628.126139-1-dgilbert@redhat.com>
+References: <20230216182628.126139-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH v2 1/1] vhost-user-fs: add property to allow
- migration
+Content-type: text/plain
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 4/4] virtiofsd: Swing deprecated message to
+ removed-features
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,98 +17,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: Anton Kuchin <antonkuchin@yandex-team.ru>, qemu-devel@nongnu.org, "Dr.
- David Alan Gilbert" <dgilbert@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, "Daniel P. =?utf-8?Q?Berrang=C3=A9?=" <berrange@redhat.com>, Markus Armbruster <armbru@redhat.com>, yc-core@yandex-team.ru, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com, Eric Blake <eblake@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>
+To: virtio-fs@redhat.com, qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, gmaglione@redhat.com
 
-"Michael S. Tsirkin" <mst@redhat.com> wrote:
-> On Thu, Feb 16, 2023 at 11:11:22AM -0500, Michael S. Tsirkin wrote:
->> On Thu, Feb 16, 2023 at 03:14:05PM +0100, Juan Quintela wrote:
->> > Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->> > > Now any vhost-user-fs device makes VM unmigratable, that also prevents
->> > > qemu update without stopping the VM. In most cases that makes sense
->> > > because qemu has no way to transfer FUSE session state.
->> > >
->> > > But it is good to have an option for orchestrator to tune this according to
->> > > backend capabilities and migration configuration.
->> > >
->> > > This patch adds device property 'migration' that is 'none' by default
->> > > to keep old behaviour but can be set to 'external' to explicitly allow
->> > > migration with minimal virtio device state in migration stream if daemon
->> > > has some way to sync FUSE state on src and dst without help from qemu.
->> > >
->> > > Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
->> > 
->> > Reviewed-by: Juan Quintela <quintela@redhat.com>
->> > 
->> > The migration bits are correct.
->> > 
->> > And I can think a better way to explain that one device is migrated
->> > externally.
->> > 
->> > If you have to respin:
->> > 
->> > > +static int vhost_user_fs_pre_save(void *opaque)
->> > > +{
->> > > +    VHostUserFS *fs = (VHostUserFS *)opaque;
->> > 
->> > This hack is useless.
->> 
->> meaning the cast? yes.
->> 
->> > I know that there are still lots of code that still have it.
->> > 
->> > 
->> > Now remember that I have no clue about vhost-user-fs.
->> > 
->> > But this looks fishy
->> > >  static const VMStateDescription vuf_vmstate = {
->> > >      .name = "vhost-user-fs",
->> > > -    .unmigratable = 1,
->> > > +    .minimum_version_id = 0,
->> > > +    .version_id = 0,
->> > > +    .fields = (VMStateField[]) {
->> > > +        VMSTATE_VIRTIO_DEVICE,
->> > > +        VMSTATE_UINT8(migration_type, VHostUserFS),
->> > > +        VMSTATE_END_OF_LIST()
->
-> In fact why do we want to migrate this property?
-> We generally don't, we only migrate state.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-See previous discussion.
-In a nutshell, we are going to have internal migration in the future
-(not done yet).
+Move the deprecation message, since it's now gone.
 
-Later, Juan.
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Acked-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ docs/about/deprecated.rst       | 18 ------------------
+ docs/about/removed-features.rst | 13 +++++++++++++
+ 2 files changed, 13 insertions(+), 18 deletions(-)
 
->> > > +    },
->> > > +   .pre_save = vhost_user_fs_pre_save,
->> > >  };
->> > >  
->> > >  static Property vuf_properties[] = {
->> > > @@ -309,6 +337,10 @@ static Property vuf_properties[] = {
->> > >      DEFINE_PROP_UINT16("num-request-queues", VHostUserFS,
->> > >                         conf.num_request_queues, 1),
->> > >      DEFINE_PROP_UINT16("queue-size", VHostUserFS, conf.queue_size, 128),
->> > > +    DEFINE_PROP_UNSIGNED("migration", VHostUserFS, migration_type,
->> > > +                         VHOST_USER_MIGRATION_TYPE_NONE,
->> > > +                         qdev_prop_vhost_user_migration_type,
->> > > +                         uint8_t),
->> > >      DEFINE_PROP_END_OF_LIST(),
->> > 
->> > We have four properties here (5 with the new migration one), and you
->> > only migrate one.
->> > 
->> > This looks fishy, but I don't know if it makes sense.
->> > If they _have_ to be configured the same on source and destination, I
->> > would transfer them and check in post_load that the values are correct.
->> > 
->> > Later, Juan.
->> 
->> Weird suggestion.  We generally don't do this kind of check - that
->> would be open-coding each property. It's management's job to make
->> sure things are consistent.
->> 
->> -- 
->> MST
+diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
+index 2827b0c0be..ee95bcb1a6 100644
+--- a/docs/about/deprecated.rst
++++ b/docs/about/deprecated.rst
+@@ -330,24 +330,6 @@ versions, aliases will point to newer CPU model versions
+ depending on the machine type, so management software must
+ resolve CPU model aliases before starting a virtual machine.
+ 
+-Tools
+------
+-
+-virtiofsd
+-'''''''''
+-
+-There is a new Rust implementation of ``virtiofsd`` at
+-``https://gitlab.com/virtio-fs/virtiofsd``;
+-since this is now marked stable, new development should be done on that
+-rather than the existing C version in the QEMU tree.
+-The C version will still accept fixes and patches that
+-are already in development for the moment, but will eventually
+-be deleted from this tree.
+-New deployments should use the Rust version, and existing systems
+-should consider moving to it.  The command line and feature set
+-is very close and moving should be simple.
+-
+-
+ QEMU guest agent
+ ----------------
+ 
+diff --git a/docs/about/removed-features.rst b/docs/about/removed-features.rst
+index e901637ce5..5b258b446b 100644
+--- a/docs/about/removed-features.rst
++++ b/docs/about/removed-features.rst
+@@ -889,3 +889,16 @@ The VXHS code did not compile since v2.12.0. It was removed in 5.1.
+ The corresponding upstream server project is no longer maintained.
+ Users are recommended to switch to an alternative distributed block
+ device driver such as RBD.
++
++Tools
++-----
++
++virtiofsd (removed in 8.0)
++''''''''''''''''''''''''''
++
++There is a newer Rust implementation of ``virtiofsd`` at
++``https://gitlab.com/virtio-fs/virtiofsd``; this has been
++stable for some time and is now widely used.
++The command line and feature set is very close to the removed
++C implementation.
++
+-- 
+2.39.2
 

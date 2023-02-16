@@ -1,13 +1,24 @@
-Return-Path: <dgilbert@redhat.com>
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 16 Feb 2023 18:26:26 +0000
-Message-Id: <20230216182628.126139-3-dgilbert@redhat.com>
-In-Reply-To: <20230216182628.126139-1-dgilbert@redhat.com>
-References: <20230216182628.126139-1-dgilbert@redhat.com>
+Return-Path: <stefanha@redhat.com>
+Date: Thu, 16 Feb 2023 16:00:51 -0500
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <Y+6Zgy7JgABed+RO@fedora>
+References: <0d57cc40-693b-b36c-a135-fdac60dd00ec@yandex-team.ru>
+ <CAJSP0QUXB0kgsCSsmi8dpnJFYho2cR_2Liep=pGmp6WzDZ_7pw@mail.gmail.com>
+ <d6bf0b9a-a167-817d-2c17-c2e472961155@yandex-team.ru>
+ <CAJSP0QXXe6KgLN2PJvi-5GqcELhUKJPB2pUARL2ktO9TQYAq=g@mail.gmail.com>
+ <2fb6efb4-9155-99ad-3acd-c274783436ed@yandex-team.ru>
+ <87h6w5ea1m.fsf@secure.mitica>
+ <ed9832ec-eaf0-68a4-b7c1-9f1691ab149e@yandex-team.ru>
+ <874js4v151.fsf@secure.mitica>
+ <626f6e7c-07e4-4aa7-3cce-b96d9fd96d33@yandex-team.ru>
+ <87mt5ly03z.fsf@secure.mitica>
 MIME-Version: 1.0
-Content-type: text/plain
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 2/4] virtiofsd: Remove build and docs glue
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="nyKNCi8hOw9wwgQO"
+Content-Disposition: inline
+In-Reply-To: <87mt5ly03z.fsf@secure.mitica>
+Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: add capability to allow
+ migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,215 +27,96 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, gmaglione@redhat.com
+To: Juan Quintela <quintela@redhat.com>
+Cc: Anton Kuchin <antonkuchin@yandex-team.ru>, Stefan Hajnoczi <stefanha@gmail.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, yc-core@yandex-team.ru, "Michael S. Tsirkin" <mst@redhat.com>
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Remove all the virtiofsd build and docs infrastructure.
+--nyKNCi8hOw9wwgQO
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Acked-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- MAINTAINERS                                    |  2 --
- docs/conf.py                                   |  4 ----
- docs/meson.build                               |  1 -
- docs/tools/index.rst                           |  1 -
- meson.build                                    |  1 -
- meson_options.txt                              |  2 --
- .../ci/org.centos/stream/8/x86_64/configure    |  2 --
- scripts/coverity-scan/COMPONENTS.md            |  3 ---
- scripts/meson-buildoptions.sh                  |  3 ---
- tools/meson.build                              | 13 -------------
- tools/virtiofsd/50-qemu-virtiofsd.json.in      |  5 -----
- tools/virtiofsd/meson.build                    | 18 ------------------
- 12 files changed, 55 deletions(-)
- delete mode 100644 tools/virtiofsd/50-qemu-virtiofsd.json.in
- delete mode 100644 tools/virtiofsd/meson.build
+On Fri, Feb 10, 2023 at 05:08:16PM +0100, Juan Quintela wrote:
+> Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
+> > On 02/02/2023 11:59, Juan Quintela wrote:
+> >> Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
+> >>> On 01/02/2023 16:26, Juan Quintela wrote:
+> >>>> Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
+> >>>>> On 19/01/2023 18:02, Stefan Hajnoczi wrote:
+> >>>>>> On Thu, 19 Jan 2023 at 10:29, Anton Kuchin <antonkuchin@yandex-tea=
+m.ru> wrote:
+> >>>>>>> On 19/01/2023 16:30, Stefan Hajnoczi wrote:
+> >>>>>>>> On Thu, 19 Jan 2023 at 07:43, Anton Kuchin <antonkuchin@yandex-t=
+eam.ru> wrote:
+> >>>>>>>>> On 18/01/2023 17:52, Stefan Hajnoczi wrote:
+> >>>>>>>>>> On Sun, 15 Jan 2023 at 12:21, Anton Kuchin <antonkuchin@yandex=
+-team.ru> wrote:
+> >>>> Once told that, I think that you are making your live harder in the
+> >>>> future when you add the other migratable devices.
+> >>>>
+> >>>> static const VMStateDescription vuf_vmstate =3D {
+> >>>>       .name =3D "vhost-user-fs",
+> >>>>       .minimum_version_id =3D 0,
+> >>>>       .version_id =3D 0,
+> >>>>       .fields =3D (VMStateField[]) {
+> >>>>           VMSTATE_INT8(migration_type, struct VHostUserFS),
+> >>>>           VMSTATE_VIRTIO_DEVICE,
+> >>>>           VMSTATE_END_OF_LIST()
+> >>>>       },
+> >>>>       .pre_save =3D vhost_user_fs_pre_save,
+> >>>>       .subsections =3D (const VMStateDescription*[]) {
+> >>>>           &vmstate_vhost_user_fs_internal_sub,
+> >>>>           NULL
+> >>>>       }
+> >>>> };
+> >>>>
+> >>>> And you are done.
+> >>>>
+> >>>> I will propose to use a property to set migration_type, but I didn't
+> >>>> want to write the code right now.
+> >
+> > I have a little problem with implementation here and need an advice:
+> >
+> > Can we make this property adjustable at runtime after device was realiz=
+ed?
+> > There is a statement in qemu wiki [1] that makes me think this is possi=
+ble
+> > but I couldn't find any code for it or example in other devices.
+> >> "Properties are, by default, locked while the device is
+> >   realized. Exceptions
+> >> can be made by the devices themselves in order to implement a way
+> >   for a user
+> >> to interact with a device while it is realized."
+> >
+> > Or is your idea just to set this property once at construction and keep=
+ it
+> > constant for device lifetime?
+> >
+> > [1] https://wiki.qemu.org/Features/QOM
+>=20
+> I have no clue here.  Markus?  Stefan?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fd54c1f140..5090ba0e49 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2096,10 +2096,8 @@ virtiofs
- M: Dr. David Alan Gilbert <dgilbert@redhat.com>
- M: Stefan Hajnoczi <stefanha@redhat.com>
- S: Supported
--F: tools/virtiofsd/*
- F: hw/virtio/vhost-user-fs*
- F: include/hw/virtio/vhost-user-fs.h
--F: docs/tools/virtiofsd.rst
- L: virtio-fs@redhat.com
- 
- virtio-input
-diff --git a/docs/conf.py b/docs/conf.py
-index 73a287a4f2..00767b0e24 100644
---- a/docs/conf.py
-+++ b/docs/conf.py
-@@ -290,10 +290,6 @@
-     ('tools/virtfs-proxy-helper', 'virtfs-proxy-helper',
-      'QEMU 9p virtfs proxy filesystem helper',
-      ['M. Mohan Kumar'], 1),
--    ('tools/virtiofsd', 'virtiofsd',
--     'QEMU virtio-fs shared file system daemon',
--     ['Stefan Hajnoczi <stefanha@redhat.com>',
--      'Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>'], 1),
- ]
- man_make_section_directory = False
- 
-diff --git a/docs/meson.build b/docs/meson.build
-index 9136fed3b7..bbcdccce68 100644
---- a/docs/meson.build
-+++ b/docs/meson.build
-@@ -48,7 +48,6 @@ if build_docs
-         'qemu-storage-daemon.1': (have_tools ? 'man1' : ''),
-         'qemu-trace-stap.1': (stap.found() ? 'man1' : ''),
-         'virtfs-proxy-helper.1': (have_virtfs_proxy_helper ? 'man1' : ''),
--        'virtiofsd.1': (have_virtiofsd ? 'man1' : ''),
-         'qemu.1': 'man1',
-         'qemu-block-drivers.7': 'man7',
-         'qemu-cpu-models.7': 'man7'
-diff --git a/docs/tools/index.rst b/docs/tools/index.rst
-index 2151adcf78..8e65ce0dfc 100644
---- a/docs/tools/index.rst
-+++ b/docs/tools/index.rst
-@@ -16,4 +16,3 @@ command line utilities and other standalone programs.
-    qemu-pr-helper
-    qemu-trace-stap
-    virtfs-proxy-helper
--   virtiofsd
-diff --git a/meson.build b/meson.build
-index a76c855312..adfc0e28b5 100644
---- a/meson.build
-+++ b/meson.build
-@@ -3879,7 +3879,6 @@ if have_block
-   summary_info += {'Block whitelist (ro)': get_option('block_drv_ro_whitelist')}
-   summary_info += {'Use block whitelist in tools': get_option('block_drv_whitelist_in_tools')}
-   summary_info += {'VirtFS support':    have_virtfs}
--  summary_info += {'build virtiofs daemon': have_virtiofsd}
-   summary_info += {'Live block migration': config_host_data.get('CONFIG_LIVE_BLOCK_MIGRATION')}
-   summary_info += {'replication support': config_host_data.get('CONFIG_REPLICATION')}
-   summary_info += {'bochs support':     get_option('bochs').allowed()}
-diff --git a/meson_options.txt b/meson_options.txt
-index 7e5801db90..6b0900205e 100644
---- a/meson_options.txt
-+++ b/meson_options.txt
-@@ -272,8 +272,6 @@ option('vhost_user_blk_server', type: 'feature', value: 'auto',
-        description: 'build vhost-user-blk server')
- option('virtfs', type: 'feature', value: 'auto',
-        description: 'virtio-9p support')
--option('virtiofsd', type: 'feature', value: 'auto',
--       description: 'build virtiofs daemon (virtiofsd)')
- option('libvduse', type: 'feature', value: 'auto',
-        description: 'build VDUSE Library')
- option('vduse_blk_export', type: 'feature', value: 'auto',
-diff --git a/scripts/ci/org.centos/stream/8/x86_64/configure b/scripts/ci/org.centos/stream/8/x86_64/configure
-index 65eacf3c56..6e8983f39c 100755
---- a/scripts/ci/org.centos/stream/8/x86_64/configure
-+++ b/scripts/ci/org.centos/stream/8/x86_64/configure
-@@ -138,7 +138,6 @@
- --disable-vhost-vdpa \
- --disable-virglrenderer \
- --disable-virtfs \
----disable-virtiofsd \
- --disable-vnc \
- --disable-vnc-jpeg \
- --disable-png \
-@@ -191,7 +190,6 @@
- --enable-tpm \
- --enable-trace-backends=dtrace \
- --enable-usb-redir \
----enable-virtiofsd \
- --enable-vhost-kernel \
- --enable-vhost-net \
- --enable-vhost-user \
-diff --git a/scripts/coverity-scan/COMPONENTS.md b/scripts/coverity-scan/COMPONENTS.md
-index 0e6ab4936e..639dcee45a 100644
---- a/scripts/coverity-scan/COMPONENTS.md
-+++ b/scripts/coverity-scan/COMPONENTS.md
-@@ -132,9 +132,6 @@ util
- xen
-   ~ (/qemu)?(.*/xen.*)
- 
--virtiofsd
--  ~ (/qemu)?(/tools/virtiofsd/.*)
--
- (headers)
-   ~ (/qemu)?(/include/.*)
- 
-diff --git a/scripts/meson-buildoptions.sh b/scripts/meson-buildoptions.sh
-index 939cc114dd..5d969a94c0 100644
---- a/scripts/meson-buildoptions.sh
-+++ b/scripts/meson-buildoptions.sh
-@@ -175,7 +175,6 @@ meson_options_help() {
-   printf "%s\n" '  vhost-vdpa      vhost-vdpa kernel backend support'
-   printf "%s\n" '  virglrenderer   virgl rendering support'
-   printf "%s\n" '  virtfs          virtio-9p support'
--  printf "%s\n" '  virtiofsd       build virtiofs daemon (virtiofsd)'
-   printf "%s\n" '  vmnet           vmnet.framework network backend support'
-   printf "%s\n" '  vnc             VNC server'
-   printf "%s\n" '  vnc-jpeg        JPEG lossy compression for VNC server'
-@@ -461,8 +460,6 @@ _meson_option_parse() {
-     --disable-virglrenderer) printf "%s" -Dvirglrenderer=disabled ;;
-     --enable-virtfs) printf "%s" -Dvirtfs=enabled ;;
-     --disable-virtfs) printf "%s" -Dvirtfs=disabled ;;
--    --enable-virtiofsd) printf "%s" -Dvirtiofsd=enabled ;;
--    --disable-virtiofsd) printf "%s" -Dvirtiofsd=disabled ;;
-     --enable-vmnet) printf "%s" -Dvmnet=enabled ;;
-     --disable-vmnet) printf "%s" -Dvmnet=disabled ;;
-     --enable-vnc) printf "%s" -Dvnc=enabled ;;
-diff --git a/tools/meson.build b/tools/meson.build
-index 10eb3a043f..e69de29bb2 100644
---- a/tools/meson.build
-+++ b/tools/meson.build
-@@ -1,13 +0,0 @@
--have_virtiofsd = get_option('virtiofsd') \
--    .require(targetos == 'linux',
--             error_message: 'virtiofsd requires Linux') \
--    .require(seccomp.found() and libcap_ng.found(),
--             error_message: 'virtiofsd requires libcap-ng-devel and seccomp-devel') \
--    .require(have_vhost_user,
--             error_message: 'virtiofsd needs vhost-user-support') \
--    .disable_auto_if(not have_tools and not have_system) \
--    .allowed()
--
--if have_virtiofsd
--  subdir('virtiofsd')
--endif
-diff --git a/tools/virtiofsd/50-qemu-virtiofsd.json.in b/tools/virtiofsd/50-qemu-virtiofsd.json.in
-deleted file mode 100644
-index 9bcd86f8dc..0000000000
---- a/tools/virtiofsd/50-qemu-virtiofsd.json.in
-+++ /dev/null
-@@ -1,5 +0,0 @@
--{
--  "description": "QEMU virtiofsd vhost-user-fs",
--  "type": "fs",
--  "binary": "@libexecdir@/virtiofsd"
--}
-diff --git a/tools/virtiofsd/meson.build b/tools/virtiofsd/meson.build
-deleted file mode 100644
-index c134ba633f..0000000000
---- a/tools/virtiofsd/meson.build
-+++ /dev/null
-@@ -1,18 +0,0 @@
--executable('virtiofsd', files(
--  'buffer.c',
--  'fuse_opt.c',
--  'fuse_log.c',
--  'fuse_lowlevel.c',
--  'fuse_signals.c',
--  'fuse_virtio.c',
--  'helper.c',
--  'passthrough_ll.c',
--  'passthrough_seccomp.c'),
--  dependencies: [seccomp, qemuutil, libcap_ng, vhost_user],
--  install: true,
--  install_dir: get_option('libexecdir'))
--
--configure_file(input: '50-qemu-virtiofsd.json.in',
--               output: '50-qemu-virtiofsd.json',
--               configuration: { 'libexecdir' : get_option('prefix') / get_option('libexecdir') },
--               install_dir: qemu_datadir / 'vhost-user')
--- 
-2.39.2
+Sorry for the late reply. Yes, QOM properties can be set after realize
+(e.g. using the qom-set command).
 
+The set() callback can return an error, so some properties are
+implemented to refuse updates when ->realize is true.
+
+Stefan
+
+--nyKNCi8hOw9wwgQO
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmPumYMACgkQnKSrs4Gr
+c8h6+gf/Xm3DQUOYtCY4IS1GB6hMp0BIP3zfOfyPBh/CVlDtME0ngqYlOrBqxYZ6
+wWEXSyTyHwxhGMK7TkNt0JofrNHdQegdvwqXZOtpoLmxcVjCkohHa6Dh3K8H9q/f
+JcPdxz6+PPHzf293Rbo7XalCqYveWAPX+geTWRQDwLsaYksnv23UlXzkyqZQ2fyD
+8MzRc3AILX9kwTZwWYRCUGEt9HubeE1jnu3tXp4cmAyvWOd4ap/d7dAMguZZlV8C
+J7omECt5rZx5GLVdf5N8l9J/H6mUyXdGRppfsCAon3/yeSDwyNiRVsbpUQOaYqM5
+iYsbZRqzkoZH9bnFp0l7wKk01WbkOA==
+=bGPP
+-----END PGP SIGNATURE-----
+
+--nyKNCi8hOw9wwgQO--

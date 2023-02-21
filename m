@@ -1,22 +1,16 @@
-Return-Path: <peter.maydell@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=0s0VL1YH65ntfDy3fXMBFn+sJNR2U5+/VIiIt1BDbnA=;
- b=KfX1MG39fvihDekAdyC/MuJWWTbn52n4ANHmAjHhLBYUM43/gabfGPRY7iNTd0e8Lx
- zDY+jwvYE8lNEVTVDIsKdoIj9alkFPT8RchHDVh5PEg1RMkYWNrVJUnbeGA4/9ctmCdd
- GdukwL6OkEN8IW3pYnWcO2fTPX2EWy3Ioqk8YB1jde4l1/MSENSZW2mrZ1/zcIAEWcWs
- VGyYQxfI1poouRbMmZYjvLf6GrhqH2PheZbFA9oExmusmQVO8snzJJv6m8qUCWCFZmGr
- MFb4+in2aL4oOBqgKfldUUahVxQedNO8Kj9242v3Pv6S1fmHUZQOGcffqXVXs82vX+Hq
- x1uw==
+Return-Path: <stefanha@redhat.com>
+Date: Tue, 21 Feb 2023 15:45:38 -0500
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <Y/UtctcE2Zz6fN/m@fedora>
+References: <20230217170038.1273710-1-antonkuchin@yandex-team.ru>
+ <20230217170038.1273710-2-antonkuchin@yandex-team.ru>
 MIME-Version: 1.0
-References: <20230216182628.126139-1-dgilbert@redhat.com>
-In-Reply-To: <20230216182628.126139-1-dgilbert@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Tue, 21 Feb 2023 11:27:38 +0000
-Message-ID: <CAFEAcA-0=iENOFkL5mPeDmkPkfKN0Xc7wEAqBcErT3TRB5jfZQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PULL 0/4] virtiofs queue
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="1cajONYwFAWKaZxB"
+Content-Disposition: inline
+In-Reply-To: <20230217170038.1273710-2-antonkuchin@yandex-team.ru>
+Subject: Re: [Virtio-fs] [PATCH v3 1/1] vhost-user-fs: add migration type
+ property
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,47 +19,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, gmaglione@redhat.com
-
-On Thu, 16 Feb 2023 at 18:27, Dr. David Alan Gilbert (git)
-<dgilbert@redhat.com> wrote:
->
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->
-> The following changes since commit 6dffbe36af79e26a4d23f94a9a1c1201de99c261:
->
->   Merge tag 'migration-20230215-pull-request' of https://gitlab.com/juan.quintela/qemu into staging (2023-02-16 13:09:51 +0000)
->
-> are available in the Git repository at:
->
->   https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20230216b
->
-> for you to fetch changes up to a6bfdaed4a735a2cf59f265e6955fe2adcc99637:
->
->   virtiofsd: Swing deprecated message to removed-features (2023-02-16 18:15:08 +0000)
->
-> ----------------------------------------------------------------
-> Remove C virtiofsd
->
-> We deprecated the C virtiofsd in commit 34deee7b6a1418f3d62a
-> in v7.0 in favour of the Rust implementation at
->
->   https://gitlab.com/virtio-fs/virtiofsd
->
-> since then, the Rust version has had more development and
-> has held up well.  It's time to say goodbye to the C version
-> that got us going.
->
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
->
-> ----------------------------------------------------------------
+To: Anton Kuchin <antonkuchin@yandex-team.ru>
+Cc: qemu-devel@nongnu.org, yc-core@yandex-team.ru, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Markus Armbruster <armbru@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Juan Quintela <quintela@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, virtio-fs@redhat.com, Eric Blake <eblake@redhat.com>
 
 
-Applied, thanks.
+--1cajONYwFAWKaZxB
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Please update the changelog at https://wiki.qemu.org/ChangeLog/8.0
-for any user-visible changes.
+On Fri, Feb 17, 2023 at 07:00:38PM +0200, Anton Kuchin wrote:
+> Migration of vhost-user-fs device requires transfer of FUSE internal state
+> from backend. There is no standard way to do it now so by default migrati=
+on
+> must be blocked. But if this state can be externally transferred by
+> orchestrator give it an option to explicitly allow migration.
+>=20
+> Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
+> ---
+>  hw/core/qdev-properties-system.c    | 10 +++++++++
+>  hw/virtio/vhost-user-fs.c           | 32 ++++++++++++++++++++++++++++-
+>  include/hw/qdev-properties-system.h |  1 +
+>  include/hw/virtio/vhost-user-fs.h   |  2 ++
+>  qapi/migration.json                 | 16 +++++++++++++++
+>  5 files changed, 60 insertions(+), 1 deletion(-)
 
--- PMM
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
+--1cajONYwFAWKaZxB
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmP1LXIACgkQnKSrs4Gr
+c8ivrwgAt5GdQxjyi0fVLBoBkgHZheMzo79D9gVii15uTadRD01uNa0S5w6gjfEk
+IgYeiEXydei/COYYX7HjUcd3jRezxIfVPQALNp5aqnylOnBar1+a/Bc7GzpsIJM0
+0KrJco5zRmKV8fP7Yvd++QJkilhqKNsrJqaJ3cbAbVkdC/lBnJfHqtzwdb2zMKsH
+xtS7KX+l3FBt8SHwdMAodKVr6u3UnjltP+K0os0agHu8kt8DRW4blHl1UlIBNU4F
+XaaD0iOBBdH6Zak4rD7ZLC5IfOa0AXkVP2KdCRR6yS+OoKNes+kcleV/Nc2W2FlC
+x1jF0TWf6AwMw4VtBZwCbtJX3VCNGQ==
+=ZmWd
+-----END PGP SIGNATURE-----
+
+--1cajONYwFAWKaZxB--

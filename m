@@ -1,13 +1,21 @@
-Return-Path: <hreitz@redhat.com>
-From: Hanna Czenczek <hreitz@redhat.com>
-Date: Mon, 13 Mar 2023 18:48:33 +0100
-Message-Id: <20230313174833.28790-3-hreitz@redhat.com>
-In-Reply-To: <20230313174833.28790-1-hreitz@redhat.com>
-References: <20230313174833.28790-1-hreitz@redhat.com>
+Return-Path: <antonkuchin@yandex-team.ru>
+Message-ID: <954a51f0-dfb8-7688-2197-d93e6b0c5fde@yandex-team.ru>
+Date: Wed, 22 Feb 2023 19:15:40 +0200
 MIME-Version: 1.0
-Content-type: text/plain
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC 2/2] vhost-user-fs: Implement stateful migration
+References: <20230217170038.1273710-1-antonkuchin@yandex-team.ru>
+ <20230217170038.1273710-2-antonkuchin@yandex-team.ru>
+ <59165bde-bfd4-a073-c618-205be3951e4a@yandex-team.ru>
+ <20230222074214-mutt-send-email-mst@kernel.org>
+ <22fee9b6-1dc0-792c-13cf-54c9303556ab@yandex-team.ru>
+ <8372550f-def7-4336-c597-d22155abf145@yandex-team.ru>
+ <20230222112907-mutt-send-email-mst@kernel.org>
+From: Anton Kuchin <antonkuchin@yandex-team.ru>
+In-Reply-To: <20230222112907-mutt-send-email-mst@kernel.org>
+Content-Language: en-US, ru-RU
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v3 1/1] vhost-user-fs: add migration type
+ property
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,214 +24,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: Hanna Czenczek <hreitz@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "Dr . David Alan Gilbert" <dgilbert@redhat.com>, Juan Quintela <quintela@redhat.com>
+To: "Michael S. Tsirkin" <mst@redhat.com>, Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>
+Cc: qemu-devel@nongnu.org, yc-core@yandex-team.ru, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Markus Armbruster <armbru@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Juan Quintela <quintela@redhat.com>, =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, virtio-fs@redhat.com, Eric Blake <eblake@redhat.com>
 
-A virtio-fs device's VM state consists of:
-- the virtio device (vring) state (VMSTATE_VIRTIO_DEVICE)
-- the back-end's (virtiofsd's) internal state
+On 22/02/2023 18:43, Michael S. Tsirkin wrote:
+> On Wed, Feb 22, 2023 at 06:14:31PM +0300, Vladimir Sementsov-Ogievskiy wr=
+ote:
+>> On 22.02.23 17:25, Anton Kuchin wrote:
+>>>>>> +static int vhost_user_fs_pre_save(void *opaque)
+>>>>>> +{
+>>>>>> +=C2=A0=C2=A0=C2=A0 VHostUserFS *fs =3D opaque;
+>>>>>> +=C2=A0=C2=A0=C2=A0 g_autofree char *path =3D object_get_canonical_p=
+ath(OBJECT(fs));
+>>>>>> +
+>>>>>> +=C2=A0=C2=A0=C2=A0 switch (fs->migration_type) {
+>>>>>> +=C2=A0=C2=A0=C2=A0 case VHOST_USER_MIGRATION_TYPE_NONE:
+>>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 error_report("Migration =
+is blocked by device %s", path);
+>>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 break;
+>>>>>> +=C2=A0=C2=A0=C2=A0 case VHOST_USER_MIGRATION_TYPE_EXTERNAL:
+>>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 return 0;
+>>>>>> +=C2=A0=C2=A0=C2=A0 default:
+>>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 error_report("Migration =
+type '%s' is not supported by device %s",
+>>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 VhostUserMigrationTy=
+pe_str(fs->migration_type), path);
+>>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 break;
+>>>>>> +=C2=A0=C2=A0=C2=A0 }
+>>>>>> +
+>>>>>> +=C2=A0=C2=A0=C2=A0 return -1;
+>>>>>> +}
+>>>>> Should we also add this as .pre_load, to force user select correct mi=
+gration_type on target too?
+>>>> In fact, I would claim we only want pre_load.
+>>>> When qemu is started on destination we know where it's migrated
+>>>> from so this flag can be set.
+>>>> When qemu is started on source we generally do not yet know so
+>>>> we don't know whether it's safe to set this flag.
+>> But destination is a "source" for next migration, so there shouldn't be =
+real difference.
+> And whether to allow that migration should be decided by destination of
+> that migration.
 
-We get/set the latter via the new vhost-user operations FS_SET_STATE_FD,
-FS_GET_STATE, and FS_SET_STATE.
+Destination can just refuse to load unsupported state. But this happens
+automatically if migration code finds unknown subsection and needs no
+explicit check by device .pre_load.
 
-Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
----
- hw/virtio/vhost-user-fs.c | 171 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 170 insertions(+), 1 deletion(-)
-
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 83fc20e49e..df1fb02acc 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -20,8 +20,10 @@
- #include "hw/virtio/virtio-bus.h"
- #include "hw/virtio/virtio-access.h"
- #include "qemu/error-report.h"
-+#include "qemu/memfd.h"
- #include "hw/virtio/vhost.h"
- #include "hw/virtio/vhost-user-fs.h"
-+#include "migration/qemu-file-types.h"
- #include "monitor/monitor.h"
- #include "sysemu/sysemu.h"
- 
-@@ -298,9 +300,176 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
-     return &fs->vhost_dev;
- }
- 
-+/**
-+ * Fetch the internal state from the back-end (virtiofsd) and save it
-+ * to `f`.
-+ */
-+static int vuf_save_state(QEMUFile *f, void *pv, size_t size,
-+                          const VMStateField *field, JSONWriter *vmdesc)
-+{
-+    VirtIODevice *vdev = pv;
-+    VHostUserFS *fs = VHOST_USER_FS(vdev);
-+    int memfd = -1;
-+    /* Size of the shared memory through which to transfer the state */
-+    const size_t chunk_size = 4 * 1024 * 1024;
-+    size_t state_offset;
-+    ssize_t remaining;
-+    void *shm_buf;
-+    Error *local_err = NULL;
-+    int ret, ret2;
-+
-+    /* Set up shared memory through which to receive the state from virtiofsd */
-+    shm_buf = qemu_memfd_alloc("vhost-fs-state", chunk_size,
-+                               F_SEAL_SEAL | F_SEAL_SHRINK | F_SEAL_GROW,
-+                               &memfd, &local_err);
-+    if (!shm_buf) {
-+        error_report_err(local_err);
-+        ret = -ENOMEM;
-+        goto early_fail;
-+    }
-+
-+    /* Share the SHM area with virtiofsd */
-+    ret = vhost_fs_set_state_fd(&fs->vhost_dev, memfd, chunk_size);
-+    if (ret < 0) {
-+        goto early_fail;
-+    }
-+
-+    /* Receive the virtiofsd state in chunks, and write them to `f` */
-+    state_offset = 0;
-+    do {
-+        size_t this_chunk_size;
-+
-+        remaining = vhost_fs_get_state(&fs->vhost_dev, state_offset,
-+                                       chunk_size);
-+        if (remaining < 0) {
-+            ret = remaining;
-+            goto fail;
-+        }
-+
-+        /* Prefix the whole state by its total length */
-+        if (state_offset == 0) {
-+            qemu_put_be64(f, remaining);
-+        }
-+
-+        this_chunk_size = MIN(remaining, chunk_size);
-+        qemu_put_buffer(f, shm_buf, this_chunk_size);
-+        state_offset += this_chunk_size;
-+    } while (remaining >= chunk_size);
-+
-+    ret = 0;
-+fail:
-+    /* Have virtiofsd close the shared memory */
-+    ret2 = vhost_fs_set_state_fd(&fs->vhost_dev, -1, 0);
-+    if (ret2 < 0) {
-+        error_report("Failed to remove state FD from the vhost-user-fs back "
-+                     "end: %s", strerror(-ret));
-+        if (ret == 0) {
-+            ret = ret2;
-+        }
-+    }
-+
-+early_fail:
-+    if (shm_buf) {
-+        qemu_memfd_free(shm_buf, chunk_size, memfd);
-+    }
-+
-+    return ret;
-+}
-+
-+/**
-+ * Load the back-end's (virtiofsd's) internal state from `f` and send
-+ * it over to that back-end.
-+ */
-+static int vuf_load_state(QEMUFile *f, void *pv, size_t size,
-+                          const VMStateField *field)
-+{
-+    VirtIODevice *vdev = pv;
-+    VHostUserFS *fs = VHOST_USER_FS(vdev);
-+    int memfd = -1;
-+    /* Size of the shared memory through which to transfer the state */
-+    const size_t chunk_size = 4 * 1024 * 1024;
-+    size_t state_offset;
-+    uint64_t remaining;
-+    void *shm_buf;
-+    Error *local_err = NULL;
-+    int ret, ret2;
-+
-+    /* The state is prefixed by its total length, read that first */
-+    remaining = qemu_get_be64(f);
-+
-+    /* Set up shared memory through which to send the state to virtiofsd */
-+    shm_buf = qemu_memfd_alloc("vhost-fs-state", chunk_size,
-+                               F_SEAL_SEAL | F_SEAL_SHRINK | F_SEAL_GROW,
-+                               &memfd, &local_err);
-+    if (!shm_buf) {
-+        error_report_err(local_err);
-+        ret = -ENOMEM;
-+        goto early_fail;
-+    }
-+
-+    /* Share the SHM area with virtiofsd */
-+    ret = vhost_fs_set_state_fd(&fs->vhost_dev, memfd, chunk_size);
-+    if (ret < 0) {
-+        goto early_fail;
-+    }
-+
-+    /*
-+     * Read the virtiofsd state in chunks from `f`, and send them over
-+     * to virtiofsd
-+     */
-+    state_offset = 0;
-+    do {
-+        size_t this_chunk_size = MIN(remaining, chunk_size);
-+
-+        if (qemu_get_buffer(f, shm_buf, this_chunk_size) < this_chunk_size) {
-+            ret = -EINVAL;
-+            goto fail;
-+        }
-+
-+        ret = vhost_fs_set_state(&fs->vhost_dev, state_offset, this_chunk_size);
-+        if (ret < 0) {
-+            goto fail;
-+        }
-+
-+        state_offset += this_chunk_size;
-+        remaining -= this_chunk_size;
-+    } while (remaining > 0);
-+
-+    ret = 0;
-+fail:
-+    ret2 = vhost_fs_set_state_fd(&fs->vhost_dev, -1, 0);
-+    if (ret2 < 0) {
-+        error_report("Failed to remove state FD from the vhost-user-fs back "
-+                     "end -- perhaps it failed to deserialize/apply the state: "
-+                     "%s", strerror(-ret2));
-+        if (ret == 0) {
-+            ret = ret2;
-+        }
-+    }
-+
-+early_fail:
-+    if (shm_buf) {
-+        qemu_memfd_free(shm_buf, chunk_size, memfd);
-+    }
-+
-+    return ret;
-+}
-+
- static const VMStateDescription vuf_vmstate = {
-     .name = "vhost-user-fs",
--    .unmigratable = 1,
-+    .version_id = 1,
-+    .fields = (VMStateField[]) {
-+        VMSTATE_VIRTIO_DEVICE,
-+        {
-+            .name = "back-end",
-+            .info = &(const VMStateInfo) {
-+                .name = "virtio-fs back-end state",
-+                .get = vuf_load_state,
-+                .put = vuf_save_state,
-+            },
-+        },
-+        VMSTATE_END_OF_LIST()
-+    },
- };
- 
- static Property vuf_properties[] = {
--- 
-2.39.1
+>
+>
+>> The new property has ".realized_set_allowed =3D true", so, as I understa=
+nd it may be changed at any time, so that's not a problem.
+>>
+>>> This property selects if VM can migrate and if it can what should qemu =
+put
+>>> to the migration stream. So we select on source what type of migration =
+is
+>>> allowed for this VM, destination can't check anything at load time.
+>> OK, so the new field "migration" regulates only outgoing migration and d=
+o nothing for incoming. On incoming migration the migration stream itself d=
+efines the type of device migration.
+>> Worth mentioning in doc?
+>>
+>> --=20
+>> Best regards,
+>> Vladimir
 

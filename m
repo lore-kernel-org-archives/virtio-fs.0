@@ -1,25 +1,21 @@
-Return-Path: <eperezma@redhat.com>
+Return-Path: <mst@redhat.com>
+Date: Wed, 22 Feb 2023 11:51:52 -0500
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20230222115106-mutt-send-email-mst@kernel.org>
+References: <20230217170038.1273710-1-antonkuchin@yandex-team.ru>
+ <20230217170038.1273710-2-antonkuchin@yandex-team.ru>
+ <59165bde-bfd4-a073-c618-205be3951e4a@yandex-team.ru>
+ <20230222074214-mutt-send-email-mst@kernel.org>
+ <22fee9b6-1dc0-792c-13cf-54c9303556ab@yandex-team.ru>
+ <8372550f-def7-4336-c597-d22155abf145@yandex-team.ru>
+ <333c4451-8eef-0603-c3f5-10e38c0eb24e@yandex-team.ru>
 MIME-Version: 1.0
-References: <20230411150515.14020-1-hreitz@redhat.com>
- <20230411150515.14020-3-hreitz@redhat.com>
- <20230412210641.GC2813183@fedora>
- <246691c3-2287-7472-3615-7ec0f074445c@redhat.com>
- <CAJSP0QU-iDTT+xtkZ_xRf4vX+hM0WY+H1SXSuyS+cjiogz3A_A@mail.gmail.com>
- <b0cd4f54-94ed-09a4-cec2-e81f36da4008@redhat.com>
- <CAJaqyWegMfuc8s6bKdxdM4uVixmhy-F3xUUyOCYS1yGDXoiVZA@mail.gmail.com>
- <20230417151840.GD3852722@fedora>
- <CAJaqyWeTBXStyxty4G5qpiG=UoZkmOmr75hHaC3H21kJfK=idg@mail.gmail.com>
- <CAJSP0QWmFgJvVPLDo2eoFapj8GCmDjaaEygAaywZwHuH=_q=rQ@mail.gmail.com>
- <CAJaqyWd122pfv4XMzQhju7a5DV3FwbXvbedh1Z9s6T5Pw4a0GQ@mail.gmail.com>
- <CAJSP0QWhivOnFmmkBoZkxui6xbUVjs3oEUc3-QwPN2V3d7t9rg@mail.gmail.com>
-In-Reply-To: <CAJSP0QWhivOnFmmkBoZkxui6xbUVjs3oEUc3-QwPN2V3d7t9rg@mail.gmail.com>
-From: Eugenio Perez Martin <eperezma@redhat.com>
-Date: Tue, 18 Apr 2023 12:09:23 +0200
-Message-ID: <CAJaqyWe_CyPHMj8bvr7x0T+nRuPjQA1FSHzdFqbpaJfhHbUhEw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+In-Reply-To: <333c4451-8eef-0603-c3f5-10e38c0eb24e@yandex-team.ru>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
- state transfer
+Subject: Re: [Virtio-fs] [PATCH v3 1/1] vhost-user-fs: add migration type
+ property
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,86 +24,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@gmail.com>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
+To: Anton Kuchin <antonkuchin@yandex-team.ru>
+Cc: Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, qemu-devel@nongnu.org, yc-core@yandex-team.ru, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Markus Armbruster <armbru@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Juan Quintela <quintela@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, virtio-fs@redhat.com, Eric Blake <eblake@redhat.com>
 
-On Mon, Apr 17, 2023 at 9:46=E2=80=AFPM Stefan Hajnoczi <stefanha@gmail.com=
-> wrote:
->
-> On Mon, 17 Apr 2023 at 15:12, Eugenio Perez Martin <eperezma@redhat.com> =
-wrote:
-> >
-> > On Mon, Apr 17, 2023 at 9:08=E2=80=AFPM Stefan Hajnoczi <stefanha@gmail=
-.com> wrote:
-> > >
-> > > On Mon, 17 Apr 2023 at 14:56, Eugenio Perez Martin <eperezma@redhat.c=
-om> wrote:
-> > > >
-> > > > On Mon, Apr 17, 2023 at 5:18=E2=80=AFPM Stefan Hajnoczi <stefanha@r=
-edhat.com> wrote:
-> > > > >
-> > > > > On Fri, Apr 14, 2023 at 05:17:02PM +0200, Eugenio Perez Martin wr=
-ote:
-> > > > > > On Thu, Apr 13, 2023 at 7:55=E2=80=AFPM Hanna Czenczek <hreitz@=
-redhat.com> wrote:
-> > > > > > >
-> > > > > > > On 13.04.23 13:38, Stefan Hajnoczi wrote:
-> > > > > > > > On Thu, 13 Apr 2023 at 05:24, Hanna Czenczek <hreitz@redhat=
-.com> wrote:
-> > > > > > > >> On 12.04.23 23:06, Stefan Hajnoczi wrote:
-> > > > > > > >>> On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek =
-wrote:
-> > > > > > > Basically, what I=E2=80=99m hearing is that I need to impleme=
-nt a different
-> > > > > > > feature that has no practical impact right now, and also fix =
-bugs around
-> > > > > > > it along the way...
-> > > > > > >
-> > > > > >
-> > > > > > To fix this properly requires iterative device migration in qem=
-u as
-> > > > > > far as I know, instead of using VMStates [1]. This way the stat=
-e is
-> > > > > > requested to virtiofsd before the device reset.
-> > > > >
-> > > > > I don't follow. Many devices are fine with non-iterative migratio=
-n. They
-> > > > > shouldn't be forced to do iterative migration.
-> > > > >
-> > > >
-> > > > Sorry I think I didn't express myself well. I didn't mean to force
-> > > > virtiofsd to support the iterative migration, but to use the device
-> > > > iterative migration API in QEMU to send the needed commands before
-> > > > vhost_dev_stop. In that regard, the device or the vhost-user comman=
-ds
-> > > > would not require changes.
-> > > >
-> > > > I think it is convenient in the long run for virtiofsd, as if the
-> > > > state grows so much that it's not feasible to fetch it in one shot
-> > > > there is no need to make changes in the qemu migration protocol. I
-> > > > think it is not unlikely in virtiofs, but maybe I'm missing somethi=
-ng
-> > > > obvious and it's state will never grow.
-> > >
-> > > I don't understand. vCPUs are still running at that point and the
-> > > device state could change. It's not safe to save the full device stat=
-e
-> > > until vCPUs have stopped (after vhost_dev_stop).
-> > >
-> >
-> > I think the vCPU is already stopped at save_live_complete_precopy
-> > callback. Maybe my understanding is wrong?
->
-> Agreed, vCPUs are stopped in save_live_complete_precopy(). However,
-> you wrote "use the device iterative migration API in QEMU to send the
-> needed commands before vhost_dev_stop". save_live_complete_precopy()
-> runs after vhost_dev_stop() so it doesn't seem to solve the problem.
->
+On Wed, Feb 22, 2023 at 06:49:10PM +0200, Anton Kuchin wrote:
+> On 22/02/2023 17:14, Vladimir Sementsov-Ogievskiy wrote:
+> > On 22.02.23 17:25, Anton Kuchin wrote:
+> > > > > > +static int vhost_user_fs_pre_save(void *opaque)
+> > > > > > +{
+> > > > > > +=A0=A0=A0 VHostUserFS *fs =3D opaque;
+> > > > > > +=A0=A0=A0 g_autofree char *path =3D object_get_canonical_path(=
+OBJECT(fs));
+> > > > > > +
+> > > > > > +=A0=A0=A0 switch (fs->migration_type) {
+> > > > > > +=A0=A0=A0 case VHOST_USER_MIGRATION_TYPE_NONE:
+> > > > > > +=A0=A0=A0=A0=A0=A0=A0 error_report("Migration is blocked by de=
+vice %s", path);
+> > > > > > +=A0=A0=A0=A0=A0=A0=A0 break;
+> > > > > > +=A0=A0=A0 case VHOST_USER_MIGRATION_TYPE_EXTERNAL:
+> > > > > > +=A0=A0=A0=A0=A0=A0=A0 return 0;
+> > > > > > +=A0=A0=A0 default:
+> > > > > > +=A0=A0=A0=A0=A0=A0=A0 error_report("Migration type '%s' is not
+> > > > > > supported by device %s",
+> > > > > > + VhostUserMigrationType_str(fs->migration_type), path);
+> > > > > > +=A0=A0=A0=A0=A0=A0=A0 break;
+> > > > > > +=A0=A0=A0 }
+> > > > > > +
+> > > > > > +=A0=A0=A0 return -1;
+> > > > > > +}
+> > > > > Should we also add this as .pre_load, to force user select
+> > > > > correct migration_type on target too?
+> > > > In fact, I would claim we only want pre_load.
+> > > > When qemu is started on destination we know where it's migrated
+> > > > from so this flag can be set.
+> > > > When qemu is started on source we generally do not yet know so
+> > > > we don't know whether it's safe to set this flag.
+> >=20
+> > But destination is a "source" for next migration, so there shouldn't be
+> > real difference.
+> > The new property has ".realized_set_allowed =3D true", so, as I underst=
+and
+> > it may be changed at any time, so that's not a problem.
+>=20
+> Yes, exactly. So destination's property sets not how it will handle this
+> incoming
+> migration but the future outgoing one.
 
-You're right, and it actually makes the most sense.
 
-So I guess this converges with the other thread, let's follow the
-discussion there.
+How do you know where you are going to migrate though?
+I think you don't.
+Setting it on source is better since we know where we
+are migrating from.
 
-Thanks!
+> >=20
+> > >=20
+> > > This property selects if VM can migrate and if it can what should
+> > > qemu put
+> > > to the migration stream. So we select on source what type of
+> > > migration is
+> > > allowed for this VM, destination can't check anything at load time.
+> >=20
+> > OK, so the new field "migration" regulates only outgoing migration and
+> > do nothing for incoming. On incoming migration the migration stream
+> > itself defines the type of device migration.
+> > Worth mentioning in doc?
+>=20
+> Good point. I don't think this deserves a respin but if I have to send v4
+> I'll include
+> clarification in it.
 

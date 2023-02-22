@@ -1,16 +1,24 @@
-Return-Path: <hreitz@redhat.com>
-Message-ID: <0ca69a92-49ab-223e-b737-9d8655883f38@redhat.com>
-Date: Thu, 13 Apr 2023 10:19:18 +0200
+Return-Path: <mst@redhat.com>
+Date: Wed, 22 Feb 2023 15:21:36 -0500
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20230222151814-mutt-send-email-mst@kernel.org>
+References: <20230217170038.1273710-2-antonkuchin@yandex-team.ru>
+ <59165bde-bfd4-a073-c618-205be3951e4a@yandex-team.ru>
+ <20230222074214-mutt-send-email-mst@kernel.org>
+ <22fee9b6-1dc0-792c-13cf-54c9303556ab@yandex-team.ru>
+ <8372550f-def7-4336-c597-d22155abf145@yandex-team.ru>
+ <333c4451-8eef-0603-c3f5-10e38c0eb24e@yandex-team.ru>
+ <20230222115106-mutt-send-email-mst@kernel.org>
+ <11593688-7ca4-def3-6212-7c26faa4d1c6@yandex-team.ru>
+ <20230222121133-mutt-send-email-mst@kernel.org>
+ <a477ca70-8aea-6c16-122e-1ded4af11f49@yandex-team.ru>
 MIME-Version: 1.0
-References: <20230411150515.14020-1-hreitz@redhat.com>
- <20230411150515.14020-2-hreitz@redhat.com> <20230412205138.GA2813183@fedora>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <20230412205138.GA2813183@fedora>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 1/4] vhost: Re-enable vrings after setting
- features
+In-Reply-To: <a477ca70-8aea-6c16-122e-1ded4af11f49@yandex-team.ru>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v3 1/1] vhost-user-fs: add migration type
+ property
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,164 +27,139 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, Roman Kagan <rvkagan@yandex-team.ru>, Maxime Coquelin <maxime.coquelin@redhat.com>, =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>
+To: Anton Kuchin <antonkuchin@yandex-team.ru>
+Cc: Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, qemu-devel@nongnu.org, yc-core@yandex-team.ru, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Markus Armbruster <armbru@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Juan Quintela <quintela@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, virtio-fs@redhat.com, Eric Blake <eblake@redhat.com>
 
-On 12.04.23 22:51, Stefan Hajnoczi wrote:
-> On Tue, Apr 11, 2023 at 05:05:12PM +0200, Hanna Czenczek wrote:
->> If the back-end supports the VHOST_USER_F_PROTOCOL_FEATURES feature,
->> setting the vhost features will set this feature, too.  Doing so
->> disables all vrings, which may not be intended.
->>
->> For example, enabling or disabling logging during migration requires
->> setting those features (to set or unset VHOST_F_LOG_ALL), which will
->> automatically disable all vrings.  In either case, the VM is running
->> (disabling logging is done after a failed or cancelled migration, and
->> only once the VM is running again, see comment in
->> memory_global_dirty_log_stop()), so the vrings should really be enabled.
->> As a result, the back-end seems to hang.
->>
->> To fix this, we must remember whether the vrings are supposed to be
->> enabled, and, if so, re-enable them after a SET_FEATURES call that set
->> VHOST_USER_F_PROTOCOL_FEATURES.
->>
->> It seems less than ideal that there is a short period in which the VM is
->> running but the vrings will be stopped (between SET_FEATURES and
->> SET_VRING_ENABLE).  To fix this, we would need to change the protocol,
->> e.g. by introducing a new flag or vhost-user protocol feature to disable
->> disabling vrings whenever VHOST_USER_F_PROTOCOL_FEATURES is set, or add
->> new functions for setting/clearing singular feature bits (so that
->> F_LOG_ALL can be set/cleared without touching F_PROTOCOL_FEATURES).
->>
->> Even with such a potential addition to the protocol, we still need this
->> fix here, because we cannot expect that back-ends will implement this
->> addition.
->>
->> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
->> ---
->>   include/hw/virtio/vhost.h | 10 ++++++++++
->>   hw/virtio/vhost.c         | 13 +++++++++++++
->>   2 files changed, 23 insertions(+)
->>
->> diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
->> index a52f273347..2fe02ed5d4 100644
->> --- a/include/hw/virtio/vhost.h
->> +++ b/include/hw/virtio/vhost.h
->> @@ -90,6 +90,16 @@ struct vhost_dev {
->>       int vq_index_end;
->>       /* if non-zero, minimum required value for max_queues */
->>       int num_queues;
->> +
->> +    /*
->> +     * Whether the virtqueues are supposed to be enabled (via
->> +     * SET_VRING_ENABLE).  Setting the features (e.g. for
->> +     * enabling/disabling logging) will disable all virtqueues if
->> +     * VHOST_USER_F_PROTOCOL_FEATURES is set, so then we need to
->> +     * re-enable them if this field is set.
->> +     */
->> +    bool enable_vqs;
->> +
->>       /**
->>        * vhost feature handling requires matching the feature set
->>        * offered by a backend which may be a subset of the total
->> diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
->> index a266396576..cbff589efa 100644
->> --- a/hw/virtio/vhost.c
->> +++ b/hw/virtio/vhost.c
->> @@ -50,6 +50,8 @@ static unsigned int used_memslots;
->>   static QLIST_HEAD(, vhost_dev) vhost_devices =
->>       QLIST_HEAD_INITIALIZER(vhost_devices);
->>   
->> +static int vhost_dev_set_vring_enable(struct vhost_dev *hdev, int enable);
->> +
->>   bool vhost_has_free_slot(void)
->>   {
->>       unsigned int slots_limit = ~0U;
->> @@ -899,6 +901,15 @@ static int vhost_dev_set_features(struct vhost_dev *dev,
->>           }
->>       }
->>   
->> +    if (dev->enable_vqs) {
->> +        /*
->> +         * Setting VHOST_USER_F_PROTOCOL_FEATURES would have disabled all
->> +         * virtqueues, even if that was not intended; re-enable them if
->> +         * necessary.
->> +         */
->> +        vhost_dev_set_vring_enable(dev, true);
->> +    }
->> +
->>   out:
->>       return r;
->>   }
->> @@ -1896,6 +1907,8 @@ int vhost_dev_get_inflight(struct vhost_dev *dev, uint16_t queue_size,
->>   
->>   static int vhost_dev_set_vring_enable(struct vhost_dev *hdev, int enable)
->>   {
->> +    hdev->enable_vqs = enable;
->> +
->>       if (!hdev->vhost_ops->vhost_set_vring_enable) {
->>           return 0;
->>       }
-> The vhost-user spec doesn't say that VHOST_F_LOG_ALL needs to be toggled
-> at runtime and I don't think VHOST_USER_SET_PROTOCOL_FEATURES is
-> intended to be used like that. This issue shows why doing so is a bad
-> idea.
->
-> VHOST_F_LOG_ALL does not need to be toggled to control logging. Logging
-> is controlled at runtime by the presence of the dirty log
-> (VHOST_USER_SET_LOG_BASE) and the per-vring logging flag
-> (VHOST_VRING_F_LOG).
+On Wed, Feb 22, 2023 at 08:25:19PM +0200, Anton Kuchin wrote:
+> On 22/02/2023 19:12, Michael S. Tsirkin wrote:
+> > On Wed, Feb 22, 2023 at 07:05:47PM +0200, Anton Kuchin wrote:
+> > > On 22/02/2023 18:51, Michael S. Tsirkin wrote:
+> > > > On Wed, Feb 22, 2023 at 06:49:10PM +0200, Anton Kuchin wrote:
+> > > > > On 22/02/2023 17:14, Vladimir Sementsov-Ogievskiy wrote:
+> > > > > > On 22.02.23 17:25, Anton Kuchin wrote:
+> > > > > > > > > > +static int vhost_user_fs_pre_save(void *opaque)
+> > > > > > > > > > +{
+> > > > > > > > > > +=A0=A0=A0 VHostUserFS *fs =3D opaque;
+> > > > > > > > > > +=A0=A0=A0 g_autofree char *path =3D object_get_canonic=
+al_path(OBJECT(fs));
+> > > > > > > > > > +
+> > > > > > > > > > +=A0=A0=A0 switch (fs->migration_type) {
+> > > > > > > > > > +=A0=A0=A0 case VHOST_USER_MIGRATION_TYPE_NONE:
+> > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 error_report("Migration is block=
+ed by device %s", path);
+> > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 break;
+> > > > > > > > > > +=A0=A0=A0 case VHOST_USER_MIGRATION_TYPE_EXTERNAL:
+> > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 return 0;
+> > > > > > > > > > +=A0=A0=A0 default:
+> > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 error_report("Migration type '%s=
+' is not
+> > > > > > > > > > supported by device %s",
+> > > > > > > > > > + VhostUserMigrationType_str(fs->migration_type), path);
+> > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 break;
+> > > > > > > > > > +=A0=A0=A0 }
+> > > > > > > > > > +
+> > > > > > > > > > +=A0=A0=A0 return -1;
+> > > > > > > > > > +}
+> > > > > > > > > Should we also add this as .pre_load, to force user select
+> > > > > > > > > correct migration_type on target too?
+> > > > > > > > In fact, I would claim we only want pre_load.
+> > > > > > > > When qemu is started on destination we know where it's migr=
+ated
+> > > > > > > > from so this flag can be set.
+> > > > > > > > When qemu is started on source we generally do not yet know=
+ so
+> > > > > > > > we don't know whether it's safe to set this flag.
+> > > > > > But destination is a "source" for next migration, so there shou=
+ldn't be
+> > > > > > real difference.
+> > > > > > The new property has ".realized_set_allowed =3D true", so, as I=
+ understand
+> > > > > > it may be changed at any time, so that's not a problem.
+> > > > > Yes, exactly. So destination's property sets not how it will hand=
+le this
+> > > > > incoming
+> > > > > migration but the future outgoing one.
+> > > > How do you know where you are going to migrate though?
+> > > > I think you don't.
+> > > > Setting it on source is better since we know where we
+> > > > are migrating from.
+> > > Yes, I don't know where I'm going to migrate to. This is why property
+> > > affects only how source saves state on outgoing migration.
+> > Um. I don't get the logic.
+>=20
+> For this feature to work we need orchestrator to manage the migration. And
+> we
+> generally assume that it is responsibility of orchestrator to ensure
+> matching
+> properties on source and destination.
+> As orchestrator manages both sides of migration it can set option (and we
+> can
+> check it) on either source or destination. Now it's not important which s=
+ide
+> we
+> select, because now the option is essentially binary allow/deny (but IMHO=
+ it
+> is much better to refuse source to migrate than find later that state can=
+'t
+> be
+> loaded by destination, in case of file migration this becomes especially
+> painful).
+>=20
+> But there are plans to add internal migration option (extract FUSE state
+> from
+> backend and transfer it in QEMU migration stream), and that's where
+> setting/checking
+> on source becomes important because it will rely on this property to deci=
+de
+> if
+> extra state form backend needs to be put in the migration stream subsecti=
+on.
 
-Technically, the spec doesn’t say that SET_LOG_BASE is required.  It says:
 
-“To start/stop logging of data/used ring writes, the front-end may send 
-messages VHOST_USER_SET_FEATURES with VHOST_F_LOG_ALL and 
-VHOST_USER_SET_VRING_ADDR with VHOST_VRING_F_LOG in ring’s flags set to 
-1/0, respectively.”
+If we do internal migration that will be a different property
+which has to match on source *and* destination.
 
-(So the spec also very much does imply that toggling F_LOG_ALL at 
-runtime is a valid way to enable/disable logging.  If we were to no 
-longer do that, we should clarify it there.)
 
-I mean, naturally, logging without a shared memory area to log in to 
-isn’t much fun, so we could clarify that SET_LOG_BASE is also a 
-requirement, but it looks to me as if we can’t use SET_LOG_BASE to 
-disable logging, because it’s supposed to always pass a valid FD (at 
-least libvhost-user expects this: 
-https://gitlab.com/qemu-project/qemu/-/blob/master/subprojects/libvhost-user/libvhost-user.c#L1044). 
-So after a cancelled migration, the dirty bitmap SHM will stay around 
-indefinitely (which is already not great, but if we were to use the 
-presence of that bitmap as an indicator as to whether we should log or 
-not, it would be worse).
+> If you are concerned about orchestrator breaking assumption of matching
+> properties
+> on source and destination this is not really supported AFAIK but I don't
+> think we
+> need to punish it for this, maybe it has its reasons: I can imagine scena=
+rio
+> where orchestrator could want to migrate from source with
+> 'migration=3Dexternal'
+> to destination with 'migration=3Dnone' to ensure that destination can't be
+> migrated further.
 
-So the VRING_F_LOG flag remains.
+No. I am concerned about a simple practical matter:
+- I decide to restart qemu on the same host - so I need to enable
+  migration
+- Later I decide to migrate qemu to another host - this should be
+  blocked
 
-> I suggest permanently enabling VHOST_F_LOG_ALL upon connection when the
-> the backend supports it. No spec changes are required.
->
-> libvhost-user looks like it will work. I didn't look at DPDK/SPDK, but
-> checking that it works there is important too.
 
-I can’t find VRING_F_LOG in libvhost-user, so what protocol do you mean 
-exactly that would work in libvhost-user?  Because SET_LOG_BASE won’t 
-work, as you can’t use it to disable logging.
+Property on source does not satisfy both at the same time.
+Property on destination does.
 
-(For DPDK, I’m not sure.  It looks like it sometimes takes VRING_F_LOG 
-into account, but I think only when it comes to logging accesses to the 
-vring specifically, i.e. not DMA to other areas of guest memory?  I 
-think only places that use vq->log_guest_addr implicitly check it, 
-others don’t.  So for example, 
-vhost_log_write_iova()/vhost_log_cache_write_iova() don’t seem to check 
-VRING_F_LOG, which seem to be the functions generally used for writes to 
-memory outside of the vrings.  So here, even if VRING_F_LOG is disabled 
-for all vrings, as long as a log SHM is set, all writes to memory 
-outside of the immediate vrings seem to cause logging (as long as 
-F_LOG_ALL is set).)
 
-Hanna
 
-> I have CCed people who may be interested in this issue. This is the
-> first time I've looked at vhost-user logging, so this idea may not work.
->
-> Stefan
+> >=20
+> >=20
+> > > > > > > This property selects if VM can migrate and if it can what sh=
+ould
+> > > > > > > qemu put
+> > > > > > > to the migration stream. So we select on source what type of
+> > > > > > > migration is
+> > > > > > > allowed for this VM, destination can't check anything at load=
+ time.
+> > > > > > OK, so the new field "migration" regulates only outgoing migrat=
+ion and
+> > > > > > do nothing for incoming. On incoming migration the migration st=
+ream
+> > > > > > itself defines the type of device migration.
+> > > > > > Worth mentioning in doc?
+> > > > > Good point. I don't think this deserves a respin but if I have to=
+ send v4
+> > > > > I'll include
+> > > > > clarification in it.
 

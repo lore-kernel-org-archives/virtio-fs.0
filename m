@@ -1,11 +1,20 @@
-Return-Path: <xiagao@redhat.com>
-MIME-Version: 1.0
+Return-Path: <alpha754293@hotmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=hotmail.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=dU/LriFecgFDB4eUVpU5CE0w3rknABAoeT6vBKqFwlE=;
+ b=Cvvgb6Xg6LdSWCgmah56PqrFU4gDs6y9hbU6ymO9OS1fqVhso2wionfRVbkbiC9RPooJ7FWUBTsXtbZ4JYwnH6+rDS/6YwyrZz1xVD4varYBHJzW2y623q2nx5ijd/oNgomELIhH6OKQdCMLItngtMUQIm5MP0T9ouhDnWdrf5WytwJYtzRqDMzO6i+Nm6BmKbgPDH4Q5LIUsRDSJ16gOHE40OlDnUG9D3ceNPQgpKGMsHK/oisikCBGyYr3j2YRLtnQv39WA0+1D4/lPRCaKDrr1Njif2Utg+ht2CrVm/mSoCZRyExPfAT7xO8kLv+Lmg9WlJqxQoRTGcs2WqU/7w==
+From: Ewen Chan <alpha754293@hotmail.com>
+Date: Fri, 3 Mar 2023 04:09:26 +0000
+Message-ID: <SA1P221MB101899A720637370A7C33E64B5B39@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
 References: <SA1P221MB1018AA58757048B93CFB3437B5AD9@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
-In-Reply-To: <SA1P221MB1018AA58757048B93CFB3437B5AD9@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
-From: Xiaoling Gao <xiagao@redhat.com>
-Date: Fri, 3 Mar 2023 10:08:11 +0800
-Message-ID: <CADVA6RSDvd1PiqMuRS2EK=qcM-u9-8GkTN1R3PMfiyQF6_3FfQ@mail.gmail.com>
-Content-Type: multipart/related; boundary="00000000000081439905f5f56bd1"
+ <CADVA6RSDvd1PiqMuRS2EK=qcM-u9-8GkTN1R3PMfiyQF6_3FfQ@mail.gmail.com>
+In-Reply-To: <CADVA6RSDvd1PiqMuRS2EK=qcM-u9-8GkTN1R3PMfiyQF6_3FfQ@mail.gmail.com>
+MIME-Version: 1.0
+Content-Language: en-CA
+Content-Type: multipart/related;
+ boundary="_005_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_";
+ type="multipart/alternative"
 Subject: Re: [Virtio-fs] [virtio-fs] Windows 10 VirtioFS Service error - The
  service did not respond to the start or control request in a timely fashion
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -16,491 +25,419 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Ewen Chan <alpha754293@hotmail.com>
+To: Xiaoling Gao <xiagao@redhat.com>
 Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---00000000000081439905f5f56bd1
-Content-Type: multipart/alternative; boundary="00000000000081439705f5f56bd0"
+--_005_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_
+Content-Type: multipart/alternative;
+	boundary="_000_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_"
 
---00000000000081439705f5f56bd0
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-Ewen Chan <alpha754293@hotmail.com> =E4=BA=8E2023=E5=B9=B43=E6=9C=881=E6=97=
-=A5=E5=91=A8=E4=B8=89 20:05=E5=86=99=E9=81=93=EF=BC=9A
-
-> To Whom It May Concern:
->
-> I am trying to use Virtiofs inside a Windows 10 VM under Proxmox 7.3-3.
->
-> Previously, I was able to do it, but now, for some reason, whenever I try
-> to start the service, this is the error message that I get:
->
->
-> I tried a fresh install of Windows 10 Pro x64 and then installed the
-> virtio Windows drivers (virtio-win-0.1.229.iso) this error is still poppi=
-ng
-> up.
->
-> I have a script which daemonizes the virtiofsd daemon:
->
->   # cat launch-virtio-daemon.sh
->
-> #!/usr/bin/bash
->
->
->
-> function launch() {
->
->     nohup /usr/lib/kvm/virtiofsd --syslog --daemonize
-> --socket-path=3D/var/run/shared-fs.sock -o source=3D/export/myfs/ -o
-> cache=3Dalways &> /dev/null  &
->     return 0
-> }
->
-> launch
->
->
-> And in my Proxmox VM, I have called the launch-virtio-daemon.sh via a
-> Proxmox hookscript:
->
-> qm set 101 --hookscript local:snippets/virtiofs.pl
->
-> and this is what's in the virtiofs.pl file:
->
-> # cat /var/lib/vz/snippets/virtiofs.pl
->
-> #!/usr/bin/perl
->
-> # Exmple hook script for PVE guests (hookscript config option)
-> # You can set this via pct/qm with
-> # pct set <vmid> -hookscript <volume-id>
-> # qm set <vmid> -hookscript <volume-id>
-> # where <volume-id> has to be an executable file in the snippets folder
-> # of any storage with directories e.g.:
-> # qm set 100 -hookscript local:snippets/hookscript.pl
->
-> use strict;
-> use warnings;
->
-> print "GUEST HOOK: " . join(' ', @ARGV). "\n";
->
-> # First argument is the vmid
->
-> my $vmid =3D shift;
->
-> # Second argument is the phase
->
-> my $phase =3D shift;
->
-> if ($phase eq 'pre-start') {
->
->     # First phase 'pre-start' will be executed before the guest
->     # ist started. Exiting with a code !=3D 0 will abort the start
->
->     print "$vmid is starting, doing preparations.\n";
->
->     system('/var/lib/vz/snippets/launch-virtio-daemon.sh');
->
->     # print "preparations failed, aborting."
->     # exit(1);
->
-> } elsif ($phase eq 'post-start') {
->
->     # Second phase 'post-start' will be executed after the guest
->     # successfully started.
->
->     print "$vmid started successfully.\n";
->
-> } elsif ($phase eq 'pre-stop') {
->
->     # Third phase 'pre-stop' will be executed before stopping the guest
->     # via the API. Will not be executed if the guest is stopped from
->     # within e.g., with a 'poweroff'
->
->     print "$vmid will be stopped.\n";
->
-> } elsif ($phase eq 'post-stop') {
->
->     # Last phase 'post-stop' will be executed after the guest stopped.
->     # This should even be executed in case the guest crashes or stopped
->     # unexpectedly.
->
->     print "$vmid stopped. Doing cleanup.\n";
->
-> } else {
->     die "got unknown phase '$phase'\n";
-> }
->
-> exit(0);
->
->
->
-> This was working before and now I don't really know nor understand why it
-> isn't working anymore.
->
-
-Hi, you said it was working before, did you do some updates that lead to
-the failure?
-And could you check the virtiofsd daemon process status?
-
-Best,
-Xiaoling
-
-
->
-> Your help would be greatly appreciated.
->
-> Thank you.
->
-> Sincerely,
-> Ewen Chan
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
->
-
-
---=20
-BR,
-Xiaoling
-
---00000000000081439705f5f56bd0
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div dir=3D"ltr"><br></div><br><div class=3D"gmail_quote">=
-<div dir=3D"ltr" class=3D"gmail_attr">Ewen Chan &lt;<a href=3D"mailto:alpha=
-754293@hotmail.com">alpha754293@hotmail.com</a>&gt; =E4=BA=8E2023=E5=B9=B43=
-=E6=9C=881=E6=97=A5=E5=91=A8=E4=B8=89 20:05=E5=86=99=E9=81=93=EF=BC=9A<br><=
-/div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;bo=
-rder-left:1px solid rgb(204,204,204);padding-left:1ex"><div class=3D"msg-77=
-79357774933869110">
-
-
-
-
-<div dir=3D"ltr">
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-To Whom It May Concern:</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-I am trying to use Virtiofs inside a Windows 10 VM under Proxmox 7.3-3.</di=
-v>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-Previously, I was able to do it, but now, for some reason, whenever I try t=
-o start the service, this is the error message that I get:</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<img style=3D"max-width: 100%;" size=3D"6810" src=3D"cid:186a5379c006d0e7b4=
-11"></div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-I tried a fresh install of Windows 10 Pro x64 and then installed the virtio=
- Windows drivers (virtio-win-0.1.229.iso) this error is still popping up.</=
-div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-I have a script which daemonizes the virtiofsd daemon:</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<span>=E2=80=82=E2=80=82=E2=80=82=E2=80=82=C2=A0 # cat launch-virtio-daemon=
-.sh</span><br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<blockquote style=3D"margin-top:0px;margin-bottom:0px">
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">#!/usr/b=
-in/bash</span></div>
-</blockquote>
-<div><br>
-</div>
-<blockquote style=3D"margin-top:0px;margin-bottom:0px">
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">function=
- launch() {</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 nohup /usr/lib/kvm/virtiofsd --syslog --daemonize --socket-path=3D/v=
-ar/run/shared-fs.sock -o source=3D/export/myfs/ -o cache=3Dalways &amp;&gt;=
- /dev/null =C2=A0&amp;</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 return 0</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">}</span>=
-</div>
-<div><br>
-</div>
-<span style=3D"font-family:&quot;Courier New&quot;,monospace">launch</span>=
-<br>
-</blockquote>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-And in my Proxmox VM, I have called the launch-virtio-daemon.sh via a Proxm=
-ox hookscript:</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-qm set 101 --hookscript local:snippets/<a href=3D"http://virtiofs.pl" targe=
-t=3D"_blank">virtiofs.pl</a></div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-and this is what&#39;s in the <a href=3D"http://virtiofs.pl" target=3D"_bla=
-nk">virtiofs.pl</a> file:</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-# cat /var/lib/vz/snippets/<a href=3D"http://virtiofs.pl" target=3D"_blank"=
->virtiofs.pl</a></div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<blockquote style=3D"margin-top:0px;margin-bottom:0px"><span style=3D"font-=
-family:&quot;Courier New&quot;,monospace">#!/usr/bin/perl</span>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># Exmple=
- hook script for PVE guests (hookscript config option)</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># You ca=
-n set this via pct/qm with</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># pct se=
-t &lt;vmid&gt; -hookscript &lt;volume-id&gt;</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># qm set=
- &lt;vmid&gt; -hookscript &lt;volume-id&gt;</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># where =
-&lt;volume-id&gt; has to be an executable file in the snippets folder</span=
-></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># of any=
- storage with directories e.g.:</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># qm set=
- 100 -hookscript local:snippets/<a href=3D"http://hookscript.pl" target=3D"=
-_blank">hookscript.pl</a></span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">use stri=
-ct;</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">use warn=
-ings;</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">print &q=
-uot;GUEST HOOK: &quot; . join(&#39; &#39;, @ARGV). &quot;\n&quot;;</span></=
-div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># First =
-argument is the vmid</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">my $vmid=
- =3D shift;</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace"># Second=
- argument is the phase</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">my $phas=
-e =3D shift;</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">if ($pha=
-se eq &#39;pre-start&#39;) {</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # First phase &#39;pre-start&#39; will be executed before the guest<=
-/span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # ist started. Exiting with a code !=3D 0 will abort the start</span=
-></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 print &quot;$vmid is starting, doing preparations.\n&quot;;</span></=
-div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 system(&#39;/var/lib/vz/snippets/launch-virtio-daemon.sh&#39;);</spa=
-n></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # print &quot;preparations failed, aborting.&quot;</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # exit(1);</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">} elsif =
-($phase eq &#39;post-start&#39;) {</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # Second phase &#39;post-start&#39; will be executed after the guest=
-</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # successfully started.</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 print &quot;$vmid started successfully.\n&quot;;</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">} elsif =
-($phase eq &#39;pre-stop&#39;) {</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # Third phase &#39;pre-stop&#39; will be executed before stopping th=
-e guest</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # via the API. Will not be executed if the guest is stopped from</sp=
-an></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # within e.g., with a &#39;poweroff&#39;</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 print &quot;$vmid will be stopped.\n&quot;;</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">} elsif =
-($phase eq &#39;post-stop&#39;) {</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # Last phase &#39;post-stop&#39; will be executed after the guest st=
-opped.</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # This should even be executed in case the guest crashes or stopped<=
-/span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 # unexpectedly.</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 print &quot;$vmid stopped. Doing cleanup.\n&quot;;</span></div>
-<div><br>
-</div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">} else {=
-</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">=C2=A0 =
-=C2=A0 die &quot;got unknown phase &#39;$phase&#39;\n&quot;;</span></div>
-<div><span style=3D"font-family:&quot;Courier New&quot;,monospace">}</span>=
-</div>
-<div><br>
-</div>
-<span style=3D"font-family:&quot;Courier New&quot;,monospace">exit(0);</spa=
-n><br>
-</blockquote>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-This was working before and now I don&#39;t really know nor understand why =
-it isn&#39;t working anymore.</div></div></div></blockquote><div>=C2=A0</di=
-v><div>Hi, you said it was working before, did you do some updates that lea=
-d to the failure?</div><div>And could you check the virtiofsd daemon proces=
-s status?</div><div><br></div><div>Best,</div><div>Xiaoling</div><div>=C2=
-=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8e=
-x;border-left:1px solid rgb(204,204,204);padding-left:1ex"><div class=3D"ms=
-g-7779357774933869110"><div dir=3D"ltr">
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-Your help would be greatly appreciated.</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-Thank you.</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-Sincerely,</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0);background-color:rgb(255,255,255)">
-Ewen Chan<br>
-</div>
-</div>
-
-_______________________________________________<br>
-Virtio-fs mailing list<br>
-<a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_blank">Virtio-fs@redhat.=
-com</a><br>
-<a href=3D"https://listman.redhat.com/mailman/listinfo/virtio-fs" rel=3D"no=
-referrer" target=3D"_blank">https://listman.redhat.com/mailman/listinfo/vir=
-tio-fs</a><br>
-</div></blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=
-=3D"ltr" class=3D"gmail_signature"><div dir=3D"ltr">BR,<div>Xiaoling</div><=
-/div></div></div>
-
---00000000000081439705f5f56bd0--
-
---00000000000081439905f5f56bd1
-Content-Type: image/png; name="Capture.PNG"
-Content-Disposition: inline; filename="Capture.PNG"
+--_000_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: base64
+
+WGlhb2xpbmc6DQoNClRoZSBvbmx5IHRoaW5nIHRoYXQgSSBkaWQgd2FzIEkgaGFkIHRvIHB1bGwg
+YWxsIG9mIHRoZSBkcml2ZXMgb3V0IGZyb20gdGhlIHN5c3RlbSBiZWNhdXNlIEkgbmVlZGVkIHRv
+IG1vdmUgdGhlIHN5c3RlbSBmcm9tIG9uZSBhcmVhIGluIHRoZSBiYXNlbWVudCBvZiBteSBob21l
+IGZvciBteSBob21lbGFiIGludG8gbXkgcmFjaywgYW5kIHRoZW4gcHV0IGFsbCB0aGUgZHJpdmVz
+IGJhY2suDQoNCk5vIG90aGVyIHVwZGF0ZXMsIGVpdGhlciB0byBQcm94bW94LCBub3IgdGhlIHN5
+c3RlbSwgd2FzIHBlcmZvcm1lZC4NCg0KV2hlbiBJIHR5cGU6DQojIHBzIGF1eCB8IGdyZXAgdmly
+dGlvZnMNCml0IHNob3dzIHRoYXQgdGhlIHByb2Nlc3NlcyBhcmUgcnVubmluZy4NCg0KSSBhbSBu
+b3QgcmVhbGx5IHN1cmUgaG93IGVsc2UgSSBjYW4gY2hlY2sgdGhlIHN0YXR1cyBvZiB0aGUgdmly
+dGlvZnNkIGRhZW1vbi4NCg0KW2NpZDo3NjEzOTEyOS1jZGJmLTQ5ZjctOTU0MS1mOWYyM2EyMDI2
+YTRdDQoNClRoYW5rIHlvdS4NCg0KU2luY2VyZWx5LA0KRXdlbg0KX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX18NCkZyb206IFhpYW9saW5nIEdhbyA8eGlhZ2FvQHJlZGhhdC5jb20+DQpT
+ZW50OiBNYXJjaCAyLCAyMDIzIDk6MDggUE0NClRvOiBFd2VuIENoYW4gPGFscGhhNzU0MjkzQGhv
+dG1haWwuY29tPg0KQ2M6IHZpcnRpby1mc0ByZWRoYXQuY29tIDx2aXJ0aW8tZnNAcmVkaGF0LmNv
+bT4NClN1YmplY3Q6IFJlOiBbVmlydGlvLWZzXSBbdmlydGlvLWZzXSBXaW5kb3dzIDEwIFZpcnRp
+b0ZTIFNlcnZpY2UgZXJyb3IgLSBUaGUgc2VydmljZSBkaWQgbm90IHJlc3BvbmQgdG8gdGhlIHN0
+YXJ0IG9yIGNvbnRyb2wgcmVxdWVzdCBpbiBhIHRpbWVseSBmYXNoaW9uDQoNCg0KDQpFd2VuIENo
+YW4gPGFscGhhNzU0MjkzQGhvdG1haWwuY29tPG1haWx0bzphbHBoYTc1NDI5M0Bob3RtYWlsLmNv
+bT4+IOS6jjIwMjPlubQz5pyIMeaXpeWRqOS4iSAyMDowNeWGmemBk++8mg0KVG8gV2hvbSBJdCBN
+YXkgQ29uY2VybjoNCg0KSSBhbSB0cnlpbmcgdG8gdXNlIFZpcnRpb2ZzIGluc2lkZSBhIFdpbmRv
+d3MgMTAgVk0gdW5kZXIgUHJveG1veCA3LjMtMy4NCg0KUHJldmlvdXNseSwgSSB3YXMgYWJsZSB0
+byBkbyBpdCwgYnV0IG5vdywgZm9yIHNvbWUgcmVhc29uLCB3aGVuZXZlciBJIHRyeSB0byBzdGFy
+dCB0aGUgc2VydmljZSwgdGhpcyBpcyB0aGUgZXJyb3IgbWVzc2FnZSB0aGF0IEkgZ2V0Og0KDQpb
+Y2lkOjE4NmE1Mzc5YzAwNmQwZTdiNDExXQ0KDQpJIHRyaWVkIGEgZnJlc2ggaW5zdGFsbCBvZiBX
+aW5kb3dzIDEwIFBybyB4NjQgYW5kIHRoZW4gaW5zdGFsbGVkIHRoZSB2aXJ0aW8gV2luZG93cyBk
+cml2ZXJzICh2aXJ0aW8td2luLTAuMS4yMjkuaXNvKSB0aGlzIGVycm9yIGlzIHN0aWxsIHBvcHBp
+bmcgdXAuDQoNCkkgaGF2ZSBhIHNjcmlwdCB3aGljaCBkYWVtb25pemVzIHRoZSB2aXJ0aW9mc2Qg
+ZGFlbW9uOg0KDQrigILigILigILigIIgICMgY2F0IGxhdW5jaC12aXJ0aW8tZGFlbW9uLnNoDQoj
+IS91c3IvYmluL2Jhc2gNCg0KDQpmdW5jdGlvbiBsYXVuY2goKSB7DQoNCiAgICBub2h1cCAvdXNy
+L2xpYi9rdm0vdmlydGlvZnNkIC0tc3lzbG9nIC0tZGFlbW9uaXplIC0tc29ja2V0LXBhdGg9L3Zh
+ci9ydW4vc2hhcmVkLWZzLnNvY2sgLW8gc291cmNlPS9leHBvcnQvbXlmcy8gLW8gY2FjaGU9YWx3
+YXlzICY+IC9kZXYvbnVsbCAgJg0KICAgIHJldHVybiAwDQp9DQoNCmxhdW5jaA0KDQpBbmQgaW4g
+bXkgUHJveG1veCBWTSwgSSBoYXZlIGNhbGxlZCB0aGUgbGF1bmNoLXZpcnRpby1kYWVtb24uc2gg
+dmlhIGEgUHJveG1veCBob29rc2NyaXB0Og0KDQpxbSBzZXQgMTAxIC0taG9va3NjcmlwdCBsb2Nh
+bDpzbmlwcGV0cy92aXJ0aW9mcy5wbDxodHRwOi8vdmlydGlvZnMucGw+DQoNCmFuZCB0aGlzIGlz
+IHdoYXQncyBpbiB0aGUgdmlydGlvZnMucGw8aHR0cDovL3ZpcnRpb2ZzLnBsPiBmaWxlOg0KDQoj
+IGNhdCAvdmFyL2xpYi92ei9zbmlwcGV0cy92aXJ0aW9mcy5wbDxodHRwOi8vdmlydGlvZnMucGw+
+DQojIS91c3IvYmluL3BlcmwNCg0KIyBFeG1wbGUgaG9vayBzY3JpcHQgZm9yIFBWRSBndWVzdHMg
+KGhvb2tzY3JpcHQgY29uZmlnIG9wdGlvbikNCiMgWW91IGNhbiBzZXQgdGhpcyB2aWEgcGN0L3Ft
+IHdpdGgNCiMgcGN0IHNldCA8dm1pZD4gLWhvb2tzY3JpcHQgPHZvbHVtZS1pZD4NCiMgcW0gc2V0
+IDx2bWlkPiAtaG9va3NjcmlwdCA8dm9sdW1lLWlkPg0KIyB3aGVyZSA8dm9sdW1lLWlkPiBoYXMg
+dG8gYmUgYW4gZXhlY3V0YWJsZSBmaWxlIGluIHRoZSBzbmlwcGV0cyBmb2xkZXINCiMgb2YgYW55
+IHN0b3JhZ2Ugd2l0aCBkaXJlY3RvcmllcyBlLmcuOg0KIyBxbSBzZXQgMTAwIC1ob29rc2NyaXB0
+IGxvY2FsOnNuaXBwZXRzL2hvb2tzY3JpcHQucGw8aHR0cDovL2hvb2tzY3JpcHQucGw+DQoNCnVz
+ZSBzdHJpY3Q7DQp1c2Ugd2FybmluZ3M7DQoNCnByaW50ICJHVUVTVCBIT09LOiAiIC4gam9pbign
+ICcsIEBBUkdWKS4gIlxuIjsNCg0KIyBGaXJzdCBhcmd1bWVudCBpcyB0aGUgdm1pZA0KDQpteSAk
+dm1pZCA9IHNoaWZ0Ow0KDQojIFNlY29uZCBhcmd1bWVudCBpcyB0aGUgcGhhc2UNCg0KbXkgJHBo
+YXNlID0gc2hpZnQ7DQoNCmlmICgkcGhhc2UgZXEgJ3ByZS1zdGFydCcpIHsNCg0KICAgICMgRmly
+c3QgcGhhc2UgJ3ByZS1zdGFydCcgd2lsbCBiZSBleGVjdXRlZCBiZWZvcmUgdGhlIGd1ZXN0DQog
+ICAgIyBpc3Qgc3RhcnRlZC4gRXhpdGluZyB3aXRoIGEgY29kZSAhPSAwIHdpbGwgYWJvcnQgdGhl
+IHN0YXJ0DQoNCiAgICBwcmludCAiJHZtaWQgaXMgc3RhcnRpbmcsIGRvaW5nIHByZXBhcmF0aW9u
+cy5cbiI7DQoNCiAgICBzeXN0ZW0oJy92YXIvbGliL3Z6L3NuaXBwZXRzL2xhdW5jaC12aXJ0aW8t
+ZGFlbW9uLnNoJyk7DQoNCiAgICAjIHByaW50ICJwcmVwYXJhdGlvbnMgZmFpbGVkLCBhYm9ydGlu
+Zy4iDQogICAgIyBleGl0KDEpOw0KDQp9IGVsc2lmICgkcGhhc2UgZXEgJ3Bvc3Qtc3RhcnQnKSB7
+DQoNCiAgICAjIFNlY29uZCBwaGFzZSAncG9zdC1zdGFydCcgd2lsbCBiZSBleGVjdXRlZCBhZnRl
+ciB0aGUgZ3Vlc3QNCiAgICAjIHN1Y2Nlc3NmdWxseSBzdGFydGVkLg0KDQogICAgcHJpbnQgIiR2
+bWlkIHN0YXJ0ZWQgc3VjY2Vzc2Z1bGx5LlxuIjsNCg0KfSBlbHNpZiAoJHBoYXNlIGVxICdwcmUt
+c3RvcCcpIHsNCg0KICAgICMgVGhpcmQgcGhhc2UgJ3ByZS1zdG9wJyB3aWxsIGJlIGV4ZWN1dGVk
+IGJlZm9yZSBzdG9wcGluZyB0aGUgZ3Vlc3QNCiAgICAjIHZpYSB0aGUgQVBJLiBXaWxsIG5vdCBi
+ZSBleGVjdXRlZCBpZiB0aGUgZ3Vlc3QgaXMgc3RvcHBlZCBmcm9tDQogICAgIyB3aXRoaW4gZS5n
+Liwgd2l0aCBhICdwb3dlcm9mZicNCg0KICAgIHByaW50ICIkdm1pZCB3aWxsIGJlIHN0b3BwZWQu
+XG4iOw0KDQp9IGVsc2lmICgkcGhhc2UgZXEgJ3Bvc3Qtc3RvcCcpIHsNCg0KICAgICMgTGFzdCBw
+aGFzZSAncG9zdC1zdG9wJyB3aWxsIGJlIGV4ZWN1dGVkIGFmdGVyIHRoZSBndWVzdCBzdG9wcGVk
+Lg0KICAgICMgVGhpcyBzaG91bGQgZXZlbiBiZSBleGVjdXRlZCBpbiBjYXNlIHRoZSBndWVzdCBj
+cmFzaGVzIG9yIHN0b3BwZWQNCiAgICAjIHVuZXhwZWN0ZWRseS4NCg0KICAgIHByaW50ICIkdm1p
+ZCBzdG9wcGVkLiBEb2luZyBjbGVhbnVwLlxuIjsNCg0KfSBlbHNlIHsNCiAgICBkaWUgImdvdCB1
+bmtub3duIHBoYXNlICckcGhhc2UnXG4iOw0KfQ0KDQpleGl0KDApOw0KDQoNClRoaXMgd2FzIHdv
+cmtpbmcgYmVmb3JlIGFuZCBub3cgSSBkb24ndCByZWFsbHkga25vdyBub3IgdW5kZXJzdGFuZCB3
+aHkgaXQgaXNuJ3Qgd29ya2luZyBhbnltb3JlLg0KDQpIaSwgeW91IHNhaWQgaXQgd2FzIHdvcmtp
+bmcgYmVmb3JlLCBkaWQgeW91IGRvIHNvbWUgdXBkYXRlcyB0aGF0IGxlYWQgdG8gdGhlIGZhaWx1
+cmU/DQpBbmQgY291bGQgeW91IGNoZWNrIHRoZSB2aXJ0aW9mc2QgZGFlbW9uIHByb2Nlc3Mgc3Rh
+dHVzPw0KDQpCZXN0LA0KWGlhb2xpbmcNCg0KDQpZb3VyIGhlbHAgd291bGQgYmUgZ3JlYXRseSBh
+cHByZWNpYXRlZC4NCg0KVGhhbmsgeW91Lg0KDQpTaW5jZXJlbHksDQpFd2VuIENoYW4NCl9fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fDQpWaXJ0aW8tZnMgbWFp
+bGluZyBsaXN0DQpWaXJ0aW8tZnNAcmVkaGF0LmNvbTxtYWlsdG86VmlydGlvLWZzQHJlZGhhdC5j
+b20+DQpodHRwczovL2xpc3RtYW4ucmVkaGF0LmNvbS9tYWlsbWFuL2xpc3RpbmZvL3ZpcnRpby1m
+cw0KDQoNCi0tDQpCUiwNClhpYW9saW5nDQo=
+--_000_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyIgc3R5bGU9
+ImRpc3BsYXk6bm9uZTsiPiBQIHttYXJnaW4tdG9wOjA7bWFyZ2luLWJvdHRvbTowO30gPC9zdHls
+ZT4NCjwvaGVhZD4NCjxib2R5IGRpcj0ibHRyIj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBD
+YWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJn
+YigwLCAwLCAwKTsgYmFja2dyb3VuZC1jb2xvcjogcmdiKDI1NSwgMjU1LCAyNTUpOyIgY2xhc3M9
+ImVsZW1lbnRUb1Byb29mIj4NClhpYW9saW5nOjxicj4NCjxicj4NClRoZSBvbmx5IHRoaW5nIHRo
+YXQgSSBkaWQgd2FzIEkgaGFkIHRvIHB1bGwgYWxsIG9mIHRoZSBkcml2ZXMgb3V0IGZyb20gdGhl
+IHN5c3RlbSBiZWNhdXNlIEkgbmVlZGVkIHRvIG1vdmUgdGhlIHN5c3RlbSBmcm9tIG9uZSBhcmVh
+IGluIHRoZSBiYXNlbWVudCBvZiBteSBob21lIGZvciBteSBob21lbGFiIGludG8gbXkgcmFjaywg
+YW5kIHRoZW4gcHV0IGFsbCB0aGUgZHJpdmVzIGJhY2suPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250
+LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7
+IGNvbG9yOiByZ2IoMCwgMCwgMCk7IGJhY2tncm91bmQtY29sb3I6IHJnYigyNTUsIDI1NSwgMjU1
+KTsiIGNsYXNzPSJlbGVtZW50VG9Qcm9vZiI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZv
+bnQtZmFtaWx5OiBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJw
+dDsgY29sb3I6IHJnYigwLCAwLCAwKTsgYmFja2dyb3VuZC1jb2xvcjogcmdiKDI1NSwgMjU1LCAy
+NTUpOyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIj4NCk5vIG90aGVyIHVwZGF0ZXMsIGVpdGhlciB0
+byBQcm94bW94LCBub3IgdGhlIHN5c3RlbSwgd2FzIHBlcmZvcm1lZC48YnI+DQo8L2Rpdj4NCjxk
+aXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZv
+bnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAwKTsgYmFja2dyb3VuZC1jb2xvcjogcmdi
+KDI1NSwgMjU1LCAyNTUpOyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIj4NCjxicj4NCjwvZGl2Pg0K
+PGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENhbGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsg
+Zm9udC1zaXplOiAxMnB0OyBjb2xvcjogcmdiKDAsIDAsIDApOyBiYWNrZ3JvdW5kLWNvbG9yOiBy
+Z2IoMjU1LCAyNTUsIDI1NSk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KV2hlbiBJIHR5cGU6
+PC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5z
+LXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IGJhY2tncm91bmQt
+Y29sb3I6IHJnYigyNTUsIDI1NSwgMjU1KTsiIGNsYXNzPSJlbGVtZW50VG9Qcm9vZiI+DQojIHBz
+IGF1eCB8IGdyZXAgdmlydGlvZnM8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxp
+YnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigw
+LCAwLCAwKTsgYmFja2dyb3VuZC1jb2xvcjogcmdiKDI1NSwgMjU1LCAyNTUpOyIgY2xhc3M9ImVs
+ZW1lbnRUb1Byb29mIj4NCml0IHNob3dzIHRoYXQgdGhlIHByb2Nlc3NlcyBhcmUgcnVubmluZy48
+L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMt
+c2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAwKTsgYmFja2dyb3VuZC1j
+b2xvcjogcmdiKDI1NSwgMjU1LCAyNTUpOyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIj4NCjxicj4N
+CjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENhbGlicmksIEhlbHZldGljYSwgc2Fu
+cy1zZXJpZjsgZm9udC1zaXplOiAxMnB0OyBjb2xvcjogcmdiKDAsIDAsIDApOyBiYWNrZ3JvdW5k
+LWNvbG9yOiByZ2IoMjU1LCAyNTUsIDI1NSk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KSSBh
+bSBub3QgcmVhbGx5IHN1cmUgaG93IGVsc2UgSSBjYW4gY2hlY2sgdGhlIHN0YXR1cyBvZiB0aGUg
+dmlydGlvZnNkIGRhZW1vbi48L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJp
+LCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAw
+LCAwKTsgYmFja2dyb3VuZC1jb2xvcjogcmdiKDI1NSwgMjU1LCAyNTUpOyIgY2xhc3M9ImVsZW1l
+bnRUb1Byb29mIj4NCjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENhbGli
+cmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMnB0OyBjb2xvcjogcmdiKDAs
+IDAsIDApOyBiYWNrZ3JvdW5kLWNvbG9yOiByZ2IoMjU1LCAyNTUsIDI1NSk7IiBjbGFzcz0iZWxl
+bWVudFRvUHJvb2YiPg0KPGltZyBzdHlsZT0ibWF4LXdpZHRoOiAxMDAlOyIgY2xhc3M9InctMTA1
+MCBoLTY1IiBzaXplPSI2NzY0IiBjb250ZW50dHlwZT0iaW1hZ2UvcG5nIiBkYXRhLW91dGxvb2st
+dHJhY2U9IkY6MXxUOjEiIHNyYz0iY2lkOjc2MTM5MTI5LWNkYmYtNDlmNy05NTQxLWY5ZjIzYTIw
+MjZhNCI+PGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVs
+dmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7
+IGJhY2tncm91bmQtY29sb3I6IHJnYigyNTUsIDI1NSwgMjU1KTsiIGNsYXNzPSJlbGVtZW50VG9Q
+cm9vZiI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBI
+ZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAw
+KTsgYmFja2dyb3VuZC1jb2xvcjogcmdiKDI1NSwgMjU1LCAyNTUpOyIgY2xhc3M9ImVsZW1lbnRU
+b1Byb29mIj4NClRoYW5rIHlvdS48L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxp
+YnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigw
+LCAwLCAwKTsgYmFja2dyb3VuZC1jb2xvcjogcmdiKDI1NSwgMjU1LCAyNTUpOyIgY2xhc3M9ImVs
+ZW1lbnRUb1Byb29mIj4NCjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENh
+bGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMnB0OyBjb2xvcjogcmdi
+KDAsIDAsIDApOyBiYWNrZ3JvdW5kLWNvbG9yOiByZ2IoMjU1LCAyNTUsIDI1NSk7IiBjbGFzcz0i
+ZWxlbWVudFRvUHJvb2YiPg0KU2luY2VyZWx5LDwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1p
+bHk6IENhbGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMnB0OyBjb2xv
+cjogcmdiKDAsIDAsIDApOyBiYWNrZ3JvdW5kLWNvbG9yOiByZ2IoMjU1LCAyNTUsIDI1NSk7IiBj
+bGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KRXdlbjxicj4NCjwvZGl2Pg0KPGRpdiBpZD0iYXBwZW5k
+b25zZW5kIj48L2Rpdj4NCjxociBzdHlsZT0iZGlzcGxheTppbmxpbmUtYmxvY2s7d2lkdGg6OTgl
+IiB0YWJpbmRleD0iLTEiPg0KPGRpdiBpZD0iZGl2UnBseUZ3ZE1zZyIgZGlyPSJsdHIiPjxmb250
+IGZhY2U9IkNhbGlicmksIHNhbnMtc2VyaWYiIHN0eWxlPSJmb250LXNpemU6MTFwdCIgY29sb3I9
+IiMwMDAwMDAiPjxiPkZyb206PC9iPiBYaWFvbGluZyBHYW8gJmx0O3hpYWdhb0ByZWRoYXQuY29t
+Jmd0Ozxicj4NCjxiPlNlbnQ6PC9iPiBNYXJjaCAyLCAyMDIzIDk6MDggUE08YnI+DQo8Yj5Ubzo8
+L2I+IEV3ZW4gQ2hhbiAmbHQ7YWxwaGE3NTQyOTNAaG90bWFpbC5jb20mZ3Q7PGJyPg0KPGI+Q2M6
+PC9iPiB2aXJ0aW8tZnNAcmVkaGF0LmNvbSAmbHQ7dmlydGlvLWZzQHJlZGhhdC5jb20mZ3Q7PGJy
+Pg0KPGI+U3ViamVjdDo8L2I+IFJlOiBbVmlydGlvLWZzXSBbdmlydGlvLWZzXSBXaW5kb3dzIDEw
+IFZpcnRpb0ZTIFNlcnZpY2UgZXJyb3IgLSBUaGUgc2VydmljZSBkaWQgbm90IHJlc3BvbmQgdG8g
+dGhlIHN0YXJ0IG9yIGNvbnRyb2wgcmVxdWVzdCBpbiBhIHRpbWVseSBmYXNoaW9uPC9mb250Pg0K
+PGRpdj4mbmJzcDs8L2Rpdj4NCjwvZGl2Pg0KPGRpdj4NCjxkaXYgZGlyPSJsdHIiPg0KPGRpdiBk
+aXI9Imx0ciI+PGJyPg0KPC9kaXY+DQo8YnI+DQo8ZGl2IGNsYXNzPSJ4X2dtYWlsX3F1b3RlIj4N
+CjxkaXYgZGlyPSJsdHIiIGNsYXNzPSJ4X2dtYWlsX2F0dHIiPkV3ZW4gQ2hhbiAmbHQ7PGEgaHJl
+Zj0ibWFpbHRvOmFscGhhNzU0MjkzQGhvdG1haWwuY29tIj5hbHBoYTc1NDI5M0Bob3RtYWlsLmNv
+bTwvYT4mZ3Q7IOS6jjIwMjPlubQz5pyIMeaXpeWRqOS4iSAyMDowNeWGmemBk++8mjxicj4NCjwv
+ZGl2Pg0KPGJsb2NrcXVvdGUgY2xhc3M9InhfZ21haWxfcXVvdGUiIHN0eWxlPSJtYXJnaW46MHB4
+IDBweCAwcHggMC44ZXg7IGJvcmRlci1sZWZ0OjFweCBzb2xpZCByZ2IoMjA0LDIwNCwyMDQpOyBw
+YWRkaW5nLWxlZnQ6MWV4Ij4NCjxkaXYgY2xhc3M9InhfbXNnLTc3NzkzNTc3NzQ5MzM4NjkxMTAi
+Pg0KPGRpdiBkaXI9Imx0ciI+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZl
+dGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKTsgYmFja2dy
+b3VuZC1jb2xvcjpyZ2IoMjU1LDI1NSwyNTUpIj4NClRvIFdob20gSXQgTWF5IENvbmNlcm46PC9k
+aXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlm
+OyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpyZ2Io
+MjU1LDI1NSwyNTUpIj4NCjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2Fs
+aWJyaSxIZWx2ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAs
+MCk7IGJhY2tncm91bmQtY29sb3I6cmdiKDI1NSwyNTUsMjU1KSI+DQpJIGFtIHRyeWluZyB0byB1
+c2UgVmlydGlvZnMgaW5zaWRlIGEgV2luZG93cyAxMCBWTSB1bmRlciBQcm94bW94IDcuMy0zLjwv
+ZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1zZXJp
+ZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29sb3I6cmdi
+KDI1NSwyNTUsMjU1KSI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNh
+bGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCww
+LDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0KUHJldmlvdXNseSwgSSB3
+YXMgYWJsZSB0byBkbyBpdCwgYnV0IG5vdywgZm9yIHNvbWUgcmVhc29uLCB3aGVuZXZlciBJIHRy
+eSB0byBzdGFydCB0aGUgc2VydmljZSwgdGhpcyBpcyB0aGUgZXJyb3IgbWVzc2FnZSB0aGF0IEkg
+Z2V0OjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fu
+cy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29s
+b3I6cmdiKDI1NSwyNTUsMjU1KSI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFt
+aWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpy
+Z2IoMCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0KPGltZyBzaXpl
+PSI2ODEwIiBzdHlsZT0ibWF4LXdpZHRoOjEwMCUiIGRhdGEtb3V0bG9vay10cmFjZT0iRjoxfFQ6
+MSIgc3JjPSJjaWQ6MTg2YTUzNzljMDA2ZDBlN2I0MTEiPjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9u
+dC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNv
+bG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29sb3I6cmdiKDI1NSwyNTUsMjU1KSI+DQo8YnI+
+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMt
+c2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9y
+OnJnYigyNTUsMjU1LDI1NSkiPg0KSSB0cmllZCBhIGZyZXNoIGluc3RhbGwgb2YgV2luZG93cyAx
+MCBQcm8geDY0IGFuZCB0aGVuIGluc3RhbGxlZCB0aGUgdmlydGlvIFdpbmRvd3MgZHJpdmVycyAo
+dmlydGlvLXdpbi0wLjEuMjI5LmlzbykgdGhpcyBlcnJvciBpcyBzdGlsbCBwb3BwaW5nIHVwLjwv
+ZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1zZXJp
+ZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29sb3I6cmdi
+KDI1NSwyNTUsMjU1KSI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNh
+bGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCww
+LDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0KSSBoYXZlIGEgc2NyaXB0
+IHdoaWNoIGRhZW1vbml6ZXMgdGhlIHZpcnRpb2ZzZCBkYWVtb246PC9kaXY+DQo8ZGl2IHN0eWxl
+PSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJw
+dDsgY29sb3I6cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpyZ2IoMjU1LDI1NSwyNTUpIj4N
+Cjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Es
+c2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQt
+Y29sb3I6cmdiKDI1NSwyNTUsMjU1KSI+DQo8c3Bhbj7igILigILigILigIImbmJzcDsgIyBjYXQg
+bGF1bmNoLXZpcnRpby1kYWVtb24uc2g8L3NwYW4+PGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJm
+b250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsg
+Y29sb3I6cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpyZ2IoMjU1LDI1NSwyNTUpIj4NCjxi
+bG9ja3F1b3RlIHN0eWxlPSJtYXJnaW4tdG9wOjBweDsgbWFyZ2luLWJvdHRvbTowcHgiPg0KPGRp
+dj48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3Nw
+YWNlIj4jIS91c3IvYmluL2Jhc2g8L3NwYW4+PC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8ZGl2Pjxi
+cj4NCjwvZGl2Pg0KPGJsb2NrcXVvdGUgc3R5bGU9Im1hcmdpbi10b3A6MHB4OyBtYXJnaW4tYm90
+dG9tOjBweCI+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj48c3BhbiBzdHlsZT0iZm9udC1mYW1p
+bHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3NwYWNlIj5mdW5jdGlvbiBsYXVuY2goKSB7
+PC9zcGFuPjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQt
+ZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+Jm5ic3A7ICZuYnNwOyBu
+b2h1cCAvdXNyL2xpYi9rdm0vdmlydGlvZnNkIC0tc3lzbG9nIC0tZGFlbW9uaXplIC0tc29ja2V0
+LXBhdGg9L3Zhci9ydW4vc2hhcmVkLWZzLnNvY2sgLW8gc291cmNlPS9leHBvcnQvbXlmcy8gLW8g
+Y2FjaGU9YWx3YXlzICZhbXA7Jmd0OyAvZGV2L251bGwgJm5ic3A7JmFtcDs8L3NwYW4+PC9kaXY+
+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxt
+b25vc3BhY2UiPiZuYnNwOyAmbmJzcDsgcmV0dXJuIDA8L3NwYW4+PC9kaXY+DQo8ZGl2PjxzcGFu
+IHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPn08
+L3NwYW4+PC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5
+OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+bGF1bmNoPC9zcGFuPjxicj4NCjwv
+YmxvY2txdW90ZT4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2
+ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tn
+cm91bmQtY29sb3I6cmdiKDI1NSwyNTUsMjU1KSI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9
+ImZvbnQtZmFtaWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0
+OyBjb2xvcjpyZ2IoMCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0K
+QW5kIGluIG15IFByb3htb3ggVk0sIEkgaGF2ZSBjYWxsZWQgdGhlIGxhdW5jaC12aXJ0aW8tZGFl
+bW9uLnNoIHZpYSBhIFByb3htb3ggaG9va3NjcmlwdDo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQt
+ZmFtaWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xv
+cjpyZ2IoMCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0KPGJyPg0K
+PC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNl
+cmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpy
+Z2IoMjU1LDI1NSwyNTUpIj4NCnFtIHNldCAxMDEgLS1ob29rc2NyaXB0IGxvY2FsOnNuaXBwZXRz
+LzxhIGhyZWY9Imh0dHA6Ly92aXJ0aW9mcy5wbCIgdGFyZ2V0PSJfYmxhbmsiPnZpcnRpb2ZzLnBs
+PC9hPjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fu
+cy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29s
+b3I6cmdiKDI1NSwyNTUsMjU1KSI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFt
+aWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpy
+Z2IoMCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0KYW5kIHRoaXMg
+aXMgd2hhdCdzIGluIHRoZSA8YSBocmVmPSJodHRwOi8vdmlydGlvZnMucGwiIHRhcmdldD0iX2Js
+YW5rIj52aXJ0aW9mcy5wbDwvYT4gZmlsZTo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5
+OkNhbGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2Io
+MCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0KPGJyPg0KPC9kaXY+
+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBm
+b250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpyZ2IoMjU1
+LDI1NSwyNTUpIj4NCiMgY2F0IC92YXIvbGliL3Z6L3NuaXBwZXRzLzxhIGhyZWY9Imh0dHA6Ly92
+aXJ0aW9mcy5wbCIgdGFyZ2V0PSJfYmxhbmsiPnZpcnRpb2ZzLnBsPC9hPjwvZGl2Pg0KPGRpdiBz
+dHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXpl
+OjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29sb3I6cmdiKDI1NSwyNTUsMjU1
+KSI+DQo8YmxvY2txdW90ZSBzdHlsZT0ibWFyZ2luLXRvcDowcHg7IG1hcmdpbi1ib3R0b206MHB4
+Ij48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3Nw
+YWNlIj4jIS91c3IvYmluL3Blcmw8L3NwYW4+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj48c3Bh
+biBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3NwYWNlIj4j
+IEV4bXBsZSBob29rIHNjcmlwdCBmb3IgUFZFIGd1ZXN0cyAoaG9va3NjcmlwdCBjb25maWcgb3B0
+aW9uKTwvc3Bhbj48L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0Nv
+dXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+IyBZb3UgY2FuIHNldCB0aGlzIHZpYSBwY3QvcW0g
+d2l0aDwvc3Bhbj48L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0Nv
+dXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+IyBwY3Qgc2V0ICZsdDt2bWlkJmd0OyAtaG9va3Nj
+cmlwdCAmbHQ7dm9sdW1lLWlkJmd0Ozwvc3Bhbj48L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZv
+bnQtZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+IyBxbSBzZXQgJmx0
+O3ZtaWQmZ3Q7IC1ob29rc2NyaXB0ICZsdDt2b2x1bWUtaWQmZ3Q7PC9zcGFuPjwvZGl2Pg0KPGRp
+dj48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3Nw
+YWNlIj4jIHdoZXJlICZsdDt2b2x1bWUtaWQmZ3Q7IGhhcyB0byBiZSBhbiBleGVjdXRhYmxlIGZp
+bGUgaW4gdGhlIHNuaXBwZXRzIGZvbGRlcjwvc3Bhbj48L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9
+ImZvbnQtZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+IyBvZiBhbnkg
+c3RvcmFnZSB3aXRoIGRpcmVjdG9yaWVzIGUuZy46PC9zcGFuPjwvZGl2Pg0KPGRpdj48c3BhbiBz
+dHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3NwYWNlIj4jIHFt
+IHNldCAxMDAgLWhvb2tzY3JpcHQgbG9jYWw6c25pcHBldHMvPGEgaHJlZj0iaHR0cDovL2hvb2tz
+Y3JpcHQucGwiIHRhcmdldD0iX2JsYW5rIj5ob29rc2NyaXB0LnBsPC9hPjwvc3Bhbj48L2Rpdj4N
+CjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtD
+b3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPnVzZSBzdHJpY3Q7PC9zcGFuPjwvZGl2Pg0KPGRp
+dj48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3Nw
+YWNlIj51c2Ugd2FybmluZ3M7PC9zcGFuPjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+
+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFj
+ZSI+cHJpbnQgJnF1b3Q7R1VFU1QgSE9PSzogJnF1b3Q7IC4gam9pbignICcsIEBBUkdWKS4gJnF1
+b3Q7XG4mcXVvdDs7PC9zcGFuPjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+PHNwYW4g
+c3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+IyBG
+aXJzdCBhcmd1bWVudCBpcyB0aGUgdm1pZDwvc3Bhbj48L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+
+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxt
+b25vc3BhY2UiPm15ICR2bWlkID0gc2hpZnQ7PC9zcGFuPjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rp
+dj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7
+LG1vbm9zcGFjZSI+IyBTZWNvbmQgYXJndW1lbnQgaXMgdGhlIHBoYXNlPC9zcGFuPjwvZGl2Pg0K
+PGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0Nv
+dXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+bXkgJHBoYXNlID0gc2hpZnQ7PC9zcGFuPjwvZGl2
+Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90
+O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+aWYgKCRwaGFzZSBlcSAncHJlLXN0YXJ0Jykg
+ezwvc3Bhbj48L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250
+LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJzcDsg
+IyBGaXJzdCBwaGFzZSAncHJlLXN0YXJ0JyB3aWxsIGJlIGV4ZWN1dGVkIGJlZm9yZSB0aGUgZ3Vl
+c3Q8L3NwYW4+PC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtDb3Vy
+aWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJzcDsgIyBpc3Qgc3RhcnRlZC4gRXhp
+dGluZyB3aXRoIGEgY29kZSAhPSAwIHdpbGwgYWJvcnQgdGhlIHN0YXJ0PC9zcGFuPjwvZGl2Pg0K
+PGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0Nv
+dXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+Jm5ic3A7ICZuYnNwOyBwcmludCAmcXVvdDskdm1p
+ZCBpcyBzdGFydGluZywgZG9pbmcgcHJlcGFyYXRpb25zLlxuJnF1b3Q7Ozwvc3Bhbj48L2Rpdj4N
+CjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtD
+b3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJzcDsgc3lzdGVtKCcvdmFyL2xp
+Yi92ei9zbmlwcGV0cy9sYXVuY2gtdmlydGlvLWRhZW1vbi5zaCcpOzwvc3Bhbj48L2Rpdj4NCjxk
+aXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtDb3Vy
+aWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJzcDsgIyBwcmludCAmcXVvdDtwcmVw
+YXJhdGlvbnMgZmFpbGVkLCBhYm9ydGluZy4mcXVvdDs8L3NwYW4+PC9kaXY+DQo8ZGl2PjxzcGFu
+IHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZu
+YnNwOyAmbmJzcDsgIyBleGl0KDEpOzwvc3Bhbj48L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8
+ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxtb25v
+c3BhY2UiPn0gZWxzaWYgKCRwaGFzZSBlcSAncG9zdC1zdGFydCcpIHs8L3NwYW4+PC9kaXY+DQo8
+ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291
+cmllciBOZXcmcXVvdDssbW9ub3NwYWNlIj4mbmJzcDsgJm5ic3A7ICMgU2Vjb25kIHBoYXNlICdw
+b3N0LXN0YXJ0JyB3aWxsIGJlIGV4ZWN1dGVkIGFmdGVyIHRoZSBndWVzdDwvc3Bhbj48L2Rpdj4N
+CjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1v
+bm9zcGFjZSI+Jm5ic3A7ICZuYnNwOyAjIHN1Y2Nlc3NmdWxseSBzdGFydGVkLjwvc3Bhbj48L2Rp
+dj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVv
+dDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJzcDsgcHJpbnQgJnF1b3Q7
+JHZtaWQgc3RhcnRlZCBzdWNjZXNzZnVsbHkuXG4mcXVvdDs7PC9zcGFuPjwvZGl2Pg0KPGRpdj48
+YnI+DQo8L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0NvdXJpZXIg
+TmV3JnF1b3Q7LG1vbm9zcGFjZSI+fSBlbHNpZiAoJHBoYXNlIGVxICdwcmUtc3RvcCcpIHs8L3Nw
+YW4+PC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj48c3BhbiBzdHlsZT0iZm9udC1mYW1p
+bHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3NwYWNlIj4mbmJzcDsgJm5ic3A7ICMgVGhp
+cmQgcGhhc2UgJ3ByZS1zdG9wJyB3aWxsIGJlIGV4ZWN1dGVkIGJlZm9yZSBzdG9wcGluZyB0aGUg
+Z3Vlc3Q8L3NwYW4+PC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtD
+b3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJzcDsgIyB2aWEgdGhlIEFQSS4g
+V2lsbCBub3QgYmUgZXhlY3V0ZWQgaWYgdGhlIGd1ZXN0IGlzIHN0b3BwZWQgZnJvbTwvc3Bhbj48
+L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1
+b3Q7LG1vbm9zcGFjZSI+Jm5ic3A7ICZuYnNwOyAjIHdpdGhpbiBlLmcuLCB3aXRoIGEgJ3Bvd2Vy
+b2ZmJzwvc3Bhbj48L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJm
+b250LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJz
+cDsgcHJpbnQgJnF1b3Q7JHZtaWQgd2lsbCBiZSBzdG9wcGVkLlxuJnF1b3Q7Ozwvc3Bhbj48L2Rp
+dj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVv
+dDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPn0gZWxzaWYgKCRwaGFzZSBlcSAncG9zdC1z
+dG9wJykgezwvc3Bhbj48L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxl
+PSJmb250LWZhbWlseTomcXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAm
+bmJzcDsgIyBMYXN0IHBoYXNlICdwb3N0LXN0b3AnIHdpbGwgYmUgZXhlY3V0ZWQgYWZ0ZXIgdGhl
+IGd1ZXN0IHN0b3BwZWQuPC9zcGFuPjwvZGl2Pg0KPGRpdj48c3BhbiBzdHlsZT0iZm9udC1mYW1p
+bHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9ub3NwYWNlIj4mbmJzcDsgJm5ic3A7ICMgVGhp
+cyBzaG91bGQgZXZlbiBiZSBleGVjdXRlZCBpbiBjYXNlIHRoZSBndWVzdCBjcmFzaGVzIG9yIHN0
+b3BwZWQ8L3NwYW4+PC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTomcXVvdDtD
+b3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPiZuYnNwOyAmbmJzcDsgIyB1bmV4cGVjdGVkbHku
+PC9zcGFuPjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQt
+ZmFtaWx5OiZxdW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+Jm5ic3A7ICZuYnNwOyBw
+cmludCAmcXVvdDskdm1pZCBzdG9wcGVkLiBEb2luZyBjbGVhbnVwLlxuJnF1b3Q7Ozwvc3Bhbj48
+L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2PjxzcGFuIHN0eWxlPSJmb250LWZhbWlseTom
+cXVvdDtDb3VyaWVyIE5ldyZxdW90Oyxtb25vc3BhY2UiPn0gZWxzZSB7PC9zcGFuPjwvZGl2Pg0K
+PGRpdj48c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVvdDssbW9u
+b3NwYWNlIj4mbmJzcDsgJm5ic3A7IGRpZSAmcXVvdDtnb3QgdW5rbm93biBwaGFzZSAnJHBoYXNl
+J1xuJnF1b3Q7Ozwvc3Bhbj48L2Rpdj4NCjxkaXY+PHNwYW4gc3R5bGU9ImZvbnQtZmFtaWx5OiZx
+dW90O0NvdXJpZXIgTmV3JnF1b3Q7LG1vbm9zcGFjZSI+fTwvc3Bhbj48L2Rpdj4NCjxkaXY+PGJy
+Pg0KPC9kaXY+DQo8c3BhbiBzdHlsZT0iZm9udC1mYW1pbHk6JnF1b3Q7Q291cmllciBOZXcmcXVv
+dDssbW9ub3NwYWNlIj5leGl0KDApOzwvc3Bhbj48YnI+DQo8L2Jsb2NrcXVvdGU+DQo8L2Rpdj4N
+CjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZv
+bnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUs
+MjU1LDI1NSkiPg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJp
+LEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKTsg
+YmFja2dyb3VuZC1jb2xvcjpyZ2IoMjU1LDI1NSwyNTUpIj4NCjxicj4NCjwvZGl2Pg0KPGRpdiBz
+dHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXpl
+OjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29sb3I6cmdiKDI1NSwyNTUsMjU1
+KSI+DQpUaGlzIHdhcyB3b3JraW5nIGJlZm9yZSBhbmQgbm93IEkgZG9uJ3QgcmVhbGx5IGtub3cg
+bm9yIHVuZGVyc3RhbmQgd2h5IGl0IGlzbid0IHdvcmtpbmcgYW55bW9yZS48L2Rpdj4NCjwvZGl2
+Pg0KPC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8ZGl2PiZuYnNwOzwvZGl2Pg0KPGRpdj5IaSwgeW91
+IHNhaWQgaXQgd2FzIHdvcmtpbmcgYmVmb3JlLCBkaWQgeW91IGRvIHNvbWUgdXBkYXRlcyB0aGF0
+IGxlYWQgdG8gdGhlIGZhaWx1cmU/PC9kaXY+DQo8ZGl2PkFuZCBjb3VsZCB5b3UgY2hlY2sgdGhl
+IHZpcnRpb2ZzZCBkYWVtb24gcHJvY2VzcyBzdGF0dXM/PC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2
+Pg0KPGRpdj5CZXN0LDwvZGl2Pg0KPGRpdj5YaWFvbGluZzwvZGl2Pg0KPGRpdj4mbmJzcDs8L2Rp
+dj4NCjxibG9ja3F1b3RlIGNsYXNzPSJ4X2dtYWlsX3F1b3RlIiBzdHlsZT0ibWFyZ2luOjBweCAw
+cHggMHB4IDAuOGV4OyBib3JkZXItbGVmdDoxcHggc29saWQgcmdiKDIwNCwyMDQsMjA0KTsgcGFk
+ZGluZy1sZWZ0OjFleCI+DQo8ZGl2IGNsYXNzPSJ4X21zZy03Nzc5MzU3Nzc0OTMzODY5MTEwIj4N
+CjxkaXYgZGlyPSJsdHIiPg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRp
+Y2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91
+bmQtY29sb3I6cmdiKDI1NSwyNTUsMjU1KSI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZv
+bnQtZmFtaWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBj
+b2xvcjpyZ2IoMCwwLDApOyBiYWNrZ3JvdW5kLWNvbG9yOnJnYigyNTUsMjU1LDI1NSkiPg0KWW91
+ciBoZWxwIHdvdWxkIGJlIGdyZWF0bHkgYXBwcmVjaWF0ZWQuPC9kaXY+DQo8ZGl2IHN0eWxlPSJm
+b250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsg
+Y29sb3I6cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpyZ2IoMjU1LDI1NSwyNTUpIj4NCjxi
+cj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fu
+cy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29s
+b3I6cmdiKDI1NSwyNTUsMjU1KSI+DQpUaGFuayB5b3UuPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250
+LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29s
+b3I6cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpyZ2IoMjU1LDI1NSwyNTUpIj4NCjxicj4N
+CjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1z
+ZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCk7IGJhY2tncm91bmQtY29sb3I6
+cmdiKDI1NSwyNTUsMjU1KSI+DQpTaW5jZXJlbHksPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZh
+bWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6
+cmdiKDAsMCwwKTsgYmFja2dyb3VuZC1jb2xvcjpyZ2IoMjU1LDI1NSwyNTUpIj4NCkV3ZW4gQ2hh
+bjxicj4NCjwvZGl2Pg0KPC9kaXY+DQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fXzxicj4NClZpcnRpby1mcyBtYWlsaW5nIGxpc3Q8YnI+DQo8YSBocmVmPSJt
+YWlsdG86VmlydGlvLWZzQHJlZGhhdC5jb20iIHRhcmdldD0iX2JsYW5rIj5WaXJ0aW8tZnNAcmVk
+aGF0LmNvbTwvYT48YnI+DQo8YSBocmVmPSJodHRwczovL2xpc3RtYW4ucmVkaGF0LmNvbS9tYWls
+bWFuL2xpc3RpbmZvL3ZpcnRpby1mcyIgcmVsPSJub3JlZmVycmVyIiB0YXJnZXQ9Il9ibGFuayI+
+aHR0cHM6Ly9saXN0bWFuLnJlZGhhdC5jb20vbWFpbG1hbi9saXN0aW5mby92aXJ0aW8tZnM8L2E+
+PGJyPg0KPC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8L2Rpdj4NCjxiciBjbGVhcj0iYWxsIj4NCjxk
+aXY+PGJyPg0KPC9kaXY+DQotLSA8YnI+DQo8ZGl2IGRpcj0ibHRyIiBjbGFzcz0ieF9nbWFpbF9z
+aWduYXR1cmUiPg0KPGRpdiBkaXI9Imx0ciI+QlIsDQo8ZGl2PlhpYW9saW5nPC9kaXY+DQo8L2Rp
+dj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2Rpdj4NCjwvYm9keT4NCjwvaHRtbD4NCg==
+--_000_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_--
+
+--_005_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_
+Content-Type: image/png; name="Capture.PNG"
+Content-Description: Capture.PNG
+Content-Disposition: inline; filename="Capture.PNG"; size=6810;
+	creation-date="Fri, 03 Mar 2023 02:08:30 GMT";
+	modification-date="Fri, 03 Mar 2023 04:05:17 GMT"
 Content-ID: <186a5379c006d0e7b411>
-X-Attachment-Id: 186a5379c006d0e7b411
+Content-Transfer-Encoding: base64
 
 iVBORw0KGgoAAAANSUhEUgAAAaMAAAC9CAYAAAAePhKrAAAAAXNSR0IArs4c6QAAAARnQU1BAACx
 jwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAABovSURBVHhe7Z3rsxzHWYf3CwX/Qr7xD1BFISio
@@ -622,5 +559,133 @@ I0IIIbQsidfI70VHjx61f1p09uxZM3r55ZfNuXPnrDNJglI//yu/bv//1d/8gP1/0zt/w9uOEEL9
 6E/M+37uHeYd7yj1TnOZmg4NWeU76U6dOmUnRKNXXnnFnD9/3i6cPHnSHDt2zE6d5F6ePHYnUym5
 tyc/NsnTD/I4nvzl7BNPPGEef/xx89hjjyGEEEJTiTeIR4hXiGeId4iH7N271/qKvGRBvEZmRfIz
 0Ysvvmj+HxiDD28RZtnwAAAAAElFTkSuQmCC
---00000000000081439905f5f56bd1--
+--_005_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_
+Content-Type: image/png; name="Capture.PNG"
+Content-Description: Capture.PNG
+Content-Disposition: inline; filename="Capture.PNG"; size=6764;
+	creation-date="Fri, 03 Mar 2023 04:08:22 GMT";
+	modification-date="Fri, 03 Mar 2023 04:08:22 GMT"
+Content-ID: <76139129-cdbf-49f7-9541-f9f23a2026a4>
+Content-Transfer-Encoding: base64
+
+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
+V5k76c5mPZtZZzIfu52PM+fuAs9XZ1de57MXVJnKY19lKi+oMuj9Cbrzr/K7mXXlBZipwHzWR73z
+ApXhNfsMZjg7nVHrPJwxg7C/9BcNWI41z7Hx6pxp3wLfW3evu37oWffU3wX3xNfpOaf9jtP9T/sT
+Yj+1L2r4mq0zH3npis4/Zed81PA1W7M2ZafzK8SzUc+H9SzXeVfQ7X9yfnS7/skZO+B5+Dq9hq7f
++SuoHmurM2ux5gznFLs+69Oc0jmzMuMrZgKls6YynYd6rDHHc4bKsZbNSHhVfjp3RF6x4vN+MXeZ
+ymOUx9rq3BF5xYrP+8XMdPlqxle13pkR5akZtW7uiLxixef9rppZY7+bM409BWeyGVFelX8RfmS6
+fIbqsaYyiPJRizVnOBdsfdEQm2TrnTnTvoW4N0WWZT3o/Bene3T+KrEf7ovrDuxGB9en4N6xJ647
+sBsdXJ+i9sW9UQtdrZUWeyCZV3WuoNs/80NHX62VFntM2On8Gtkzmj67aW6Hbu+rzq72ueqMFeJM
+PBvXHdiNjlorLfaYkHVYVzmlIeFHRuWVxnSZzGdd5ZTGnsqwVs34iplMU3qWq7zQw+Mczxkqx9ok
+w1Q+e1X2Lroz2e/mDJVjbXW+m8n5oSGV94L9WCst1jszUnkvlB8ag5m7qc5kr5sVkVFZ9gKVQW0F
+7mczEp7KM+xnMxO+6mS6yoWGZD7OKoPai+2/aGDYW50z7VvJ7rV7Bp0fnO7T+avEfrjnyhmn/Y7T
+/U/7Hd3eMWeZzmeUV+WvoNu/8sNDH+fON2esPNvKe9H5u1xxbmSmual+N3Eunq2uReUyHefOn1Dl
+2VvJdnrQ+cHuPqx3M4M+Z1dmfM0yzEm204POD1SOtUkmY9JVmT9Fdjbr0xyjfNZW57vpzl+dGfTx
+Va13ZiTzdjrvQF0La92swAzneVZMMhXcx7nyKg1hv8szVZ691TnTkMp/7BcNyv8msvvr7nvau3o+
+Re1XaStZ1HaZ7h/aSha1XXivbmZt1V+dT+n2X51Z6/wpO51fgJ/L6oxU3i685+rMOnusqUyl3406
+t9JWshO/o8uyvzpn2sRjumzms44zewrOZDPrnMVXtc6ITJfN/JVelVUea5NM5a3OdzM9P3T2uxlR
+HmtVBkH/Tvi8O2d8VeudGVFepmW+yt9Jd/7p3GUqT2nK7+AOzpWntM7PMhmTbGRUlrVJZuq92Pqf
+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
+tc7DGTMI+0t/0YDlWPMcG6/OmfYt8L1197rrh551Kx895Z+Ae+Lr9JzTfsfp/qd9pOqFV+2rfOwp
+X+WUHmvWcGZ9FdXHfSt/d56y2/sF4tl0z+fdz7A7/+T6otv1T87YAc/D1+k1dP3OX0H1WFudWYs1
+Zzin2PVZn+aUzpmVGV8xEyidNZXpPNRjjTmeM1SOtWxGwqvy07kj8ooVn/eLuctUHqM81lbnjsgr
+VnzeL2amy1czvqr1zowoT82odXNH5BUrPu931cwa+92caewpOJPNiPKq/IvwI9PlM1SPNZVBlI9a
+rDnDuWDri4bYJFvvzJn2LcS9KbIs60Hnv1jdA+dYo38K7hn74roDu9HB9Sm4d+yJ6w7sRgfXU6ad
+LHfaD9iPGfVuHfMKWY/1bFZM/Ck7nV+je0bvfIZ/6tqqfa46Y4U4E8/GdQd2o6PWSos9JmQd1lVO
+aUj4kVF5pTFdJvNZVzmlsacyrFUzvmIm05Se5Sov9PA4x3OGyrE2yTCVz16VvYvuTPa7OUPlWFud
+72ZyfmhI5b1gP9ZKi/XOjFTeC+WHxmDmbqoz2etmRWRUlr1AZVBbgfvZjISn8gz72cyErzqZrnKh
+IZmPs8qg9mL7LxoY9lbnTPtWsnvtnkHnB6v7dPMpsd/uGaf9jtP9T/svVvIqe9pH2I9ZaVU+5glV
+h70q++LUN2vw86yeb+XdSXfu5LoiM81N9buJc/FsdS0ql+k4d/6EKs/eSrbTg84PdvdhvZsZ9Dm7
+MuNrlmFOsp0edH6gcqxNMhmTrsr8KbKzWZ/mGOWztjrfTXf+6sygj69qvTMjmbfTeQfqWljrZgVm
+OM+zYpKp4D7OlVdpCPtdnqny7K3OmYZU/mO/aFD+N5HdX3ff097V8ylqv0pbyaK2y3T/0FayqGVw
+9ukza+zz3NH1u5k59TN2e98OP5fqOVXeXfCZqzPr7LGmMpV+N+rcSlvJTvyOLsv+6pxpE4/pspnP
+Os7sKTiTzaxzFl/VOiMyXTbzV3pVVnmsTTKVtzrfzfT80NnvZkR5rFUZBP074fPunPFVrXdmRHmZ
+lvkqfyfd+adzl6k8pSm/gzs4V57SOj/LZEyykVFZ1iaZqfdi638GmW3YZTqfM8r/BvAe+T6VhlR+
+eFnm1D+F91dnTL0sc8Jk/6mXZTJU90WVqbygyqC343Om8jq4G1QZ9JAu1/kVO51fAZ+pekbsB5y7
+A3Xui6k/YdKtvLvBa9u5jq7f+RWTLO+La/ZR77zwWWN4j2Diq3XMocVakXW4p7RMR011FGof9hjl
+cTeoMughmV910Ztm2Mtyd4Hnd+eqDHbZU36Q+dhlJpmr4Wvja1jxUVdZpcXMepVVGabzsj56f4Lu
+/BNf6dnMOtL5FdhVe7A+yVS6ymWs5LJseOGrNWqI0pClv2gwxhhjjDHGPI/sl4E74TPfcQ3G3Inf
+0/v4iwZjjDHGGGM+kPgl6J2/DD3hGoy5A7+3z/AXDcYYY4wxxhhjjLmMr/mi4UnfNp1cy0n3nXzq
+dRuD+H28xxOeG17DO6/DGGOMMcZ8wBcNKx8Yn/QBc+dasLPTfzefeM3fzie+h5SeceX94fsX1ydc
+eX1P56pndspTrsMYY4wx5pd59BcNqx8Yn/QBc+dannT9O3z69X8bn/bzWL3eq+/v6fs9nafc7689
+d2OMMcaYJzL+oiE+vMUHOP4wN52R8BQqg1320Oc1+52Hc5ZhT/kqU9F1cN8ql9H1r/Kz+ZTYb3ff
+rl/5rGVzaOxzhr0dP+AcZpVWeZmm1jFzvvNwVj4SPsM+dpBJJ5uZ8Lvci0lmFTx7Z++uf5XPa/aV
+p/wg87GLKH+ixcw6+93MujHGGGPML7L0Fw34AYo/UOF6Z0aUx1qVCV1lAuWhFmueVXZlVmR+dNHP
+5o6ufzqzpvyKyCvQ53zMHV3/dGYt1jyr7GReQXVZ6zKdz3PlKS3WmOE5Q+VQw1fMVXOskchxVs1I
+5WVER4E+52PuWO13eZ5RCz1bq3mVqq+8qVZ5rOFcecYYY4wxv8jWFw3xASpb78yd3nkv2M9mJDz2
+cc66L7ibzRO6zs6eSNVnr5sVkZlkV+E9d86oOuytzqiFnq0V4TO7GdRQZ6pc5qm58lgLnTM8K7IM
+6viK2dWZ6fwXk8wOvO/qOZN8ZBD2MM9UnVgzkZ1kKg9RHmr4irmYkfCqfDYbY4wxxvwy23/RwLC3
+OmeaIsuxjnPlVdrEe8F+l1dMOzt7I6rPWjcrMDPJr8D7neyvuqytzpk28V50/oRqj+n+kVNZ1nGu
+vEpDTnz08BXzq3NGlpv2d+C9V8/q8ux3s6LqsLcK96v9lIcavqq1mqeZSjfGGGOM+SUe80UDz8wk
+X2Uqr9Iyb3WeUHXYy7Khs8fa1fM0s8vp3l3/dM60zFudO7o8+yqPWufzXHmVhqDPWZ4Z9PGVO6FV
+HmqZ181Xc3pe1z+du0zlTVjpZx7qnOlm1tnvZmOMMcaYX2PrfwaZfYBiP1tnc6wzosNd9ljLMmqN
+GtNl2MtyCuxmndVM5V3tK13lTsAzdvbt+is+zuyFxnSZzq+Y5Kv9J1rMiMqvekiWqTovsk7WYy9m
+1pEqk3WupDp/Qtdnj3Poo84eayqD+hTu8j7oI+yrLmpVJlBeaMozxhhjjPk1lv6iwRjzu3zLL1D+
+RdCc4PePMcYYY0yPv2gwxrTEL1ef+kvWp1+/eS9+/xhjjDHGrOEvGowxxhhjjDHGGHMZ/qLhTah/
+GcN/MWNP+SoTuUzPuuwhmDvhdO/Tfsfp/qf9jm5v9jlT+cp7UfXRu4Lp/pnH/Sz3ovMVuO9q9xc4
+fT6n/Y5u/87vqPrsIZi7k9Ozu37nfzrTe1P+pFdx2v+T3H2dJ/tH9+T6rtjjieB9ffK9ffo9fPrz
+v4NP/5l2fPv9/c8XDf/6678BPTCaRRG6XGIAAAAASUVORK5CYII=
+--_005_SA1P221MB101899A720637370A7C33E64B5B39SA1P221MB1018NAMP_--
 

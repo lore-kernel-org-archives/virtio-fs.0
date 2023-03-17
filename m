@@ -1,17 +1,32 @@
-Return-Path: <hreitz@redhat.com>
-Message-ID: <f1b1f5b4-cb0b-2799-6e61-c645571fad2c@redhat.com>
-Date: Fri, 17 Mar 2023 18:53:22 +0100
+Return-Path: <antonkuchin@yandex-team.ru>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+ s=default; 
+ t=1679076258; bh=0GvQd16L2GG216lK5AzJlSxe623NJ/77dh4aIxW+8i8=;
+ h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
+ b=MwzSc813I2LoLa1Ubm/N+7OvqSYPxb7Fq9oOqo0H6MGOYnou9SKacx4fK9IEDRBC9
+ ThzyMPk3IYttbaTc7hJozZ/CKGfPwTAESTPuglBjAZjJ8FOU/ONZdpVNQIyDFDbY5S
+ pxgP23H/frNVWwD+mGmBDn7dWz7g2XQYrrcLORBc=
+Message-ID: <dd55f2b9-e602-3981-9d92-875e83a79e0e@yandex-team.ru>
+Date: Fri, 17 Mar 2023 20:04:13 +0200
 MIME-Version: 1.0
-References: <20230313174833.28790-1-hreitz@redhat.com>
- <20230313174833.28790-2-hreitz@redhat.com>
- <8dc9cba8-b6fa-f0e7-8ec8-3d4152ad7a5e@yandex-team.ru>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <8dc9cba8-b6fa-f0e7-8ec8-3d4152ad7a5e@yandex-team.ru>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [RFC 1/2] vhost-user: Add interface for virtio-fs
- migration
+References: <20230228094756-mutt-send-email-mst@kernel.org>
+ <f3338868-d43a-a499-5db8-2fb06d244e37@yandex-team.ru>
+ <20230228161602-mutt-send-email-mst@kernel.org>
+ <8c3c140a-3c11-ba21-0c53-9cf25928bad0@yandex-team.ru>
+ <20230301101212-mutt-send-email-mst@kernel.org>
+ <78299aea-4049-991b-fe89-de0d1845bdff@yandex-team.ru>
+ <20230301121224-mutt-send-email-mst@kernel.org>
+ <bc89a1b1-2478-7780-0d74-64aac91beed5@yandex-team.ru>
+ <20230301152038-mutt-send-email-mst@kernel.org>
+ <c85c067f-5bbb-ca5c-a6ba-bae1c356eef1@yandex-team.ru>
+ <20230306165137-mutt-send-email-mst@kernel.org>
+From: Anton Kuchin <antonkuchin@yandex-team.ru>
+In-Reply-To: <20230306165137-mutt-send-email-mst@kernel.org>
+Content-Language: en-US, ru-RU
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v3 1/1] vhost-user-fs: add migration type
+ property
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,67 +35,48 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Anton Kuchin <antonkuchin@yandex-team.ru>
-Cc: Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
+To: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, yc-core@yandex-team.ru, Stefan Hajnoczi <stefanha@redhat.com>, Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Markus Armbruster <armbru@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Juan Quintela <quintela@redhat.com>, =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Eric Blake <eblake@redhat.com>
 
-On 17.03.23 18:39, Anton Kuchin wrote:
-> On 13/03/2023 19:48, Hanna Czenczek wrote:
->> Add a virtio-fs-specific vhost-user interface to facilitate migrating
->> back-end-internal state.  We plan to migrate the internal state simply
->> as a binary blob after the streaming phase, so all we need is a way to
->> transfer such a blob from and to the back-end.  We do so by using a
->> dedicated area of shared memory through which the blob is transferred in
->> chunks.
+On 06/03/2023 23:53, Michael S. Tsirkin wrote:
+> On Mon, Mar 06, 2023 at 10:55:29PM +0200, Anton Kuchin wrote:
+>> On 01/03/2023 22:22, Michael S. Tsirkin wrote:
+>>> On Wed, Mar 01, 2023 at 09:35:56PM +0200, Anton Kuchin wrote:
+>>>> I do trust them :)
+>>>> I have to, otherwise we would need to pack all the properties and
+>>>> flags of qemu to the migration stream and validate them at
+>>>> destination or entire migration ends up broken beyond repair if
+>>>> orchestrators tend to do stupid things and need babysitting.
+>>> This is not at all a crazy idea. It has some disadvantages
+>>> too esp around cross version migration, which is why we
+>>> don't do this yet.
+>>>
+>> Indeed. I know VMMs that chose this path. But as long as
+>> qemu decided to trust orchestrators I think we'd better
+>> keep this consistent across the codebase.
 >>
->> This patch adds the following vhost operations (and implements them for
->> vhost-user):
->>
->> - FS_SET_STATE_FD: The front-end passes a dedicated shared memory area
->>    to the back-end.  This area will be used to transfer state via the
->>    other two operations.
->>    (After the transfer FS_SET_STATE_FD detaches the shared memory area
->>    again.)
->>
->> - FS_GET_STATE: The front-end asks the back-end to place a chunk of
->>    internal state into the shared memory area.
->>
->> - FS_SET_STATE: The front-end puts a chunk of internal state into the
->>    shared memory area, and asks the back-end to fetch it.
->>
->> On the source side, the back-end is expected to serialize its internal
->> state either when FS_SET_STATE_FD is invoked, or when FS_GET_STATE is
->> invoked the first time.  On subsequent FS_GET_STATE calls, it memcpy()s
->> parts of that serialized state into the shared memory area.
->>
->> On the destination side, the back-end is expected to collect the state
->> blob over all FS_SET_STATE calls, and then deserialize and apply it once
->> FS_SET_STATE_FD detaches the shared memory area.
->>
->> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
->> ---
->>   include/hw/virtio/vhost-backend.h |   9 ++
->>   include/hw/virtio/vhost.h         |  68 +++++++++++++++
->>   hw/virtio/vhost-user.c            | 138 ++++++++++++++++++++++++++++++
->>   hw/virtio/vhost.c                 |  29 +++++++
->>   4 files changed, 244 insertions(+)
->>
-
-[...]
-
->> +static ssize_t vhost_user_fs_get_state(struct vhost_dev *dev,
->> +                                       uint64_t state_offset,
->> +                                       size_t size)
->> +{
+>> Only ivshmem_pre_load callback bothers to check device
+>> property and virtio_net_tx_waiting_pre_load checks that
+>> number of queue pairs doesn't exceed allowed maximum, all
+>> other *_pre_load functions generally just initialize some
+>> parts of state that need to be set before stream starts
+>> loading.
+> We do validate things by necessity we just try to do
+> as much as we can table-driver so it's not open-coded
+> and less visible. We used to have lot more callbacks
+> nowdays we try to keep it table driven.
+> But e.g. pci streams RO state and validates that it's the same
+> on destination.
 >
-> Am I right to assume that vrings are supposed to be stopped to get/set 
-> state?
-> If I am shouldn't we check it before sending message or do you believe 
-> it is
-> better to return error from backend in these cases?
 
-Good point!  Yes, the vrings should be stopped.  I don’t verify this 
-currently, but it makes sense to do so both on the qemu and the 
-virtiofsd side.
-
-Hanna
+Sorry for late reply. I agree that checks should be done if
+we have data at hand.
+But in my opinion the situation here is a little different:
+pci is emulated by qemu and RO state affects how emulation
+will work on destination, the point of vhost-user is to
+outsource device emulation logic to daemons outside qemu and
+allow orchestrator manage both qemu and daemons.
+So engineering additional flags in qemu that don't affect
+device operation but only to check orchestrator correctness
+is excessive in my opinion.
 

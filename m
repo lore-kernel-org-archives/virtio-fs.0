@@ -1,28 +1,22 @@
-Return-Path: <stefanha@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20210112; t=1678898045;
- h=content-transfer-encoding:cc:to:subject:message-id:date:from
- :in-reply-to:references:mime-version:from:to:cc:subject:date
- :message-id:reply-to;
- bh=MeCMC8UVxnfNnGa1kuwPfz3Mk2N5NEKae7N+GRlze08=;
- b=Hqe0WGAkdVZ0vGlmEXnrfEcCJH+Mc+8Cu5WYXSSy+ANFx9eUcd+4mAeKhnzr4B0uGA
- 9//DshLo48pr3S1PhnWitO7mZ5Hn+o3wP7isWMr+4MTizl+wKZk76IHDUYTYXBE/4oPc
- T6VdZLwUmSGpQv5oG3lRZhCcvcDwb9XmjqgaDK9ZFfu3L/4yFTUu2isxvEqMzZY6Pi7+
- uSb4kPFiDKTEIoL3G/zTYfw/xoYnQJrZDYhVrnhQAtKGkNwxHDYbYCLL7Qg3rc4cvPu+
- sOru9V2BbdDwwxOHXmoFZ1+NB6QkA+Z90gdcJAKKYC8tbouTQXniqXRrSfWE1VKVgxvW
- hzpw==
+Return-Path: <antonkuchin@yandex-team.ru>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+ s=default; 
+ t=1679073589; bh=6LomDRG4nR+efSRxGTuQTm5WspZMhTAGhIr+0ABV5MM=;
+ h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
+ b=SeMcZe3CsVRsXDYdv10C0YBC1vn6XBZhJ2C/FGbHtVw0Lage0NJjb5UiVuprUYyvx
+ WWOKPkPUK60mIV8yWvbw1a1OUlKaXRhJwZgRwkW0px5OTEo3H9Nkh91R3xDKHJ9QMy
+ CjlpNBHGGTUnNPjXrFrHb9Yy7G064UQkB4b8RZP8=
+Message-ID: <035ba8d3-7943-ae8d-f4b2-76ac4fd74cf0@yandex-team.ru>
+Date: Fri, 17 Mar 2023 19:19:46 +0200
 MIME-Version: 1.0
 References: <20230313174833.28790-1-hreitz@redhat.com>
- <20230313174833.28790-2-hreitz@redhat.com>
- <20230315135844.GC6146@fedora>
- <aca54f19-1c95-01b6-5c5d-bfcee7942c16@redhat.com>
-In-Reply-To: <aca54f19-1c95-01b6-5c5d-bfcee7942c16@redhat.com>
-From: Stefan Hajnoczi <stefanha@gmail.com>
-Date: Wed, 15 Mar 2023 12:33:53 -0400
-Message-ID: <CAJSP0QX1+YvFeHqbOfysKOmR-oZqz35BfWBgyNUiZOce=zWobA@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [RFC 1/2] vhost-user: Add interface for virtio-fs
+ <20230313174833.28790-3-hreitz@redhat.com>
+From: Anton Kuchin <antonkuchin@yandex-team.ru>
+In-Reply-To: <20230313174833.28790-3-hreitz@redhat.com>
+Content-Language: en-US, ru-RU
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [RFC 2/2] vhost-user-fs: Implement stateful
  migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -33,109 +27,237 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Hanna Czenczek <hreitz@redhat.com>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, "Dr . David Alan Gilbert" <dgilbert@redhat.com>, Juan Quintela <quintela@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "Dr . David Alan Gilbert" <dgilbert@redhat.com>, Juan Quintela <quintela@redhat.com>
 
-On Wed, 15 Mar 2023 at 11:56, Hanna Czenczek <hreitz@redhat.com> wrote:
+On 13/03/2023 19:48, Hanna Czenczek wrote:
+> A virtio-fs device's VM state consists of:
+> - the virtio device (vring) state (VMSTATE_VIRTIO_DEVICE)
+> - the back-end's (virtiofsd's) internal state
 >
-> On 15.03.23 14:58, Stefan Hajnoczi wrote:
-> > On Mon, Mar 13, 2023 at 06:48:32PM +0100, Hanna Czenczek wrote:
-> >> Add a virtio-fs-specific vhost-user interface to facilitate migrating
-> >> back-end-internal state.  We plan to migrate the internal state simply
-> > Luckily the interface does not need to be virtiofs-specific since it
-> > only transfers opaque data. Any stateful device can use this for
-> > migration. Please make it generic both at the vhost-user protocol
-> > message level and at the QEMU vhost API level.
+> We get/set the latter via the new vhost-user operations FS_SET_STATE_FD,
+> FS_GET_STATE, and FS_SET_STATE.
 >
-> OK, sure.
+> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> ---
+>   hw/virtio/vhost-user-fs.c | 171 +++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 170 insertions(+), 1 deletion(-)
 >
-> >> as a binary blob after the streaming phase, so all we need is a way to
-> >> transfer such a blob from and to the back-end.  We do so by using a
-> >> dedicated area of shared memory through which the blob is transferred =
-in
-> >> chunks.
-> > Keeping the migration data transfer separate from the vhost-user UNIX
-> > domain socket is a good idea since the amount of data could be large an=
-d
-> > may congest the UNIX domain socket. The shared memory interface solves
-> > this.
-> >
-> > Where I get lost is why it needs to be shared memory instead of simply
-> > an fd? On the source, the front-end could read the fd until EOF and
-> > transfer the opaque data. On the destination, the front-end could write
-> > to the fd and then close it. I think that would be simpler than the
-> > shared memory interface and could potentially support zero-copy via
-> > splice(2) (QEMU doesn't need to look at the data being transferred!).
-> >
-> > Here is an outline of an fd-based interface:
-> >
-> > - SET_DEVICE_STATE_FD: The front-end passes a file descriptor for
-> >    transferring device state.
-> >
-> >    The @direction argument:
-> >    - SAVE: the back-end transfers an outgoing device state over the fd.
-> >    - LOAD: the back-end transfers an incoming device state over the fd.
-> >
-> >    The @phase argument:
-> >    - STOPPED: the device is stopped.
-> >    - PRE_COPY: reserved for future use.
-> >    - POST_COPY: reserved for future use.
-> >
-> >    The back-end transfers data over the fd according to @direction and
-> >    @phase upon receiving the SET_DEVICE_STATE_FD message.
-> >
-> > There are loose ends like how the message interacts with the virtqueue
-> > enabled state, what happens if multiple SET_DEVICE_STATE_FD messages ar=
-e
-> > sent, etc. I have ignored them for now.
-> >
-> > What I wanted to mention about the fd-based interface is:
-> >
-> > - It's just one message. The I/O activity happens via the fd and does
-> >    not involve GET_STATE/SET_STATE messages over the vhost-user domain
-> >    socket.
-> >
-> > - Buffer management is up to the front-end and back-end implementations
-> >    and a bit simpler than the shared memory interface.
-> >
-> > Did you choose the shared memory approach because it has certain
-> > advantages?
->
-> I simply chose it because I didn=E2=80=99t think of anything else. :)
->
-> Using just an FD for a pipe-like interface sounds perfect to me.  I
-> expect that to make the code simpler and, as you point out, it=E2=80=99s =
-just
-> better in general.  Thanks!
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index 83fc20e49e..df1fb02acc 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -20,8 +20,10 @@
+>   #include "hw/virtio/virtio-bus.h"
+>   #include "hw/virtio/virtio-access.h"
+>   #include "qemu/error-report.h"
+> +#include "qemu/memfd.h"
+>   #include "hw/virtio/vhost.h"
+>   #include "hw/virtio/vhost-user-fs.h"
+> +#include "migration/qemu-file-types.h"
+>   #include "monitor/monitor.h"
+>   #include "sysemu/sysemu.h"
+>   
+> @@ -298,9 +300,176 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
+>       return &fs->vhost_dev;
+>   }
+>   
+> +/**
+> + * Fetch the internal state from the back-end (virtiofsd) and save it
+> + * to `f`.
+> + */
+> +static int vuf_save_state(QEMUFile *f, void *pv, size_t size,
+> +                          const VMStateField *field, JSONWriter *vmdesc)
+> +{
+> +    VirtIODevice *vdev = pv;
+> +    VHostUserFS *fs = VHOST_USER_FS(vdev);
+> +    int memfd = -1;
+> +    /* Size of the shared memory through which to transfer the state */
+> +    const size_t chunk_size = 4 * 1024 * 1024;
+> +    size_t state_offset;
+> +    ssize_t remaining;
+> +    void *shm_buf;
+> +    Error *local_err = NULL;
+> +    int ret, ret2;
+> +
+> +    /* Set up shared memory through which to receive the state from virtiofsd */
+> +    shm_buf = qemu_memfd_alloc("vhost-fs-state", chunk_size,
+> +                               F_SEAL_SEAL | F_SEAL_SHRINK | F_SEAL_GROW,
+> +                               &memfd, &local_err);
+> +    if (!shm_buf) {
+> +        error_report_err(local_err);
+> +        ret = -ENOMEM;
+> +        goto early_fail;
+> +    }
+> +
+> +    /* Share the SHM area with virtiofsd */
+> +    ret = vhost_fs_set_state_fd(&fs->vhost_dev, memfd, chunk_size);
+> +    if (ret < 0) {
+> +        goto early_fail;
 
-The Linux VFIO Migration v2 API could be interesting to look at too:
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/inc=
-lude/uapi/linux/vfio.h#n814
+Don't we need some log message here too?
 
-It has a state machine that puts the device into
-pre-copy/saving/loading/etc states.
+> +    }
+> +
+> +    /* Receive the virtiofsd state in chunks, and write them to `f` */
+> +    state_offset = 0;
+> +    do {
+> +        size_t this_chunk_size;
+> +
+> +        remaining = vhost_fs_get_state(&fs->vhost_dev, state_offset,
+> +                                       chunk_size);
+> +        if (remaining < 0) {
+> +            ret = remaining;
+> +            goto fail;
+> +        }
+> +
+> +        /* Prefix the whole state by its total length */
+> +        if (state_offset == 0) {
+> +            qemu_put_be64(f, remaining);
+> +        }
+> +
+> +        this_chunk_size = MIN(remaining, chunk_size);
+> +        qemu_put_buffer(f, shm_buf, this_chunk_size);
+> +        state_offset += this_chunk_size;
+> +    } while (remaining >= chunk_size);
+> +
+> +    ret = 0;
+> +fail:
+> +    /* Have virtiofsd close the shared memory */
+> +    ret2 = vhost_fs_set_state_fd(&fs->vhost_dev, -1, 0);
+> +    if (ret2 < 0) {
+> +        error_report("Failed to remove state FD from the vhost-user-fs back "
+> +                     "end: %s", strerror(-ret));
+> +        if (ret == 0) {
+> +            ret = ret2;
+> +        }
+> +    }
+> +
+> +early_fail:
+> +    if (shm_buf) {
+> +        qemu_memfd_free(shm_buf, chunk_size, memfd);
+> +    }
+> +
+> +    return ret;
+> +}
+> +
+> +/**
+> + * Load the back-end's (virtiofsd's) internal state from `f` and send
+> + * it over to that back-end.
+> + */
+> +static int vuf_load_state(QEMUFile *f, void *pv, size_t size,
+> +                          const VMStateField *field)
+> +{
+> +    VirtIODevice *vdev = pv;
+> +    VHostUserFS *fs = VHOST_USER_FS(vdev);
+> +    int memfd = -1;
+> +    /* Size of the shared memory through which to transfer the state */
+> +    const size_t chunk_size = 4 * 1024 * 1024;
+> +    size_t state_offset;
+> +    uint64_t remaining;
+> +    void *shm_buf;
+> +    Error *local_err = NULL;
+> +    int ret, ret2;
+> +
+> +    /* The state is prefixed by its total length, read that first */
+> +    remaining = qemu_get_be64(f);
+> +
+> +    /* Set up shared memory through which to send the state to virtiofsd */
+> +    shm_buf = qemu_memfd_alloc("vhost-fs-state", chunk_size,
+> +                               F_SEAL_SEAL | F_SEAL_SHRINK | F_SEAL_GROW,
+> +                               &memfd, &local_err);
+> +    if (!shm_buf) {
+> +        error_report_err(local_err);
+> +        ret = -ENOMEM;
+> +        goto early_fail;
+> +    }
+> +
+> +    /* Share the SHM area with virtiofsd */
+> +    ret = vhost_fs_set_state_fd(&fs->vhost_dev, memfd, chunk_size);
+> +    if (ret < 0) {
+> +        goto early_fail;
+> +    }
+> +
+> +    /*
+> +     * Read the virtiofsd state in chunks from `f`, and send them over
+> +     * to virtiofsd
+> +     */
+> +    state_offset = 0;
+> +    do {
+> +        size_t this_chunk_size = MIN(remaining, chunk_size);
+> +
+> +        if (qemu_get_buffer(f, shm_buf, this_chunk_size) < this_chunk_size) {
+> +            ret = -EINVAL;
+> +            goto fail;
+> +        }
+> +
+> +        ret = vhost_fs_set_state(&fs->vhost_dev, state_offset, this_chunk_size);
+> +        if (ret < 0) {
+> +            goto fail;
+> +        }
+> +
+> +        state_offset += this_chunk_size;
+> +        remaining -= this_chunk_size;
+> +    } while (remaining > 0);
+> +
+> +    ret = 0;
+> +fail:
+> +    ret2 = vhost_fs_set_state_fd(&fs->vhost_dev, -1, 0);
+> +    if (ret2 < 0) {
+> +        error_report("Failed to remove state FD from the vhost-user-fs back "
+> +                     "end -- perhaps it failed to deserialize/apply the state: "
+> +                     "%s", strerror(-ret2));
+> +        if (ret == 0) {
+> +            ret = ret2;
+> +        }
+> +    }
+> +
+> +early_fail:
+> +    if (shm_buf) {
+> +        qemu_memfd_free(shm_buf, chunk_size, memfd);
+> +    }
+> +
+> +    return ret;
+> +}
+> +
+>   static const VMStateDescription vuf_vmstate = {
+>       .name = "vhost-user-fs",
+> -    .unmigratable = 1,
+> +    .version_id = 1,
+> +    .fields = (VMStateField[]) {
+> +        VMSTATE_VIRTIO_DEVICE,
+> +        {
+> +            .name = "back-end",
+> +            .info = &(const VMStateInfo) {
+> +                .name = "virtio-fs back-end state",
+> +                .get = vuf_load_state,
+> +                .put = vuf_save_state,
+> +            },
+> +        },
 
-> > What is the rationale for waiting to receive the entire incoming state
-> > before parsing it rather than parsing it in a streaming fashion? Can
-> > this be left as an implementation detail of the vhost-user back-end so
-> > that there's freedom in choosing either approach?
->
-> The rationale was that when using the shared memory approach, you need
-> to specify the offset into the state of the chunk that you=E2=80=99re cur=
-rently
-> transferring.  So to allow streaming, you=E2=80=99d need to make the fron=
-t-end
-> transfer the chunks in a streaming fashion, so that these offsets are
-> continuously increasing.  Definitely possible, and reasonable, I just
-> thought it=E2=80=99d be easier not to define it at this point and just st=
-ate
-> that decoding at the end is always safe.
->
-> When using a pipe/splicing, however, that won=E2=80=99t be a concern anym=
-ore, so
-> yes, then we can definitely allow the back-end to decode its state while
-> it=E2=80=99s still being received.
+I've been working on stateless migration patch [1] and there was 
+discussed that we
+need to keep some kind of blocker by default if orchestrators rely on 
+unmigratable
+field in virtio-fs vmstate to block the migration.
+For this purpose I've implemented flag that selects "none" or "external" 
+and is checked
+in pre_save, so it could be extended with "internal" option.
+We didn't come to conclusion if we also need to check incoming 
+migration, the discussion
+has stopped for a while but I'm going back to it now.
 
-I see.
+I would appreciate if you have time to take a look at the discussion and 
+consider the idea
+proposed there to store internal state as a subsection of vmstate to 
+make it as an option
+but not mandatory.
 
-Stefan
+[1] 
+https://patchew.org/QEMU/20230217170038.1273710-1-antonkuchin@yandex-team.ru/
+
+> +        VMSTATE_END_OF_LIST()
+> +    },
+>   };
+>   
+>   static Property vuf_properties[] = {
 

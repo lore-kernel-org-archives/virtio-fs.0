@@ -1,16 +1,11 @@
-Return-Path: <stefanx@lrz.uni-muenchen.de>
-Message-ID: <a0874daf-a63a-eb2a-76e8-a57f63ab9f6e@lrz.uni-muenchen.de>
-Date: Tue, 4 Apr 2023 22:06:42 +0200
+Return-Path: <hreitz@redhat.com>
+From: Hanna Czenczek <hreitz@redhat.com>
+Date: Tue, 11 Apr 2023 17:05:11 +0200
+Message-Id: <20230411150515.14020-1-hreitz@redhat.com>
 MIME-Version: 1.0
-References: <reply-a5b7554ee57f194421d0557ae5d491ed@gitlab.com>
- <issue_87934469@gitlab.com> <note_1341159092@gitlab.com>
-From: stefanx <stefanx@lrz.uni-muenchen.de>
-In-Reply-To: <note_1341159092@gitlab.com>
-Content-Type: multipart/alternative;
- boundary="------------TN5ON4RvswHHdq4GZCl0JM02"
-Content-Language: de-DE
-Subject: Re: [Virtio-fs] QEMU | virtiofsd: doesn't garant write access at
- users allowed by group permission (#368)
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 0/4] vhost-user-fs: Internal migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,145 +14,92 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: QEMU / QEMU <incoming+a5b7554ee57f194421d0557ae5d491ed@incoming.gitlab.com>, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: Hanna Czenczek <hreitz@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-This is a multi-part message in MIME format.
---------------TN5ON4RvswHHdq4GZCl0JM02
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: quoted-printable
+RFC:
+https://lists.nongnu.org/archive/html/qemu-devel/2023-03/msg04263.html
 
-Am 04.04.23 um 19:51 schrieb GK (@hgkamath):
-> GitLab
->
-> GK <https://gitlab.com/hgkamath> commented <https://gitlab.com/qemu-proje=
-ct/qemu/-/issues/368#note_1341159092>:
->
-> Just a user here.
->
-> There is some fuse update going into Linux kernel 6.3
->
->   * 20230227 Miklos Szeredi [GIT PULL] fuse update for 6.3 https://lore.k=
-ernel.org/lkml/Y%2FzYyN7NeLKusmSj@miu.piliscsaba.redhat.com/
->
-> Unsure if it will address the issue.
-> In any case, virtiofsd and qemu, may need to some code updates to make us=
-e of the new feature.
->
-> =E2=80=94
-> Reply to this email directly or view it on GitLab <https://gitlab.com/qem=
-u-project/qemu/-/issues/368#note_1341159092>.
-> You're receiving this email because of your account on gitlab.com <https:=
-//gitlab.com>. Unsubscribe <https://gitlab.com/-/sent_notifications/a5b7554=
-ee57f194421d0557ae5d491ed/unsubscribe> from this thread =C2=B7 Manage all n=
-otifications <https://gitlab.com/-/profile/notifications> =C2=B7 Help <http=
-s://gitlab.com/help>
->
-Thank you, I hope there is soon an update for Ubuntu.
---------------TN5ON4RvswHHdq4GZCl0JM02
-Content-Type: text/html; charset=UTF-8
-Content-Transfer-Encoding: quoted-printable
+Hi,
 
-<html>
-  <head>
-    <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DUTF-8=
-">
-  </head>
-  <body>
-    <div class=3D"moz-cite-prefix">Am 04.04.23 um 19:51 schrieb GK
-      (@hgkamath):<br>
-    </div>
-    <blockquote type=3D"cite" cite=3D"mid:note_1341159092@gitlab.com">
-      <meta content=3D"text/html; charset=3DUTF-8" http-equiv=3D"Content-Ty=
-pe">
-      <title>
-        GitLab
-      </title>
-      <style data-premailer=3D"ignore" type=3D"text/css">a { color: #1068bf=
-; }</style>
-      <style>img {
-max-width: 100%; height: auto;
-}body {
-font-size: 0.875rem;
-}body {
--webkit-text-shadow: rgba(255,255,255,0.01) 0 0 1px;
-}body {
-font-family: var(--default-regular-font, -apple-system),BlinkMacSystemFont,=
-"Segoe UI",Roboto,"Noto Sans",Ubuntu,Cantarell,"Helvetica Neue",sans-serif,=
-"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"; =
-font-size: inherit;
-}</style>
-      <div class=3D"content">
-        <p style=3D"color: #777777;">
-          <a href=3D"https://gitlab.com/hgkamath" moz-do-not-send=3D"true">=
-GK</a>
-          <a
-            href=3D"https://gitlab.com/qemu-project/qemu/-/issues/368#note_=
-1341159092"
-            moz-do-not-send=3D"true">commented</a>:
-        </p>
-        <div class=3D"md" style=3D"color: #333238; word-wrap: break-word;">
-          <p dir=3D"auto" style=3D"color: #333238; margin: 0 0 16px;"
-            align=3D"initial">Just a user here.</p>
-          <p dir=3D"auto" style=3D"color: #333238; margin: 0 0 16px;"
-            align=3D"initial">There is some fuse update going into Linux
-            kernel 6.3</p>
-          <ul dir=3D"auto" style=3D"text-align: initial; list-style-type:
-            disc; margin: 0 0 16px; padding: 0;">
-            <li style=3D"margin-top: 0; line-height: 1.6em; margin-left:
-              25px; padding-left: 3px;">20230227 Miklos Szeredi [GIT
-              PULL] fuse update for 6.3
-              <a
-href=3D"https://lore.kernel.org/lkml/Y%2FzYyN7NeLKusmSj@miu.piliscsaba.redh=
-at.com/"
-                rel=3D"nofollow noreferrer noopener" target=3D"_blank"
-                style=3D"margin-top: 0;" moz-do-not-send=3D"true"
-                class=3D"moz-txt-link-freetext">https://lore.kernel.org/lkm=
-l/Y%2FzYyN7NeLKusmSj@miu.piliscsaba.redhat.com/</a>
-            </li>
-          </ul>
-          <p dir=3D"auto" style=3D"color: #333238; margin: 0;"
-            align=3D"initial">Unsure if it will address the issue.<br
-              style=3D"margin-top: 0;">
-            In any case, virtiofsd and qemu, may need to some code
-            updates to make use of the new feature.</p>
-        </div>
-      </div>
-      <div class=3D"footer" style=3D"margin-top: 10px;">
-        <p style=3D"font-size: small; color: #737278;">
-          =E2=80=94
-          <br>
-          Reply to this email directly or <a
-            href=3D"https://gitlab.com/qemu-project/qemu/-/issues/368#note_=
-1341159092"
-            moz-do-not-send=3D"true">view it on GitLab</a>.
-          <br>
-          You're receiving this email because of your account on <a
-            target=3D"_blank" rel=3D"noopener noreferrer"
-            href=3D"https://gitlab.com" moz-do-not-send=3D"true">gitlab.com=
-</a>.
-          <a
-href=3D"https://gitlab.com/-/sent_notifications/a5b7554ee57f194421d0557ae5d=
-491ed/unsubscribe"
-            target=3D"_blank" rel=3D"noopener noreferrer"
-            moz-do-not-send=3D"true">Unsubscribe</a> from this thread =C2=
-=B7 <a
-            href=3D"https://gitlab.com/-/profile/notifications"
-            target=3D"_blank" rel=3D"noopener noreferrer"
-            class=3D"mng-notif-link" moz-do-not-send=3D"true">Manage all
-            notifications</a> =C2=B7 <a href=3D"https://gitlab.com/help"
-            target=3D"_blank" rel=3D"noopener noreferrer" class=3D"help-lin=
-k"
-            moz-do-not-send=3D"true">Help</a>
-          <script type=3D"application/ld+json">{"@context":"http://schema.o=
-rg","@type":"EmailMessage","action":{"@type":"ViewAction","name":"View Issu=
-e","url":"https://gitlab.com/qemu-project/qemu/-/issues/368#note_1341159092=
-"}}</script>
-        </p>
-      </div>
-    </blockquote>
-    Thank you, I hope there is soon an update for Ubuntu.<br>
-  </body>
-</html>
+Patch 2 of this series adds new vhost methods (only for vhost-user at
+this point) for transferring the back-end’s internal state to/from qemu
+during migration, so that this state can be stored in the migration
+stream.  (This is what we call “internal migration”, because the state
+is internally available to qemu; this is in contrast to “external
+migration”, which Anton is working on, where the back-end’s state is
+handled by the back-end itself without involving qemu.)
 
---------------TN5ON4RvswHHdq4GZCl0JM02--
+For this, the state is handled as a binary blob by qemu, and it is
+transferred over a pipe that is established via a new vhost method.
+
+Patch 3 adds two high-level helper functions to (A) fetch any vhost
+back-end’s internal state and store it in a migration stream (a
+`QEMUFile`), and (B) load such state from a migrations stream and send
+it to a vhost back-end.  These build on the low-level interface
+introduced in patch 2.
+
+Patch 4 then uses these functions to implement internal migration for
+vhost-user-fs.  Note that this of course depends on support in the
+back-end (virtiofsd), which is not yet ready.
+
+Finally, patch 1 fixes a bug around migrating vhost-user devices: To
+enable/disable logging[1], the VHOST_F_LOG_ALL feature must be
+set/cleared, via the SET_FEATURES call.  Another, technically unrelated,
+feature exists, VHOST_USER_F_PROTOCOL_FEATURES, which indicates support
+for vhost-user protocol features.  Naturally, qemu wants to keep that
+other feature enabled, so it will set it (when possible) in every
+SET_FEATURES call.  However, a side effect of setting
+VHOST_USER_F_PROTOCOL_FEATURES is that all vrings are disabled.  This
+causes any enabling (done at the start of migration) or disabling (done
+on the source after a cancelled/failed migration) of logging to make the
+back-end hang.  Without patch 1, therefore, starting a migration will
+have any vhost-user back-end that supports both VHOST_F_LOG_ALL and
+VHOST_USER_F_PROTOCOL_FEATURES immediately hang completely, and unless
+execution is transferred to the destination, it will continue to hang.
+
+
+[1] Logging here means logging writes to guest memory pages in a dirty
+bitmap so that these dirty pages are flushed to the destination.  qemu
+cannot monitor the back-end’s writes to guest memory, so the back-end
+has to do so itself, and log its writes in a dirty bitmap shared with
+qemu.
+
+
+Changes in v1 compared to the RFC:
+- Patch 1 added
+
+- Patch 2: Interface is different, now uses a pipe instead of shared
+  memory (as suggested by Stefan); also, this is now a generic
+  vhost-user interface, and not just for vhost-user-fs
+
+- Patches 3 and 4: Because this is now supposed to be a generic
+  migration method for vhost-user back-ends, most of the migration code
+  has been moved from vhost-user-fs.c to vhost.c so it can be shared
+  between different back-ends.  The vhost-user-fs code is now a rather
+  thin wrapper around the common code.
+  - Note also (as suggested by Anton) that the back-end’s migration
+    state is now in a subsection, and that it is technically optional.
+    “Technically” means that with this series, it is always used (unless
+    the back-end doesn’t support migration, in which case migration is
+    just blocked), but Anton’s series for external migration would make
+    it optional.  (I.e., the subsection would be skipped for external
+    migration, and mandatorily included for internal migration.)
+
+
+Hanna Czenczek (4):
+  vhost: Re-enable vrings after setting features
+  vhost-user: Interface for migration state transfer
+  vhost: Add high-level state save/load functions
+  vhost-user-fs: Implement internal migration
+
+ include/hw/virtio/vhost-backend.h |  24 +++
+ include/hw/virtio/vhost.h         | 124 +++++++++++++++
+ hw/virtio/vhost-user-fs.c         | 101 +++++++++++-
+ hw/virtio/vhost-user.c            | 147 ++++++++++++++++++
+ hw/virtio/vhost.c                 | 246 ++++++++++++++++++++++++++++++
+ 5 files changed, 641 insertions(+), 1 deletion(-)
+
+-- 
+2.39.1
 

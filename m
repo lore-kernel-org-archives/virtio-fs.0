@@ -1,15 +1,15 @@
 Return-Path: <gmaglion@redhat.com>
 MIME-Version: 1.0
-References: <e73b38b8-89d2-4b5d-0b3d-17427b205b67@lrz.uni-muenchen.de>
- <CAJh=p+7OpGqcz1BSbDAQk7Zn2HLh5sUzRwF3QV_LAcDow6n8pQ@mail.gmail.com>
- <87faa352-e6d6-11de-0ed9-f5c291502f95@lrz.uni-muenchen.de>
-In-Reply-To: <87faa352-e6d6-11de-0ed9-f5c291502f95@lrz.uni-muenchen.de>
+References: <20230411150515.14020-1-hreitz@redhat.com>
+ <20230411150515.14020-2-hreitz@redhat.com>
+In-Reply-To: <20230411150515.14020-2-hreitz@redhat.com>
 From: German Maglione <gmaglione@redhat.com>
-Date: Tue, 11 Apr 2023 18:24:30 +0200
-Message-ID: <CAJh=p+4G1VEhSfQ0HCFQ0OZYmHq-ji8H6kL-=q6OKsjvm9X-ZA@mail.gmail.com>
+Date: Wed, 12 Apr 2023 12:55:18 +0200
+Message-ID: <CAJh=p+4ki4XGEKZBQADUT5iO2NfPEyhYG4aTmaXyMPNzALpiwg@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] virtiofs doesn't accept writable group permissions
+Subject: Re: [Virtio-fs] [PATCH 1/4] vhost: Re-enable vrings after setting
+ features
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,98 +18,123 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: stefanx <stefanx@lrz.uni-muenchen.de>
-Cc: virtio-fs@redhat.com
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-On Tue, Apr 4, 2023 at 8:35=E2=80=AFPM stefanx <stefanx@lrz.uni-muenchen.de=
-> wrote:
+On Tue, Apr 11, 2023 at 5:05=E2=80=AFPM Hanna Czenczek <hreitz@redhat.com> =
+wrote:
 >
-> Hello German,
+> If the back-end supports the VHOST_USER_F_PROTOCOL_FEATURES feature,
+> setting the vhost features will set this feature, too.  Doing so
+> disables all vrings, which may not be intended.
 >
-> Am 04.04.23 um 18:06 schrieb German Maglione:
-> > Hi Stefan,
-> >
-> > On Tue, Apr 4, 2023 at 3:58=E2=80=AFPM stefanx <stefanx@lrz.uni-muenche=
-n.de> wrote:
-> >>
-> >> Hello,
-> >>
-> >> virtiofs doesn't accept writable group permissions (Libvirt/KVM, guest=
- vm and host vm have Ubuntu 22.04):
-> >>
-> >> Libvirt XML (host vm):
-> >>
-> >>     <filesystem type=3D'mount' accessmode=3D'passthrough'>
-> >>       <driver type=3D'virtiofs'/>
-> >>       <source dir=3D'/mnt/xyz'/>
-> >>       <target dir=3D'mnt-xyz'/>
-> >>       <address type=3D'pci' domain=3D'0x0000' bus=3D'0x08' slot=3D'0x0=
-0' function=3D'0x0'/>
-> >>     </filesystem>
-> >>
-> >> /etc/fstab (guest vm):
-> >> ```
-> >> mnt-xyz       /mnt/xyz            virtiofs rw,_netdev 0 0
-> >> ```
-> >> In /mnt/xyz/123 I have write permissions at host vm, but not at guest =
-vm. host vm and guest vm have the same LDAP users.
-> > when you say that you do not have write permission, do you mean that
-> > when you try to write, it fails?
-> Now I have made more tests: The user has write permissions to existing fi=
-les, but cannot create new files on the guest (it's possible on the host)
-> > Could you send the output of:
-> > 'ls -lnd /mnt/xyz/123'
-> > (both in the host and the guest)
-> >
-> > and also the output of 'id' in the guest (with the user you are trying =
-to write)
+> For example, enabling or disabling logging during migration requires
+> setting those features (to set or unset VHOST_F_LOG_ALL), which will
+> automatically disable all vrings.  In either case, the VM is running
+> (disabling logging is done after a failed or cancelled migration, and
+> only once the VM is running again, see comment in
+> memory_global_dirty_log_stop()), so the vrings should really be enabled.
+> As a result, the back-end seems to hang.
 >
-> ls -lnd /mnt/xyz/123
-> -rw-r--r-- 1 16009 16100 0 Apr  4 19:32 /mnt/xyz/123
-
-Sorry, I'm a bit confused, I thought "123" was a directory not a regular fi=
-le.
-So, I'm assuming the owner (in the host) of if /mnt/xyz is not 16009, but t=
-he
-group is 16100 with write permission, that is a supplementary group of the
-user 16009, something like:
-
-drwxrwxr-x 1 0 16100 0 Apr 4 19:32 /mnt/xyz
-(I'm just using uid 0 as an example)
-is that correct?
-
-> id 16009 gid=3D16000, groups=3D...,16100(...),...
+> To fix this, we must remember whether the vrings are supposed to be
+> enabled, and, if so, re-enable them after a SET_FEATURES call that set
+> VHOST_USER_F_PROTOCOL_FEATURES.
 >
->
-> We use /mnt/xyz for years in the host without any permission problems, al=
-l attributes and permissions for all directories and files in /mnt/xyz/123 =
-are exactly the same on host and guest.
+> It seems less than ideal that there is a short period in which the VM is
+> running but the vrings will be stopped (between SET_FEATURES and
+> SET_VRING_ENABLE).  To fix this, we would need to change the protocol,
+> e.g. by introducing a new flag or vhost-user protocol feature to disable
+> disabling vrings whenever VHOST_USER_F_PROTOCOL_FEATURES is set, or add
+> new functions for setting/clearing singular feature bits (so that
+> F_LOG_ALL can be set/cleared without touching F_PROTOCOL_FEATURES).
 >
 
-Which version of virtiofsd are you using?
-Is "xyz" a mount point for (or is inside a)  nfs/cephfs?
+Could be the other way around?, I mean before commit
+02b61f38d3574900fb4cc4c450b17c75956a6a04
 
+so until v7.2rc0 we didn't have this problem with
+VHOST_USER_F_PROTOCOL_FEATURES,
+so "it seems" it's fine to start with the vrings enabled, could be
+possible to go back to that
+behavior (reflecting that in the spec) and add a new flag to start
+with vrings disabled?
 
+> Even with such a potential addition to the protocol, we still need this
+> fix here, because we cannot expect that back-ends will implement this
+> addition.
 >
-> Stefan
+> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> ---
+>  include/hw/virtio/vhost.h | 10 ++++++++++
+>  hw/virtio/vhost.c         | 13 +++++++++++++
+>  2 files changed, 23 insertions(+)
 >
+> diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
+> index a52f273347..2fe02ed5d4 100644
+> --- a/include/hw/virtio/vhost.h
+> +++ b/include/hw/virtio/vhost.h
+> @@ -90,6 +90,16 @@ struct vhost_dev {
+>      int vq_index_end;
+>      /* if non-zero, minimum required value for max_queues */
+>      int num_queues;
+> +
+> +    /*
+> +     * Whether the virtqueues are supposed to be enabled (via
+> +     * SET_VRING_ENABLE).  Setting the features (e.g. for
+> +     * enabling/disabling logging) will disable all virtqueues if
+> +     * VHOST_USER_F_PROTOCOL_FEATURES is set, so then we need to
+> +     * re-enable them if this field is set.
+> +     */
+> +    bool enable_vqs;
+> +
+>      /**
+>       * vhost feature handling requires matching the feature set
+>       * offered by a backend which may be a subset of the total
+> diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
+> index a266396576..cbff589efa 100644
+> --- a/hw/virtio/vhost.c
+> +++ b/hw/virtio/vhost.c
+> @@ -50,6 +50,8 @@ static unsigned int used_memslots;
+>  static QLIST_HEAD(, vhost_dev) vhost_devices =3D
+>      QLIST_HEAD_INITIALIZER(vhost_devices);
 >
-> >
-> >
-> >
-> >> Any ideas ?
-> >>
-> >> Thanks Stefan
-> >>
-> >> _______________________________________________
-> >> Virtio-fs mailing list
-> >> Virtio-fs@redhat.com
-> >> https://listman.redhat.com/mailman/listinfo/virtio-fs
-> >
-> >
-> > --
-> > German
-> >
+> +static int vhost_dev_set_vring_enable(struct vhost_dev *hdev, int enable=
+);
+> +
+>  bool vhost_has_free_slot(void)
+>  {
+>      unsigned int slots_limit =3D ~0U;
+> @@ -899,6 +901,15 @@ static int vhost_dev_set_features(struct vhost_dev *=
+dev,
+>          }
+>      }
+>
+> +    if (dev->enable_vqs) {
+> +        /*
+> +         * Setting VHOST_USER_F_PROTOCOL_FEATURES would have disabled al=
+l
+> +         * virtqueues, even if that was not intended; re-enable them if
+> +         * necessary.
+> +         */
+> +        vhost_dev_set_vring_enable(dev, true);
+> +    }
+> +
+>  out:
+>      return r;
+>  }
+> @@ -1896,6 +1907,8 @@ int vhost_dev_get_inflight(struct vhost_dev *dev, u=
+int16_t queue_size,
+>
+>  static int vhost_dev_set_vring_enable(struct vhost_dev *hdev, int enable=
+)
+>  {
+> +    hdev->enable_vqs =3D enable;
+> +
+>      if (!hdev->vhost_ops->vhost_set_vring_enable) {
+>          return 0;
+>      }
+> --
+> 2.39.1
 >
 
 

@@ -1,11 +1,12 @@
 Return-Path: <hreitz@redhat.com>
-Message-ID: <246691c3-2287-7472-3615-7ec0f074445c@redhat.com>
-Date: Thu, 13 Apr 2023 11:24:05 +0200
+Message-ID: <af50a052-0f3e-a03c-598d-dff841720dd6@redhat.com>
+Date: Thu, 13 Apr 2023 11:25:22 +0200
 MIME-Version: 1.0
 References: <20230411150515.14020-1-hreitz@redhat.com>
- <20230411150515.14020-3-hreitz@redhat.com> <20230412210641.GC2813183@fedora>
+ <20230411150515.14020-3-hreitz@redhat.com>
+ <CAJaqyWf8twfendAqcuPopeeZv84JcevPdDm=rKaKiRFvft+30A@mail.gmail.com>
 From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <20230412210641.GC2813183@fedora>
+In-Reply-To: <CAJaqyWf8twfendAqcuPopeeZv84JcevPdDm=rKaKiRFvft+30A@mail.gmail.com>
 Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
@@ -19,11 +20,11 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>
+To: Eugenio Perez Martin <eperezma@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-On 12.04.23 23:06, Stefan Hajnoczi wrote:
-> On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek wrote:
+On 13.04.23 10:50, Eugenio Perez Martin wrote:
+> On Tue, Apr 11, 2023 at 5:33 PM Hanna Czenczek <hreitz@redhat.com> wrote:
 >> So-called "internal" virtio-fs migration refers to transporting the
 >> back-end's (virtiofsd's) state through qemu's migration stream.  To do
 >> this, we need to be able to transfer virtiofsd's internal state to and
@@ -75,74 +76,43 @@ On 12.04.23 23:06, Stefan Hajnoczi wrote:
 >>   hw/virtio/vhost-user.c            | 147 ++++++++++++++++++++++++++++++
 >>   hw/virtio/vhost.c                 |  37 ++++++++
 >>   4 files changed, 287 insertions(+)
->>
->> diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio/vhost-backend.h
->> index ec3fbae58d..5935b32fe3 100644
->> --- a/include/hw/virtio/vhost-backend.h
->> +++ b/include/hw/virtio/vhost-backend.h
->> @@ -26,6 +26,18 @@ typedef enum VhostSetConfigType {
->>       VHOST_SET_CONFIG_TYPE_MIGRATION = 1,
->>   } VhostSetConfigType;
->>   
->> +typedef enum VhostDeviceStateDirection {
->> +    /* Transfer state from back-end (device) to front-end */
->> +    VHOST_TRANSFER_STATE_DIRECTION_SAVE = 0,
->> +    /* Transfer state from front-end to back-end (device) */
->> +    VHOST_TRANSFER_STATE_DIRECTION_LOAD = 1,
->> +} VhostDeviceStateDirection;
->> +
->> +typedef enum VhostDeviceStatePhase {
->> +    /* The device (and all its vrings) is stopped */
->> +    VHOST_TRANSFER_STATE_PHASE_STOPPED = 0,
->> +} VhostDeviceStatePhase;
-> vDPA has:
->
->    /* Suspend a device so it does not process virtqueue requests anymore
->     *
->     * After the return of ioctl the device must preserve all the necessary state
->     * (the virtqueue vring base plus the possible device specific states) that is
->     * required for restoring in the future. The device must not change its
->     * configuration after that point.
->     */
->    #define VHOST_VDPA_SUSPEND      _IO(VHOST_VIRTIO, 0x7D)
->
->    /* Resume a device so it can resume processing virtqueue requests
->     *
->     * After the return of this ioctl the device will have restored all the
->     * necessary states and it is fully operational to continue processing the
->     * virtqueue descriptors.
->     */
->    #define VHOST_VDPA_RESUME       _IO(VHOST_VIRTIO, 0x7E)
->
-> I wonder if it makes sense to import these into vhost-user so that the
-> difference between kernel vhost and vhost-user is minimized. It's okay
-> if one of them is ahead of the other, but it would be nice to avoid
-> overlapping/duplicated functionality.
->
-> (And I hope vDPA will import the device state vhost-user messages
-> introduced in this series.)
 
-I don’t understand your suggestion.  (Like, I very simply don’t 
-understand :))
+[...]
 
-These are vhost messages, right?  What purpose do you have in mind for 
-them in vhost-user for internal migration?  They’re different from the 
-state transfer messages, because they don’t transfer state to/from the 
-front-end.  Also, the state transfer stuff is supposed to be distinct 
-from starting/stopping the device; right now, it just requires the 
-device to be stopped beforehand (or started only afterwards).  And in 
-the future, new VhostDeviceStatePhase values may allow the messages to 
-be used on devices that aren’t stopped.
+>> diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
+>> index 2fe02ed5d4..29449e0fe2 100644
+>> --- a/include/hw/virtio/vhost.h
+>> +++ b/include/hw/virtio/vhost.h
+>> @@ -346,4 +346,83 @@ int vhost_dev_set_inflight(struct vhost_dev *dev,
 
-So they seem to serve very different purposes.  I can imagine using the 
-VDPA_{SUSPEND,RESUME} messages for external migration (what Anton is 
-working on), but they don’t really help with internal migration 
-implemented here.  If I were to add them, they’d just be sent in 
-addition to the new messages added in this patch here, i.e. SUSPEND on 
-the source before SET_DEVICE_STATE_FD, and RESUME on the destination 
-after CHECK_DEVICE_STATE (we could use RESUME in place of 
-CHECK_DEVICE_STATE on the destination, but we can’t do that on the 
-source, so we still need CHECK_DEVICE_STATE).
+[...]
+
+>> +/**
+>> + * vhost_set_device_state_fd(): After transferring state from/to the
+> Nitpick: This function doc is for vhost_check_device_state not
+> vhost_set_device_state_fd.
+>
+> Thanks!
+
+Oops, right, thanks!
 
 Hanna
+
+>> + * back-end via vhost_set_device_state_fd(), i.e. once the sending end
+>> + * has closed the pipe, inquire the back-end to report any potential
+>> + * errors that have occurred on its side.  This allows to sense errors
+>> + * like:
+>> + * - During outgoing migration, when the source side had already started
+>> + *   to produce its state, something went wrong and it failed to finish
+>> + * - During incoming migration, when the received state is somehow
+>> + *   invalid and cannot be processed by the back-end
+>> + *
+>> + * @dev: The vhost device
+>> + * @errp: Potential error description
+>> + *
+>> + * Returns 0 when the back-end reports successful state transfer and
+>> + * processing, and -errno when an error occurred somewhere.
+>> + */
+>> +int vhost_check_device_state(struct vhost_dev *dev, Error **errp);
+>> +
 

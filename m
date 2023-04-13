@@ -1,14 +1,17 @@
-Return-Path: <mst@redhat.com>
-Date: Thu, 13 Apr 2023 12:11:42 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20230413120554-mutt-send-email-mst@kernel.org>
-References: <20230411150515.14020-1-hreitz@redhat.com>
+Return-Path: <hreitz@redhat.com>
+Message-ID: <d9d67f07-3d4c-9bdb-052b-28e21fa27dd6@redhat.com>
+Date: Thu, 13 Apr 2023 19:31:57 +0200
 MIME-Version: 1.0
-In-Reply-To: <20230411150515.14020-1-hreitz@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
+References: <20230411150515.14020-1-hreitz@redhat.com>
+ <20230411150515.14020-3-hreitz@redhat.com> <20230412210641.GC2813183@fedora>
+ <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
+From: Hanna Czenczek <hreitz@redhat.com>
+In-Reply-To: <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 0/4] vhost-user-fs: Internal migration
+Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
+ state transfer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,112 +20,170 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
+To: Eugenio Perez Martin <eperezma@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-On Tue, Apr 11, 2023 at 05:05:11PM +0200, Hanna Czenczek wrote:
-> RFC:
-> https://lists.nongnu.org/archive/html/qemu-devel/2023-03/msg04263.html
-> 
-> Hi,
-> 
-> Patch 2 of this series adds new vhost methods (only for vhost-user at
-> this point) for transferring the back-end’s internal state to/from qemu
-> during migration, so that this state can be stored in the migration
-> stream.  (This is what we call “internal migration”, because the state
-> is internally available to qemu; this is in contrast to “external
-> migration”, which Anton is working on, where the back-end’s state is
-> handled by the back-end itself without involving qemu.)
-> 
-> For this, the state is handled as a binary blob by qemu, and it is
-> transferred over a pipe that is established via a new vhost method.
-> 
-> Patch 3 adds two high-level helper functions to (A) fetch any vhost
-> back-end’s internal state and store it in a migration stream (a
-> `QEMUFile`), and (B) load such state from a migrations stream and send
-> it to a vhost back-end.  These build on the low-level interface
-> introduced in patch 2.
-> 
-> Patch 4 then uses these functions to implement internal migration for
-> vhost-user-fs.  Note that this of course depends on support in the
-> back-end (virtiofsd), which is not yet ready.
-> 
-> Finally, patch 1 fixes a bug around migrating vhost-user devices: To
-> enable/disable logging[1], the VHOST_F_LOG_ALL feature must be
-> set/cleared, via the SET_FEATURES call.  Another, technically unrelated,
-> feature exists, VHOST_USER_F_PROTOCOL_FEATURES, which indicates support
-> for vhost-user protocol features.  Naturally, qemu wants to keep that
-> other feature enabled, so it will set it (when possible) in every
-> SET_FEATURES call.  However, a side effect of setting
-> VHOST_USER_F_PROTOCOL_FEATURES is that all vrings are disabled.
+On 13.04.23 12:14, Eugenio Perez Martin wrote:
+> On Wed, Apr 12, 2023 at 11:06 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+>> On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek wrote:
+>>> So-called "internal" virtio-fs migration refers to transporting the
+>>> back-end's (virtiofsd's) state through qemu's migration stream.  To do
+>>> this, we need to be able to transfer virtiofsd's internal state to and
+>>> from virtiofsd.
+>>>
+>>> Because virtiofsd's internal state will not be too large, we believe it
+>>> is best to transfer it as a single binary blob after the streaming
+>>> phase.  Because this method should be useful to other vhost-user
+>>> implementations, too, it is introduced as a general-purpose addition to
+>>> the protocol, not limited to vhost-user-fs.
+>>>
+>>> These are the additions to the protocol:
+>>> - New vhost-user protocol feature VHOST_USER_PROTOCOL_F_MIGRATORY_STATE:
+>>>    This feature signals support for transferring state, and is added so
+>>>    that migration can fail early when the back-end has no support.
+>>>
+>>> - SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a pipe
+>>>    over which to transfer the state.  The front-end sends an FD to the
+>>>    back-end into/from which it can write/read its state, and the back-end
+>>>    can decide to either use it, or reply with a different FD for the
+>>>    front-end to override the front-end's choice.
+>>>    The front-end creates a simple pipe to transfer the state, but maybe
+>>>    the back-end already has an FD into/from which it has to write/read
+>>>    its state, in which case it will want to override the simple pipe.
+>>>    Conversely, maybe in the future we find a way to have the front-end
+>>>    get an immediate FD for the migration stream (in some cases), in which
+>>>    case we will want to send this to the back-end instead of creating a
+>>>    pipe.
+>>>    Hence the negotiation: If one side has a better idea than a plain
+>>>    pipe, we will want to use that.
+>>>
+>>> - CHECK_DEVICE_STATE: After the state has been transferred through the
+>>>    pipe (the end indicated by EOF), the front-end invokes this function
+>>>    to verify success.  There is no in-band way (through the pipe) to
+>>>    indicate failure, so we need to check explicitly.
+>>>
+>>> Once the transfer pipe has been established via SET_DEVICE_STATE_FD
+>>> (which includes establishing the direction of transfer and migration
+>>> phase), the sending side writes its data into the pipe, and the reading
+>>> side reads it until it sees an EOF.  Then, the front-end will check for
+>>> success via CHECK_DEVICE_STATE, which on the destination side includes
+>>> checking for integrity (i.e. errors during deserialization).
+>>>
+>>> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+>>> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+>>> ---
+>>>   include/hw/virtio/vhost-backend.h |  24 +++++
+>>>   include/hw/virtio/vhost.h         |  79 ++++++++++++++++
+>>>   hw/virtio/vhost-user.c            | 147 ++++++++++++++++++++++++++++++
+>>>   hw/virtio/vhost.c                 |  37 ++++++++
+>>>   4 files changed, 287 insertions(+)
+>>>
+>>> diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio/vhost-backend.h
+>>> index ec3fbae58d..5935b32fe3 100644
+>>> --- a/include/hw/virtio/vhost-backend.h
+>>> +++ b/include/hw/virtio/vhost-backend.h
+>>> @@ -26,6 +26,18 @@ typedef enum VhostSetConfigType {
+>>>       VHOST_SET_CONFIG_TYPE_MIGRATION = 1,
+>>>   } VhostSetConfigType;
+>>>
+>>> +typedef enum VhostDeviceStateDirection {
+>>> +    /* Transfer state from back-end (device) to front-end */
+>>> +    VHOST_TRANSFER_STATE_DIRECTION_SAVE = 0,
+>>> +    /* Transfer state from front-end to back-end (device) */
+>>> +    VHOST_TRANSFER_STATE_DIRECTION_LOAD = 1,
+>>> +} VhostDeviceStateDirection;
+>>> +
+>>> +typedef enum VhostDeviceStatePhase {
+>>> +    /* The device (and all its vrings) is stopped */
+>>> +    VHOST_TRANSFER_STATE_PHASE_STOPPED = 0,
+>>> +} VhostDeviceStatePhase;
+>> vDPA has:
+>>
+>>    /* Suspend a device so it does not process virtqueue requests anymore
+>>     *
+>>     * After the return of ioctl the device must preserve all the necessary state
+>>     * (the virtqueue vring base plus the possible device specific states) that is
+>>     * required for restoring in the future. The device must not change its
+>>     * configuration after that point.
+>>     */
+>>    #define VHOST_VDPA_SUSPEND      _IO(VHOST_VIRTIO, 0x7D)
+>>
+>>    /* Resume a device so it can resume processing virtqueue requests
+>>     *
+>>     * After the return of this ioctl the device will have restored all the
+>>     * necessary states and it is fully operational to continue processing the
+>>     * virtqueue descriptors.
+>>     */
+>>    #define VHOST_VDPA_RESUME       _IO(VHOST_VIRTIO, 0x7E)
+>>
+>> I wonder if it makes sense to import these into vhost-user so that the
+>> difference between kernel vhost and vhost-user is minimized. It's okay
+>> if one of them is ahead of the other, but it would be nice to avoid
+>> overlapping/duplicated functionality.
+>>
+> That's what I had in mind in the first versions. I proposed VHOST_STOP
+> instead of VHOST_VDPA_STOP for this very reason. Later it did change
+> to SUSPEND.
+>
+> Generally it is better if we make the interface less parametrized and
+> we trust in the messages and its semantics in my opinion. In other
+> words, instead of
+> vhost_set_device_state_fd_op(VHOST_TRANSFER_STATE_PHASE_STOPPED), send
+> individually the equivalent of VHOST_VDPA_SUSPEND vhost-user command.
 
+I.e. you mean that this should simply be stateful instead of
+re-affirming the current state with a parameter?
 
-I didn't get this part.
-Two questions:
-	Rings can be enabled or disabled by ``VHOST_USER_SET_VRING_ENABLE``.
+The problem I see is that transferring states in different phases of
+migration will require specialized implementations.  So running
+SET_DEVICE_STATE_FD in a different phase will require support from the
+back-end.  Same in the front-end, the exact protocol and thus
+implementation will (probably, difficult to say at this point) depend on
+the migration phase.  I would therefore prefer to have an explicit
+distinction in the command itself that affirms the phase we’re
+targeting.
 
-	If ``VHOST_USER_F_PROTOCOL_FEATURES`` has not been negotiated, the
-	ring starts directly in the enabled state.
+On the other hand, I don’t see the parameter complicating anything. The
+front-end must supply it, but it will know the phase anyway, so this is
+easy.  The back-end can just choose to ignore it, if it doesn’t feel the
+need to verify that the phase is what it thinks it is.
 
-	If ``VHOST_USER_F_PROTOCOL_FEATURES`` has been negotiated, the ring is
-	initialized in a disabled state and is enabled by
-	``VHOST_USER_SET_VRING_ENABLE`` with parameter 1.
+> Another way to apply this is with the "direction" parameter. Maybe it
+> is better to split it into "set_state_fd" and "get_state_fd"?
 
-so VHOST_USER_F_PROTOCOL_FEATURES only controls initial state of rings,
-it does not disable rings.
+Well, it would rather be `set_state_send_fd` and `set_state_receive_fd`.
+We always negotiate a pipe between front-end and back-end, the question
+is just whether the back-end gets the receiving (load) or the sending
+(save) end.
 
+Technically, one can make it fully stateful and say that if the device
+hasn’t been started already, it’s always a LOAD, and otherwise always a
+SAVE.  But as above, I’d prefer to keep the parameter because the
+implementations are different, so I’d prefer there to be a
+re-affirmation that front-end and back-end are in sync about what should
+be done.
 
+Personally, I don’t really see the advantage of having two functions
+instead of one function with an enum with two values.  The thing about
+SET_DEVICE_STATE_FD is that it itself won’t differ much regardless of
+whether we’re loading or saving, it just negotiates the pipe – the
+difference is what happens after the pipe has been negotiated.  So if we
+split the function into two, both implementations will share most of
+their code anyway, which makes me think it should be a single function.
 
->  This
-> causes any enabling (done at the start of migration) or disabling (done
-> on the source after a cancelled/failed migration) of logging to make the
-> back-end hang.  Without patch 1, therefore, starting a migration will
-> have any vhost-user back-end that supports both VHOST_F_LOG_ALL and
-> VHOST_USER_F_PROTOCOL_FEATURES immediately hang completely, and unless
-> execution is transferred to the destination, it will continue to hang.
-> 
-> 
-> [1] Logging here means logging writes to guest memory pages in a dirty
-> bitmap so that these dirty pages are flushed to the destination.  qemu
-> cannot monitor the back-end’s writes to guest memory, so the back-end
-> has to do so itself, and log its writes in a dirty bitmap shared with
-> qemu.
-> 
-> 
-> Changes in v1 compared to the RFC:
-> - Patch 1 added
-> 
-> - Patch 2: Interface is different, now uses a pipe instead of shared
->   memory (as suggested by Stefan); also, this is now a generic
->   vhost-user interface, and not just for vhost-user-fs
-> 
-> - Patches 3 and 4: Because this is now supposed to be a generic
->   migration method for vhost-user back-ends, most of the migration code
->   has been moved from vhost-user-fs.c to vhost.c so it can be shared
->   between different back-ends.  The vhost-user-fs code is now a rather
->   thin wrapper around the common code.
->   - Note also (as suggested by Anton) that the back-end’s migration
->     state is now in a subsection, and that it is technically optional.
->     “Technically” means that with this series, it is always used (unless
->     the back-end doesn’t support migration, in which case migration is
->     just blocked), but Anton’s series for external migration would make
->     it optional.  (I.e., the subsection would be skipped for external
->     migration, and mandatorily included for internal migration.)
-> 
-> 
-> Hanna Czenczek (4):
->   vhost: Re-enable vrings after setting features
->   vhost-user: Interface for migration state transfer
->   vhost: Add high-level state save/load functions
->   vhost-user-fs: Implement internal migration
-> 
->  include/hw/virtio/vhost-backend.h |  24 +++
->  include/hw/virtio/vhost.h         | 124 +++++++++++++++
->  hw/virtio/vhost-user-fs.c         | 101 +++++++++++-
->  hw/virtio/vhost-user.c            | 147 ++++++++++++++++++
->  hw/virtio/vhost.c                 | 246 ++++++++++++++++++++++++++++++
->  5 files changed, 641 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 2.39.1
+> In that case, reusing the ioctls as vhost-user messages would be ok.
+> But that puts this proposal further from the VFIO code, which uses
+> "migration_set_state(state)", and maybe it is better when the number
+> of states is high.
+
+I’m not sure what you mean (because I don’t know the VFIO code, I
+assume).  Are you saying that using a more finely grained
+migration_set_state() model would conflict with the rather coarse
+suspend/resume?
+
+> BTW, is there any usage for *reply_fd at this moment from the backend?
+
+No, virtiofsd doesn’t plan to make use of it.
+
+Hanna
 

@@ -1,14 +1,14 @@
-Return-Path: <maxime.coquelin@redhat.com>
-Message-ID: <74a20bbf-860e-ed5b-03fa-6f25ce865652@redhat.com>
-Date: Thu, 13 Apr 2023 09:17:16 +0200
+Return-Path: <hreitz@redhat.com>
+Message-ID: <0ca69a92-49ab-223e-b737-9d8655883f38@redhat.com>
+Date: Thu, 13 Apr 2023 10:19:18 +0200
 MIME-Version: 1.0
-Content-Language: en-US
 References: <20230411150515.14020-1-hreitz@redhat.com>
  <20230411150515.14020-2-hreitz@redhat.com> <20230412205138.GA2813183@fedora>
-From: Maxime Coquelin <maxime.coquelin@redhat.com>
+From: Hanna Czenczek <hreitz@redhat.com>
 In-Reply-To: <20230412205138.GA2813183@fedora>
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] [PATCH 1/4] vhost: Re-enable vrings after setting
  features
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -19,12 +19,10 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>, Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, Roman Kagan <rvkagan@yandex-team.ru>, =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, Roman Kagan <rvkagan@yandex-team.ru>, Maxime Coquelin <maxime.coquelin@redhat.com>, =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>
 
-
-
-On 4/12/23 22:51, Stefan Hajnoczi wrote:
+On 12.04.23 22:51, Stefan Hajnoczi wrote:
 > On Tue, Apr 11, 2023 at 05:05:12PM +0200, Hanna Czenczek wrote:
 >> If the back-end supports the VHOST_USER_F_PROTOCOL_FEATURES feature,
 >> setting the vhost features will set this feature, too.  Doing so
@@ -119,34 +117,66 @@ On 4/12/23 22:51, Stefan Hajnoczi wrote:
 >>       if (!hdev->vhost_ops->vhost_set_vring_enable) {
 >>           return 0;
 >>       }
-> 
 > The vhost-user spec doesn't say that VHOST_F_LOG_ALL needs to be toggled
 > at runtime and I don't think VHOST_USER_SET_PROTOCOL_FEATURES is
 > intended to be used like that. This issue shows why doing so is a bad
 > idea.
-> 
+>
 > VHOST_F_LOG_ALL does not need to be toggled to control logging. Logging
 > is controlled at runtime by the presence of the dirty log
 > (VHOST_USER_SET_LOG_BASE) and the per-vring logging flag
 > (VHOST_VRING_F_LOG).
-> 
+
+Technically, the spec doesn’t say that SET_LOG_BASE is required.  It says:
+
+“To start/stop logging of data/used ring writes, the front-end may send 
+messages VHOST_USER_SET_FEATURES with VHOST_F_LOG_ALL and 
+VHOST_USER_SET_VRING_ADDR with VHOST_VRING_F_LOG in ring’s flags set to 
+1/0, respectively.”
+
+(So the spec also very much does imply that toggling F_LOG_ALL at 
+runtime is a valid way to enable/disable logging.  If we were to no 
+longer do that, we should clarify it there.)
+
+I mean, naturally, logging without a shared memory area to log in to 
+isn’t much fun, so we could clarify that SET_LOG_BASE is also a 
+requirement, but it looks to me as if we can’t use SET_LOG_BASE to 
+disable logging, because it’s supposed to always pass a valid FD (at 
+least libvhost-user expects this: 
+https://gitlab.com/qemu-project/qemu/-/blob/master/subprojects/libvhost-user/libvhost-user.c#L1044). 
+So after a cancelled migration, the dirty bitmap SHM will stay around 
+indefinitely (which is already not great, but if we were to use the 
+presence of that bitmap as an indicator as to whether we should log or 
+not, it would be worse).
+
+So the VRING_F_LOG flag remains.
+
 > I suggest permanently enabling VHOST_F_LOG_ALL upon connection when the
 > the backend supports it. No spec changes are required.
-> 
+>
 > libvhost-user looks like it will work. I didn't look at DPDK/SPDK, but
 > checking that it works there is important too.
-> 
+
+I can’t find VRING_F_LOG in libvhost-user, so what protocol do you mean 
+exactly that would work in libvhost-user?  Because SET_LOG_BASE won’t 
+work, as you can’t use it to disable logging.
+
+(For DPDK, I’m not sure.  It looks like it sometimes takes VRING_F_LOG 
+into account, but I think only when it comes to logging accesses to the 
+vring specifically, i.e. not DMA to other areas of guest memory?  I 
+think only places that use vq->log_guest_addr implicitly check it, 
+others don’t.  So for example, 
+vhost_log_write_iova()/vhost_log_cache_write_iova() don’t seem to check 
+VRING_F_LOG, which seem to be the functions generally used for writes to 
+memory outside of the vrings.  So here, even if VRING_F_LOG is disabled 
+for all vrings, as long as a log SHM is set, all writes to memory 
+outside of the immediate vrings seem to cause logging (as long as 
+F_LOG_ALL is set).)
+
+Hanna
+
 > I have CCed people who may be interested in this issue. This is the
 > first time I've looked at vhost-user logging, so this idea may not work.
-
-In the case of DPDK, we rely on VHOST_F_LOG_ALL to be set to know
-whether we should do dirty pages logging or not [0], so setting this
-feature at init time will cause performance degradation. The check on
-whether the log base address has been set is done afterwards.
-
-Regards,
-Maxime
-
+>
 > Stefan
 
-[0]: https://git.dpdk.org/dpdk/tree/lib/vhost/vhost.h#n594

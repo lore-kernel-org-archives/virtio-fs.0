@@ -1,26 +1,26 @@
 Return-Path: <alex.bennee@linaro.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681488275; x=1684080275;
+ d=linaro.org; s=google; t=1681488277; x=1684080277;
  h=content-transfer-encoding:mime-version:references:in-reply-to
  :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=Ac6OXeQsb/93HLbnF+qlx0Y/JMMvx4eaZHVLLhBGMnw=;
- b=RdaJOdn8FisdymopEgb4lrpOBYUrGosSgLoD8zlv0WiTwZFjeV8KjQmJ76VQFwJA7j
- MDcVYXVpkZXue1Tq0rsvBLC9raEUoAlAUhbpjKkLMCBQn7mnklvRuzxxFW2S37S4ddgx
- XqpsDd9xoSlltwSsw2qc03KPJzkl9hlM4EbqVPHY8BcE9C3X1kBgdZdlhJq3ImU/POl0
- oBc24Tcrlx9iZc65cFw9J/AQ6IgK16TtyIEsKQp5kP9WOx/PWw84d8n3vHyIoqF7h1uV
- YVLsdc2AmQo1rgTB8dt+gsNrkFj49EhwJJQsHLq4JgrIZzcfWBmtoJl/cmCvrxlg6MpJ
- UcRA==
+ bh=nVPcgNqV4+yTyF7JyxZthOMz/9y/APO3HAlemN7QWn4=;
+ b=Km+2PWccfqrAl6iXS+0QxP9ByJ0556FYve9PXciZyQzU1CJJ8I8scFfQK8XXBmXy5v
+ kxCP5k0lOtBtlyhcAQ6Ik/03qQ6RmDQ6uS/fJhi6djAoAwMq8iy9MjYzmVFdJPZwQIYs
+ Bj+0/RjbcQyU3webm69fVm/HEFtLNKhM4/Tnrdw3QUNmsG/9SS6iGWE55Aa7SiqLAoqh
+ 90DyjEPjRGMgXevBbAaVDpLPWg2yNa9I2RZRk3nqI6VTAuqjMVHRZqx4TD0ZJXVph8Am
+ Jq1XAUITDjnI/vmRKZJwwha5MCRh7FIWCZ9u/LW5ZdTsL27nmqk208OjB6hTVp15RfWV
+ ZSzw==
 From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Fri, 14 Apr 2023 17:04:22 +0100
-Message-Id: <20230414160433.2096866-2-alex.bennee@linaro.org>
+Date: Fri, 14 Apr 2023 17:04:28 +0100
+Message-Id: <20230414160433.2096866-8-alex.bennee@linaro.org>
 In-Reply-To: <20230414160433.2096866-1-alex.bennee@linaro.org>
 References: <20230414160433.2096866-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 01/12] hw/virtio: fix typo in
- VIRTIO_CONFIG_IRQ_IDX comments
+Subject: [Virtio-fs] [PATCH 07/12] include: attempt to document
+ device_class_set_props
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,140 +32,52 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Markus Armbruster <armbru@redhat.com>
 
-Fixes: 544f0278af (virtio: introduce macro VIRTIO_CONFIG_IRQ_IDX)
+I'm still not sure how I achieve by use case of the parent class
+defining the following properties:
+
+  static Property vud_properties[] = {
+      DEFINE_PROP_CHR("chardev", VHostUserDevice, chardev),
+      DEFINE_PROP_UINT16("id", VHostUserDevice, id, 0),
+      DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
+      DEFINE_PROP_END_OF_LIST(),
+  };
+
+But for the specialisation of the class I want the id to default to
+the actual device id, e.g.:
+
+  static Property vu_rng_properties[] = {
+      DEFINE_PROP_UINT16("id", VHostUserDevice, id, VIRTIO_ID_RNG),
+      DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
+      DEFINE_PROP_END_OF_LIST(),
+  };
+
+And so far the API for doing that isn't super clear.
+
 Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 ---
- hw/display/vhost-user-gpu.c    | 4 ++--
- hw/net/virtio-net.c            | 4 ++--
- hw/virtio/vhost-user-fs.c      | 4 ++--
- hw/virtio/vhost-user-gpio.c    | 2 +-
- hw/virtio/vhost-vsock-common.c | 4 ++--
- hw/virtio/virtio-crypto.c      | 4 ++--
- 6 files changed, 11 insertions(+), 11 deletions(-)
+ include/hw/qdev-core.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
-index 71dfd956b8..7c61a7c3ac 100644
---- a/hw/display/vhost-user-gpu.c
-+++ b/hw/display/vhost-user-gpu.c
-@@ -489,7 +489,7 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
+diff --git a/include/hw/qdev-core.h b/include/hw/qdev-core.h
+index bd50ad5ee1..d4bbc30c92 100644
+--- a/include/hw/qdev-core.h
++++ b/include/hw/qdev-core.h
+@@ -776,6 +776,15 @@ BusState *sysbus_get_default(void);
+ char *qdev_get_fw_dev_path(DeviceState *dev);
+ char *qdev_get_own_fw_dev_path_from_handler(BusState *bus, DeviceState *dev);
  
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
++/**
++ * device_class_set_props(): add a set of properties to an device
++ * @dc: the parent DeviceClass all devices inherit
++ * @props: an array of properties, terminate by DEFINE_PROP_END_OF_LIST()
++ *
++ * This will add a set of properties to the object. It will fault if
++ * you attempt to add an existing property defined by a parent class.
++ * To modify an inherited property you need to use????
++ */
+ void device_class_set_props(DeviceClass *dc, Property *props);
  
-@@ -506,7 +506,7 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
-index 53e1c32643..c53616a080 100644
---- a/hw/net/virtio-net.c
-+++ b/hw/net/virtio-net.c
-@@ -3359,7 +3359,7 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
-     }
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return false
-      */
- 
-@@ -3391,7 +3391,7 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
-     }
-     /*
-      *Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 83fc20e49e..49d699ffc2 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -161,7 +161,7 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-@@ -177,7 +177,7 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
-index d6927b610a..3b013f2d0f 100644
---- a/hw/virtio/vhost-user-gpio.c
-+++ b/hw/virtio/vhost-user-gpio.c
-@@ -194,7 +194,7 @@ static void vu_gpio_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
-index d2b5519d5a..623bdf91cc 100644
---- a/hw/virtio/vhost-vsock-common.c
-+++ b/hw/virtio/vhost-vsock-common.c
-@@ -129,7 +129,7 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-@@ -146,7 +146,7 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
-index 802e1b9659..6b3e607329 100644
---- a/hw/virtio/virtio-crypto.c
-+++ b/hw/virtio/virtio-crypto.c
-@@ -1208,7 +1208,7 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
-@@ -1227,7 +1227,7 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
- 
-     /*
-      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
--     * as the Marco of configure interrupt's IDX, If this driver does not
-+     * as the macro of configure interrupt's IDX, If this driver does not
-      * support, the function will return
-      */
- 
+ /**
 -- 
 2.39.2
 

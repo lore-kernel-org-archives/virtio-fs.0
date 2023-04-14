@@ -1,16 +1,4 @@
-Return-Path: <stefanha@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=gmail.com; s=20221208; t=1681418559; x=1684010559;
- h=content-transfer-encoding:cc:to:subject:message-id:date:from
- :in-reply-to:references:mime-version:from:to:cc:subject:date
- :message-id:reply-to;
- bh=sKPtIzidUFZ6mJSx4dXrIfhLjbtx3SV92WXT2BQwTE4=;
- b=ovW0zu1PWwpui+qg4eXXNgcbEj4LbEoBAma3EpWzw9Dt4B0ZIbthSD01CiSbr9g0LV
- lh8fkTinWt6lMT1KklE7Oy9X2tggSq7HdUeGn6ctyrqA5LTuCXbk4gocqZ4NP7U0KP5M
- +BipJuJIiIc3c5Z9yokJD4LdTGzTQPDsaqyHR1l5BlnF5NnnFEbPiEry/4wiVrSxf4Gp
- FSUDuE4a17CrMOU6IBObSpuyc/NJaSsBJOHtMaugwvAdxjcV1aG4XqARzEPLUm2x5kBN
- VToiwf0DzPDq0d+RUsW8WDuxo2qYWuYae0lYaQJp9tf7j8Jb3xNfyKjG6iZfwmlBtriF
- wgOQ==
+Return-Path: <eperezma@redhat.com>
 MIME-Version: 1.0
 References: <20230411150515.14020-1-hreitz@redhat.com>
  <20230411150515.14020-3-hreitz@redhat.com>
@@ -19,9 +7,9 @@ References: <20230411150515.14020-1-hreitz@redhat.com>
  <CAJSP0QU-iDTT+xtkZ_xRf4vX+hM0WY+H1SXSuyS+cjiogz3A_A@mail.gmail.com>
  <b0cd4f54-94ed-09a4-cec2-e81f36da4008@redhat.com>
 In-Reply-To: <b0cd4f54-94ed-09a4-cec2-e81f36da4008@redhat.com>
-From: Stefan Hajnoczi <stefanha@gmail.com>
-Date: Thu, 13 Apr 2023 16:42:26 -0400
-Message-ID: <CAJSP0QUh0j9QR_bXCGtbQvXiOt0cjP=L0x3APM7kNA6G=gVtfw@mail.gmail.com>
+From: Eugenio Perez Martin <eperezma@redhat.com>
+Date: Fri, 14 Apr 2023 17:17:02 +0200
+Message-ID: <CAJaqyWegMfuc8s6bKdxdM4uVixmhy-F3xUUyOCYS1yGDXoiVZA@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
@@ -35,9 +23,10 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Hanna Czenczek <hreitz@redhat.com>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>
+Cc: Stefan Hajnoczi <stefanha@gmail.com>, Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-On Thu, 13 Apr 2023 at 13:55, Hanna Czenczek <hreitz@redhat.com> wrote:
+On Thu, Apr 13, 2023 at 7:55=E2=80=AFPM Hanna Czenczek <hreitz@redhat.com> =
+wrote:
 >
 > On 13.04.23 13:38, Stefan Hajnoczi wrote:
 > > On Thu, 13 Apr 2023 at 05:24, Hanna Czenczek <hreitz@redhat.com> wrote:
@@ -234,23 +223,36 @@ unds
 > does not implement GET/SET_STATUS?  Because then this would also lead to
 > more complexity in virtiofsd.
 >
+
+At this moment the vhost-user net in DPDK suspends at
+VHOST_GET_VRING_BASE. Not the same case though, as here only the vq
+indexes / wrap bits are transferred here.
+
+Vhost-vdpa implements the suspend call so it does not need to trust
+VHOST_GET_VRING_BASE to be the last vring call done. Since virtiofsd
+is using vhost-user maybe it is not needed to implement it actually.
+
 > Basically, what I=E2=80=99m hearing is that I need to implement a differe=
 nt
 > feature that has no practical impact right now, and also fix bugs around
 > it along the way...
+>
 
-Eugenio's input regarding the design of the vhost-user messages is
-important. That way we know it can be ported to vDPA later.
+To fix this properly requires iterative device migration in qemu as
+far as I know, instead of using VMStates [1]. This way the state is
+requested to virtiofsd before the device reset.
 
-There is some extra discussion and work here, but only on the design
-of the interface. You shouldn't need to implement extra unused stuff.
-Whoever needs it can do that later based on a design that left room to
-eventually do iterative migration for vhost-user and vDPA (comparable
-to VFIO's migration interface).
+What does virtiofsd do when the state is totally sent? Does it keep
+processing requests and generating new state or is only a one shot
+that will suspend the daemon? If it is the second I think it still can
+be done in one shot at the end, always indicating "no more state" at
+save_live_pending and sending all the state at
+save_live_complete_precopy.
 
-Since both vDPA (vhost kernel) and vhost-user are stable APIs, it will
-be hard to make significant design changes later without breaking all
-existing implementations. That's why I think we should think ahead.
+Does that make sense to you?
 
-Stefan
+Thanks!
+
+[1] https://qemu.readthedocs.io/en/latest/devel/migration.html#iterative-de=
+vice-migration
 

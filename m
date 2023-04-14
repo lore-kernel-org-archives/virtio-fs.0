@@ -1,24 +1,26 @@
-Return-Path: <mst@redhat.com>
-Date: Thu, 23 Feb 2023 02:36:33 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20230223023604-mutt-send-email-mst@kernel.org>
-References: <59165bde-bfd4-a073-c618-205be3951e4a@yandex-team.ru>
- <20230222074214-mutt-send-email-mst@kernel.org>
- <22fee9b6-1dc0-792c-13cf-54c9303556ab@yandex-team.ru>
- <8372550f-def7-4336-c597-d22155abf145@yandex-team.ru>
- <333c4451-8eef-0603-c3f5-10e38c0eb24e@yandex-team.ru>
- <20230222115106-mutt-send-email-mst@kernel.org>
- <11593688-7ca4-def3-6212-7c26faa4d1c6@yandex-team.ru>
- <20230222121133-mutt-send-email-mst@kernel.org>
- <a477ca70-8aea-6c16-122e-1ded4af11f49@yandex-team.ru>
- <20230222151814-mutt-send-email-mst@kernel.org>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1681488277; x=1684080277;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=87Eys71a5bFDwpsmcqiXjalsGOMTQZkXpUaxljHCLjI=;
+ b=Lkv7hQWdIlA2sElrxSUtHPNg4UUF+/pMmmAB5iBfBiSP6hz/+L1/iAytdkjdaALLr8
+ F1GVjHMQ99qOBDE23t2pXSpoFe0kUvHQBbNg7jPSYR/BVBtOo3hRjuhRfNcd88/luB9N
+ rBpCIzB1Y9tY+p72b+QRHqRtXGJC+4USvPU9TqNQZbbwJEfMPD0ivv8p/sNwonnMdH76
+ 2IrAaCqe7w7YVX8cHy543Q2idXIgyZZDDDlg6pxvpUQMMzbCmVhfle3Clmw7mYNcKfE5
+ ANOQFG9xHDCz5+tkO6hd9ozTrgmcX9boEez6MwSvCZt4YwKcXBMe3PgChfnO+LdSdwG/
+ YmMw==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Fri, 14 Apr 2023 17:04:29 +0100
+Message-Id: <20230414160433.2096866-9-alex.bennee@linaro.org>
+In-Reply-To: <20230414160433.2096866-1-alex.bennee@linaro.org>
+References: <20230414160433.2096866-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-In-Reply-To: <20230222151814-mutt-send-email-mst@kernel.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v3 1/1] vhost-user-fs: add migration type
- property
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 08/12] qom: allow for properties to become
+ "fixed"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,150 +29,173 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Anton Kuchin <antonkuchin@yandex-team.ru>
-Cc: Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, qemu-devel@nongnu.org, yc-core@yandex-team.ru, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Markus Armbruster <armbru@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Juan Quintela <quintela@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, virtio-fs@redhat.com, Eric Blake <eblake@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Markus Armbruster <armbru@redhat.com>
 
-On Wed, Feb 22, 2023 at 03:21:42PM -0500, Michael S. Tsirkin wrote:
-> On Wed, Feb 22, 2023 at 08:25:19PM +0200, Anton Kuchin wrote:
-> > On 22/02/2023 19:12, Michael S. Tsirkin wrote:
-> > > On Wed, Feb 22, 2023 at 07:05:47PM +0200, Anton Kuchin wrote:
-> > > > On 22/02/2023 18:51, Michael S. Tsirkin wrote:
-> > > > > On Wed, Feb 22, 2023 at 06:49:10PM +0200, Anton Kuchin wrote:
-> > > > > > On 22/02/2023 17:14, Vladimir Sementsov-Ogievskiy wrote:
-> > > > > > > On 22.02.23 17:25, Anton Kuchin wrote:
-> > > > > > > > > > > +static int vhost_user_fs_pre_save(void *opaque)
-> > > > > > > > > > > +{
-> > > > > > > > > > > +=A0=A0=A0 VHostUserFS *fs =3D opaque;
-> > > > > > > > > > > +=A0=A0=A0 g_autofree char *path =3D object_get_canon=
-ical_path(OBJECT(fs));
-> > > > > > > > > > > +
-> > > > > > > > > > > +=A0=A0=A0 switch (fs->migration_type) {
-> > > > > > > > > > > +=A0=A0=A0 case VHOST_USER_MIGRATION_TYPE_NONE:
-> > > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 error_report("Migration is blo=
-cked by device %s", path);
-> > > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 break;
-> > > > > > > > > > > +=A0=A0=A0 case VHOST_USER_MIGRATION_TYPE_EXTERNAL:
-> > > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 return 0;
-> > > > > > > > > > > +=A0=A0=A0 default:
-> > > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 error_report("Migration type '=
-%s' is not
-> > > > > > > > > > > supported by device %s",
-> > > > > > > > > > > + VhostUserMigrationType_str(fs->migration_type), pat=
-h);
-> > > > > > > > > > > +=A0=A0=A0=A0=A0=A0=A0 break;
-> > > > > > > > > > > +=A0=A0=A0 }
-> > > > > > > > > > > +
-> > > > > > > > > > > +=A0=A0=A0 return -1;
-> > > > > > > > > > > +}
-> > > > > > > > > > Should we also add this as .pre_load, to force user sel=
-ect
-> > > > > > > > > > correct migration_type on target too?
-> > > > > > > > > In fact, I would claim we only want pre_load.
-> > > > > > > > > When qemu is started on destination we know where it's mi=
-grated
-> > > > > > > > > from so this flag can be set.
-> > > > > > > > > When qemu is started on source we generally do not yet kn=
-ow so
-> > > > > > > > > we don't know whether it's safe to set this flag.
-> > > > > > > But destination is a "source" for next migration, so there sh=
-ouldn't be
-> > > > > > > real difference.
-> > > > > > > The new property has ".realized_set_allowed =3D true", so, as=
- I understand
-> > > > > > > it may be changed at any time, so that's not a problem.
-> > > > > > Yes, exactly. So destination's property sets not how it will ha=
-ndle this
-> > > > > > incoming
-> > > > > > migration but the future outgoing one.
-> > > > > How do you know where you are going to migrate though?
-> > > > > I think you don't.
-> > > > > Setting it on source is better since we know where we
-> > > > > are migrating from.
-> > > > Yes, I don't know where I'm going to migrate to. This is why proper=
-ty
-> > > > affects only how source saves state on outgoing migration.
-> > > Um. I don't get the logic.
-> >=20
-> > For this feature to work we need orchestrator to manage the migration. =
-And
-> > we
-> > generally assume that it is responsibility of orchestrator to ensure
-> > matching
-> > properties on source and destination.
-> > As orchestrator manages both sides of migration it can set option (and =
-we
-> > can
-> > check it) on either source or destination. Now it's not important which=
- side
-> > we
-> > select, because now the option is essentially binary allow/deny (but IM=
-HO it
-> > is much better to refuse source to migrate than find later that state c=
-an't
-> > be
-> > loaded by destination, in case of file migration this becomes especially
-> > painful).
-> >=20
-> > But there are plans to add internal migration option (extract FUSE state
-> > from
-> > backend and transfer it in QEMU migration stream), and that's where
-> > setting/checking
-> > on source becomes important because it will rely on this property to de=
-cide
-> > if
-> > extra state form backend needs to be put in the migration stream subsec=
-tion.
->=20
->=20
-> If we do internal migration that will be a different property
-> which has to match on source *and* destination.
->=20
->=20
-> > If you are concerned about orchestrator breaking assumption of matching
-> > properties
-> > on source and destination this is not really supported AFAIK but I don't
-> > think we
-> > need to punish it for this, maybe it has its reasons: I can imagine sce=
-nario
-> > where orchestrator could want to migrate from source with
-> > 'migration=3Dexternal'
-> > to destination with 'migration=3Dnone' to ensure that destination can't=
- be
-> > migrated further.
->=20
-> No. I am concerned about a simple practical matter:
-> - I decide to restart qemu on the same host - so I need to enable
->   migration
-> - Later I decide to migrate qemu to another host - this should be
->   blocked
->=20
->=20
-> Property on source does not satisfy both at the same time.
-> Property on destination does.
+When specialising general purpose objects it is sometimes useful to
+"fix" some of the properties that were configurable by the base
+classes. We will use this facility when specialising
+vhost-user-device.
 
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+---
+ qapi/qom.json           |  2 ++
+ include/qom/object.h    | 16 +++++++++++++++-
+ qom/object.c            | 14 ++++++++++++++
+ qom/object_interfaces.c |  9 ++++++---
+ qom/qom-qmp-cmds.c      |  1 +
+ softmmu/qdev-monitor.c  |  1 +
+ 6 files changed, 39 insertions(+), 4 deletions(-)
 
-Stefan what's your take on this? Should we move this from
-save to load hook?
-
->=20
->=20
-> > >=20
-> > >=20
-> > > > > > > > This property selects if VM can migrate and if it can what =
-should
-> > > > > > > > qemu put
-> > > > > > > > to the migration stream. So we select on source what type of
-> > > > > > > > migration is
-> > > > > > > > allowed for this VM, destination can't check anything at lo=
-ad time.
-> > > > > > > OK, so the new field "migration" regulates only outgoing migr=
-ation and
-> > > > > > > do nothing for incoming. On incoming migration the migration =
-stream
-> > > > > > > itself defines the type of device migration.
-> > > > > > > Worth mentioning in doc?
-> > > > > > Good point. I don't think this deserves a respin but if I have =
-to send v4
-> > > > > > I'll include
-> > > > > > clarification in it.
+diff --git a/qapi/qom.json b/qapi/qom.json
+index a877b879b9..4cda191f00 100644
+--- a/qapi/qom.json
++++ b/qapi/qom.json
+@@ -33,12 +33,14 @@
+ # @description: if specified, the description of the property.
+ #
+ # @default-value: the default value, if any (since 5.0)
++# @fixed: if specified if value has been fixed (since 8.1)
+ #
+ # Since: 1.2
+ ##
+ { 'struct': 'ObjectPropertyInfo',
+   'data': { 'name': 'str',
+             'type': 'str',
++            'fixed': 'bool',
+             '*description': 'str',
+             '*default-value': 'any' } }
+ 
+diff --git a/include/qom/object.h b/include/qom/object.h
+index ef7258a5e1..f18d1a8254 100644
+--- a/include/qom/object.h
++++ b/include/qom/object.h
+@@ -97,6 +97,8 @@ struct ObjectProperty
+     ObjectPropertyInit *init;
+     void *opaque;
+     QObject *defval;
++    /** @fixed: if the property has been fixed at its default */
++    bool fixed;
+ };
+ 
+ /**
+@@ -1111,6 +1113,17 @@ void object_property_set_default_int(ObjectProperty *prop, int64_t value);
+  */
+ void object_property_set_default_uint(ObjectProperty *prop, uint64_t value);
+ 
++/**
++ * object_property_fix_default_uint:
++ * @prop: the property to be fixed
++ * @value: the fixed value to be written to the property
++ *
++ * When specialising an object it may make send to fix some values and
++ * not allow them to be changed. This can only be applied to
++ * properties that previously had a default and now cannot be changed.
++ */
++void object_property_fix_default_uint(ObjectProperty *prop, uint64_t value);
++
+ /**
+  * object_property_find:
+  * @obj: the object
+@@ -1961,13 +1974,14 @@ size_t object_type_get_instance_size(const char *typename);
+  * object_property_help:
+  * @name: the name of the property
+  * @type: the type of the property
++ * @fixed: has the value been fixed
+  * @defval: the default value
+  * @description: description of the property
+  *
+  * Returns: a user-friendly formatted string describing the property
+  * for help purposes.
+  */
+-char *object_property_help(const char *name, const char *type,
++char *object_property_help(const char *name, const char *type, bool fixed,
+                            QObject *defval, const char *description);
+ 
+ G_DEFINE_AUTOPTR_CLEANUP_FUNC(Object, object_unref)
+diff --git a/qom/object.c b/qom/object.c
+index e25f1e96db..b5aba3ffc8 100644
+--- a/qom/object.c
++++ b/qom/object.c
+@@ -1584,6 +1584,20 @@ void object_property_set_default_uint(ObjectProperty *prop, uint64_t value)
+     object_property_set_default(prop, QOBJECT(qnum_from_uint(value)));
+ }
+ 
++static void object_property_fix_default(ObjectProperty *prop, QObject *defval)
++{
++    g_assert(prop->init == object_property_init_defval);
++    g_assert(!prop->fixed);
++
++    prop->defval = defval;
++    prop->fixed = true;
++}
++
++void object_property_fix_default_uint(ObjectProperty *prop, uint64_t value)
++{
++    object_property_fix_default(prop, QOBJECT(qnum_from_uint(value)));
++}
++
+ bool object_property_set_uint(Object *obj, const char *name,
+                               uint64_t value, Error **errp)
+ {
+diff --git a/qom/object_interfaces.c b/qom/object_interfaces.c
+index 7d31589b04..e351938f8f 100644
+--- a/qom/object_interfaces.c
++++ b/qom/object_interfaces.c
+@@ -161,7 +161,7 @@ void user_creatable_add_qapi(ObjectOptions *options, Error **errp)
+     visit_free(v);
+ }
+ 
+-char *object_property_help(const char *name, const char *type,
++char *object_property_help(const char *name, const char *type, bool fixed,
+                            QObject *defval, const char *description)
+ {
+     GString *str = g_string_new(NULL);
+@@ -179,7 +179,9 @@ char *object_property_help(const char *name, const char *type,
+     if (defval) {
+         g_autofree char *def_json = g_string_free(qobject_to_json(defval),
+                                                   false);
+-        g_string_append_printf(str, " (default: %s)", def_json);
++        g_string_append_printf(str, " (%s: %s)",
++                               fixed ? "fixed" : "default",
++                               def_json);
+     }
+ 
+     return g_string_free(str, false);
+@@ -220,7 +222,8 @@ bool type_print_class_properties(const char *type)
+ 
+         g_ptr_array_add(array,
+                         object_property_help(prop->name, prop->type,
+-                                             prop->defval, prop->description));
++                                             prop->fixed, prop->defval,
++                                             prop->description));
+     }
+     g_ptr_array_sort(array, (GCompareFunc)qemu_pstrcmp0);
+     if (array->len > 0) {
+diff --git a/qom/qom-qmp-cmds.c b/qom/qom-qmp-cmds.c
+index 7c087299de..f4cdf4ddde 100644
+--- a/qom/qom-qmp-cmds.c
++++ b/qom/qom-qmp-cmds.c
+@@ -55,6 +55,7 @@ ObjectPropertyInfoList *qmp_qom_list(const char *path, Error **errp)
+ 
+         value->name = g_strdup(prop->name);
+         value->type = g_strdup(prop->type);
++        value->fixed = prop->fixed;
+     }
+ 
+     return props;
+diff --git a/softmmu/qdev-monitor.c b/softmmu/qdev-monitor.c
+index b8d2c4dadd..b56b2af2f2 100644
+--- a/softmmu/qdev-monitor.c
++++ b/softmmu/qdev-monitor.c
+@@ -315,6 +315,7 @@ int qdev_device_help(QemuOpts *opts)
+         g_ptr_array_add(array,
+                         object_property_help(prop->value->name,
+                                              prop->value->type,
++                                             prop->value->fixed,
+                                              prop->value->default_value,
+                                              prop->value->description));
+     }
+-- 
+2.39.2
 

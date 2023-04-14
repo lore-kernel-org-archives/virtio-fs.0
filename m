@@ -1,26 +1,23 @@
 Return-Path: <alex.bennee@linaro.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681488277; x=1684080277;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=87Eys71a5bFDwpsmcqiXjalsGOMTQZkXpUaxljHCLjI=;
- b=Lkv7hQWdIlA2sElrxSUtHPNg4UUF+/pMmmAB5iBfBiSP6hz/+L1/iAytdkjdaALLr8
- F1GVjHMQ99qOBDE23t2pXSpoFe0kUvHQBbNg7jPSYR/BVBtOo3hRjuhRfNcd88/luB9N
- rBpCIzB1Y9tY+p72b+QRHqRtXGJC+4USvPU9TqNQZbbwJEfMPD0ivv8p/sNwonnMdH76
- 2IrAaCqe7w7YVX8cHy543Q2idXIgyZZDDDlg6pxvpUQMMzbCmVhfle3Clmw7mYNcKfE5
- ANOQFG9xHDCz5+tkO6hd9ozTrgmcX9boEez6MwSvCZt4YwKcXBMe3PgChfnO+LdSdwG/
- YmMw==
+ d=linaro.org; s=google; t=1681488274; x=1684080274;
+ h=content-transfer-encoding:mime-version:message-id:date:subject:cc
+ :to:from:from:to:cc:subject:date:message-id:reply-to;
+ bh=upwamrFOWbXpB0LRg3OycRh6xKp0neSg/Tq8ON+G04o=;
+ b=HnHCUASrDHmRpFdQnH/kC4fg1J2tS2b3xMJEHXFblVbTy9J5pJ55BSNL882fCPJ8gY
+ e/CTewZXgr7dzO7+Rsr9zF+wnuI1yzLrflv6zkz/2owUK+69L8FH/mJKXQFCALXVsSgS
+ XnA4FGy8ciRF5Kdy6gdtpkukRGhhdhKJCKZgdMY2zgMlcSPrYf0JhKukHSFKd2UTmn+o
+ vNBaykoigtEb1bCLlIn6Jdg1rG2qV1WxfgUxtZaNkwqEvYvTDy3vzyF0vwJWbUfj88D6
+ ixTlxutXKhEb44W4Oo30xKEegTtiLJ+eEX09AvfeLJeTs9zCqvYNVOej8ufg61m6miOn
+ Mm1A==
 From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Fri, 14 Apr 2023 17:04:29 +0100
-Message-Id: <20230414160433.2096866-9-alex.bennee@linaro.org>
-In-Reply-To: <20230414160433.2096866-1-alex.bennee@linaro.org>
-References: <20230414160433.2096866-1-alex.bennee@linaro.org>
+Date: Fri, 14 Apr 2023 17:04:21 +0100
+Message-Id: <20230414160433.2096866-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 08/12] qom: allow for properties to become
- "fixed"
+Subject: [Virtio-fs] [PATCH 00/12] virtio: add vhost-user-generic and reduce
+ copy and paste
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,170 +29,65 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Markus Armbruster <armbru@redhat.com>
 
-When specialising general purpose objects it is sometimes useful to
-"fix" some of the properties that were configurable by the base
-classes. We will use this facility when specialising
-vhost-user-device.
+A lot of our vhost-user stubs are large chunks of boilerplate that do
+(mostly) the same thing. This series attempts to fix that by defining
+a new base class for vhost-user devices and then converting the rng
+and gpio devices to be based off them. You can even use
+vhost-user-device directly if you supply it with the right magic
+numbers (which is helpful for development).
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
----
- qapi/qom.json           |  2 ++
- include/qom/object.h    | 16 +++++++++++++++-
- qom/object.c            | 14 ++++++++++++++
- qom/object_interfaces.c |  9 ++++++---
- qom/qom-qmp-cmds.c      |  1 +
- softmmu/qdev-monitor.c  |  1 +
- 6 files changed, 39 insertions(+), 4 deletions(-)
+However the final patch runs into the weeds because I don't yet have a
+clean way to represent in QOM the fixing of certain properties for the
+specialised classes.
 
-diff --git a/qapi/qom.json b/qapi/qom.json
-index a877b879b9..4cda191f00 100644
---- a/qapi/qom.json
-+++ b/qapi/qom.json
-@@ -33,12 +33,14 @@
- # @description: if specified, the description of the property.
- #
- # @default-value: the default value, if any (since 5.0)
-+# @fixed: if specified if value has been fixed (since 8.1)
- #
- # Since: 1.2
- ##
- { 'struct': 'ObjectPropertyInfo',
-   'data': { 'name': 'str',
-             'type': 'str',
-+            'fixed': 'bool',
-             '*description': 'str',
-             '*default-value': 'any' } }
- 
-diff --git a/include/qom/object.h b/include/qom/object.h
-index ef7258a5e1..f18d1a8254 100644
---- a/include/qom/object.h
-+++ b/include/qom/object.h
-@@ -97,6 +97,8 @@ struct ObjectProperty
-     ObjectPropertyInit *init;
-     void *opaque;
-     QObject *defval;
-+    /** @fixed: if the property has been fixed at its default */
-+    bool fixed;
- };
- 
- /**
-@@ -1111,6 +1113,17 @@ void object_property_set_default_int(ObjectProperty *prop, int64_t value);
-  */
- void object_property_set_default_uint(ObjectProperty *prop, uint64_t value);
- 
-+/**
-+ * object_property_fix_default_uint:
-+ * @prop: the property to be fixed
-+ * @value: the fixed value to be written to the property
-+ *
-+ * When specialising an object it may make send to fix some values and
-+ * not allow them to be changed. This can only be applied to
-+ * properties that previously had a default and now cannot be changed.
-+ */
-+void object_property_fix_default_uint(ObjectProperty *prop, uint64_t value);
-+
- /**
-  * object_property_find:
-  * @obj: the object
-@@ -1961,13 +1974,14 @@ size_t object_type_get_instance_size(const char *typename);
-  * object_property_help:
-  * @name: the name of the property
-  * @type: the type of the property
-+ * @fixed: has the value been fixed
-  * @defval: the default value
-  * @description: description of the property
-  *
-  * Returns: a user-friendly formatted string describing the property
-  * for help purposes.
-  */
--char *object_property_help(const char *name, const char *type,
-+char *object_property_help(const char *name, const char *type, bool fixed,
-                            QObject *defval, const char *description);
- 
- G_DEFINE_AUTOPTR_CLEANUP_FUNC(Object, object_unref)
-diff --git a/qom/object.c b/qom/object.c
-index e25f1e96db..b5aba3ffc8 100644
---- a/qom/object.c
-+++ b/qom/object.c
-@@ -1584,6 +1584,20 @@ void object_property_set_default_uint(ObjectProperty *prop, uint64_t value)
-     object_property_set_default(prop, QOBJECT(qnum_from_uint(value)));
- }
- 
-+static void object_property_fix_default(ObjectProperty *prop, QObject *defval)
-+{
-+    g_assert(prop->init == object_property_init_defval);
-+    g_assert(!prop->fixed);
-+
-+    prop->defval = defval;
-+    prop->fixed = true;
-+}
-+
-+void object_property_fix_default_uint(ObjectProperty *prop, uint64_t value)
-+{
-+    object_property_fix_default(prop, QOBJECT(qnum_from_uint(value)));
-+}
-+
- bool object_property_set_uint(Object *obj, const char *name,
-                               uint64_t value, Error **errp)
- {
-diff --git a/qom/object_interfaces.c b/qom/object_interfaces.c
-index 7d31589b04..e351938f8f 100644
---- a/qom/object_interfaces.c
-+++ b/qom/object_interfaces.c
-@@ -161,7 +161,7 @@ void user_creatable_add_qapi(ObjectOptions *options, Error **errp)
-     visit_free(v);
- }
- 
--char *object_property_help(const char *name, const char *type,
-+char *object_property_help(const char *name, const char *type, bool fixed,
-                            QObject *defval, const char *description)
- {
-     GString *str = g_string_new(NULL);
-@@ -179,7 +179,9 @@ char *object_property_help(const char *name, const char *type,
-     if (defval) {
-         g_autofree char *def_json = g_string_free(qobject_to_json(defval),
-                                                   false);
--        g_string_append_printf(str, " (default: %s)", def_json);
-+        g_string_append_printf(str, " (%s: %s)",
-+                               fixed ? "fixed" : "default",
-+                               def_json);
-     }
- 
-     return g_string_free(str, false);
-@@ -220,7 +222,8 @@ bool type_print_class_properties(const char *type)
- 
-         g_ptr_array_add(array,
-                         object_property_help(prop->name, prop->type,
--                                             prop->defval, prop->description));
-+                                             prop->fixed, prop->defval,
-+                                             prop->description));
-     }
-     g_ptr_array_sort(array, (GCompareFunc)qemu_pstrcmp0);
-     if (array->len > 0) {
-diff --git a/qom/qom-qmp-cmds.c b/qom/qom-qmp-cmds.c
-index 7c087299de..f4cdf4ddde 100644
---- a/qom/qom-qmp-cmds.c
-+++ b/qom/qom-qmp-cmds.c
-@@ -55,6 +55,7 @@ ObjectPropertyInfoList *qmp_qom_list(const char *path, Error **errp)
- 
-         value->name = g_strdup(prop->name);
-         value->type = g_strdup(prop->type);
-+        value->fixed = prop->fixed;
-     }
- 
-     return props;
-diff --git a/softmmu/qdev-monitor.c b/softmmu/qdev-monitor.c
-index b8d2c4dadd..b56b2af2f2 100644
---- a/softmmu/qdev-monitor.c
-+++ b/softmmu/qdev-monitor.c
-@@ -315,6 +315,7 @@ int qdev_device_help(QemuOpts *opts)
-         g_ptr_array_add(array,
-                         object_property_help(prop->value->name,
-                                              prop->value->type,
-+                                             prop->value->fixed,
-                                              prop->value->default_value,
-                                              prop->value->description));
-     }
+The series is a net reduction in code and an increase in
+documentation but obviously needs to iron out a few more warts. I'm
+open to suggestions on the best way to tweak the QOM stuff.
+
+Alex.
+
+Alex Bennée (12):
+  hw/virtio: fix typo in VIRTIO_CONFIG_IRQ_IDX comments
+  include/hw/virtio: document virtio_notify_config
+  include/hw/virtio: add kerneldoc for virtio_init
+  include/hw/virtio: document some more usage of notifiers
+  virtio: add generic vhost-user-device
+  virtio: add PCI stub for vhost-user-device
+  include: attempt to document device_class_set_props
+  qom: allow for properties to become "fixed"
+  hw/virtio: derive vhost-user-rng from vhost-user-device
+  hw/virtio: add config support to vhost-user-device
+  hw/virtio: derive vhost-user-gpio from vhost-user-device (!BROKEN)
+  docs/system: add a basic enumeration of vhost-user devices
+
+ docs/system/devices/vhost-user-rng.rst |   2 +
+ docs/system/devices/vhost-user.rst     |  41 +++
+ qapi/qom.json                          |   2 +
+ include/hw/qdev-core.h                 |   9 +
+ include/hw/virtio/vhost-user-device.h  |  33 ++
+ include/hw/virtio/vhost-user-gpio.h    |  23 +-
+ include/hw/virtio/vhost-user-rng.h     |  11 +-
+ include/hw/virtio/virtio.h             |  21 ++
+ include/qom/object.h                   |  16 +-
+ hw/display/vhost-user-gpu.c            |   4 +-
+ hw/net/virtio-net.c                    |   4 +-
+ hw/virtio/vhost-user-device-pci.c      |  71 +++++
+ hw/virtio/vhost-user-device.c          | 359 ++++++++++++++++++++++
+ hw/virtio/vhost-user-fs.c              |   4 +-
+ hw/virtio/vhost-user-gpio.c            | 405 +------------------------
+ hw/virtio/vhost-user-rng.c             | 264 +---------------
+ hw/virtio/vhost-vsock-common.c         |   4 +-
+ hw/virtio/virtio-crypto.c              |   4 +-
+ qom/object.c                           |  14 +
+ qom/object_interfaces.c                |   9 +-
+ qom/qom-qmp-cmds.c                     |   1 +
+ softmmu/qdev-monitor.c                 |   1 +
+ hw/virtio/meson.build                  |   3 +
+ 23 files changed, 613 insertions(+), 692 deletions(-)
+ create mode 100644 include/hw/virtio/vhost-user-device.h
+ create mode 100644 hw/virtio/vhost-user-device-pci.c
+ create mode 100644 hw/virtio/vhost-user-device.c
+
 -- 
 2.39.2
 

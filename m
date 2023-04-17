@@ -1,17 +1,19 @@
 Return-Path: <stefanha@redhat.com>
-Date: Mon, 17 Apr 2023 11:12:50 -0400
+Date: Mon, 17 Apr 2023 11:18:40 -0400
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20230417151250.GC3852722@fedora>
+Message-ID: <20230417151840.GD3852722@fedora>
 References: <20230411150515.14020-1-hreitz@redhat.com>
  <20230411150515.14020-3-hreitz@redhat.com>
  <20230412210641.GC2813183@fedora>
- <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
- <d9d67f07-3d4c-9bdb-052b-28e21fa27dd6@redhat.com>
+ <246691c3-2287-7472-3615-7ec0f074445c@redhat.com>
+ <CAJSP0QU-iDTT+xtkZ_xRf4vX+hM0WY+H1SXSuyS+cjiogz3A_A@mail.gmail.com>
+ <b0cd4f54-94ed-09a4-cec2-e81f36da4008@redhat.com>
+ <CAJaqyWegMfuc8s6bKdxdM4uVixmhy-F3xUUyOCYS1yGDXoiVZA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="ETs0/9kgvfmqN2Oo"
+ protocol="application/pgp-signature"; boundary="vZ396R7jSJ+Rf8iB"
 Content-Disposition: inline
-In-Reply-To: <d9d67f07-3d4c-9bdb-052b-28e21fa27dd6@redhat.com>
+In-Reply-To: <CAJaqyWegMfuc8s6bKdxdM4uVixmhy-F3xUUyOCYS1yGDXoiVZA@mail.gmail.com>
 Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
  state transfer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -22,274 +24,273 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: Eugenio Perez Martin <eperezma@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
+To: Eugenio Perez Martin <eperezma@redhat.com>
+Cc: Hanna Czenczek <hreitz@redhat.com>, Stefan Hajnoczi <stefanha@gmail.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
 
---ETs0/9kgvfmqN2Oo
+--vZ396R7jSJ+Rf8iB
 Content-Type: text/plain; charset=utf-8
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Apr 13, 2023 at 07:31:57PM +0200, Hanna Czenczek wrote:
-> On 13.04.23 12:14, Eugenio Perez Martin wrote:
-> > On Wed, Apr 12, 2023 at 11:06=E2=80=AFPM Stefan Hajnoczi <stefanha@redh=
-at.com> wrote:
-> > > On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek wrote:
-> > > > So-called "internal" virtio-fs migration refers to transporting the
-> > > > back-end's (virtiofsd's) state through qemu's migration stream.  To=
- do
-> > > > this, we need to be able to transfer virtiofsd's internal state to =
-and
-> > > > from virtiofsd.
-> > > >=20
-> > > > Because virtiofsd's internal state will not be too large, we believ=
-e it
-> > > > is best to transfer it as a single binary blob after the streaming
-> > > > phase.  Because this method should be useful to other vhost-user
-> > > > implementations, too, it is introduced as a general-purpose additio=
-n to
-> > > > the protocol, not limited to vhost-user-fs.
-> > > >=20
-> > > > These are the additions to the protocol:
-> > > > - New vhost-user protocol feature VHOST_USER_PROTOCOL_F_MIGRATORY_S=
-TATE:
-> > > >    This feature signals support for transferring state, and is adde=
-d so
-> > > >    that migration can fail early when the back-end has no support.
-> > > >=20
-> > > > - SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a =
-pipe
-> > > >    over which to transfer the state.  The front-end sends an FD to =
+On Fri, Apr 14, 2023 at 05:17:02PM +0200, Eugenio Perez Martin wrote:
+> On Thu, Apr 13, 2023 at 7:55=E2=80=AFPM Hanna Czenczek <hreitz@redhat.com=
+> wrote:
+> >
+> > On 13.04.23 13:38, Stefan Hajnoczi wrote:
+> > > On Thu, 13 Apr 2023 at 05:24, Hanna Czenczek <hreitz@redhat.com> wrot=
+e:
+> > >> On 12.04.23 23:06, Stefan Hajnoczi wrote:
+> > >>> On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek wrote:
+> > >>>> So-called "internal" virtio-fs migration refers to transporting the
+> > >>>> back-end's (virtiofsd's) state through qemu's migration stream.  T=
+o do
+> > >>>> this, we need to be able to transfer virtiofsd's internal state to=
+ and
+> > >>>> from virtiofsd.
+> > >>>>
+> > >>>> Because virtiofsd's internal state will not be too large, we belie=
+ve it
+> > >>>> is best to transfer it as a single binary blob after the streaming
+> > >>>> phase.  Because this method should be useful to other vhost-user
+> > >>>> implementations, too, it is introduced as a general-purpose additi=
+on to
+> > >>>> the protocol, not limited to vhost-user-fs.
+> > >>>>
+> > >>>> These are the additions to the protocol:
+> > >>>> - New vhost-user protocol feature VHOST_USER_PROTOCOL_F_MIGRATORY_=
+STATE:
+> > >>>>     This feature signals support for transferring state, and is ad=
+ded so
+> > >>>>     that migration can fail early when the back-end has no support.
+> > >>>>
+> > >>>> - SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a=
+ pipe
+> > >>>>     over which to transfer the state.  The front-end sends an FD t=
+o the
+> > >>>>     back-end into/from which it can write/read its state, and the =
+back-end
+> > >>>>     can decide to either use it, or reply with a different FD for =
 the
-> > > >    back-end into/from which it can write/read its state, and the ba=
-ck-end
-> > > >    can decide to either use it, or reply with a different FD for the
-> > > >    front-end to override the front-end's choice.
-> > > >    The front-end creates a simple pipe to transfer the state, but m=
-aybe
-> > > >    the back-end already has an FD into/from which it has to write/r=
-ead
-> > > >    its state, in which case it will want to override the simple pip=
-e.
-> > > >    Conversely, maybe in the future we find a way to have the front-=
-end
-> > > >    get an immediate FD for the migration stream (in some cases), in=
- which
-> > > >    case we will want to send this to the back-end instead of creati=
-ng a
-> > > >    pipe.
-> > > >    Hence the negotiation: If one side has a better idea than a plain
-> > > >    pipe, we will want to use that.
-> > > >=20
-> > > > - CHECK_DEVICE_STATE: After the state has been transferred through =
+> > >>>>     front-end to override the front-end's choice.
+> > >>>>     The front-end creates a simple pipe to transfer the state, but=
+ maybe
+> > >>>>     the back-end already has an FD into/from which it has to write=
+/read
+> > >>>>     its state, in which case it will want to override the simple p=
+ipe.
+> > >>>>     Conversely, maybe in the future we find a way to have the fron=
+t-end
+> > >>>>     get an immediate FD for the migration stream (in some cases), =
+in which
+> > >>>>     case we will want to send this to the back-end instead of crea=
+ting a
+> > >>>>     pipe.
+> > >>>>     Hence the negotiation: If one side has a better idea than a pl=
+ain
+> > >>>>     pipe, we will want to use that.
+> > >>>>
+> > >>>> - CHECK_DEVICE_STATE: After the state has been transferred through=
+ the
+> > >>>>     pipe (the end indicated by EOF), the front-end invokes this fu=
+nction
+> > >>>>     to verify success.  There is no in-band way (through the pipe)=
+ to
+> > >>>>     indicate failure, so we need to check explicitly.
+> > >>>>
+> > >>>> Once the transfer pipe has been established via SET_DEVICE_STATE_FD
+> > >>>> (which includes establishing the direction of transfer and migrati=
+on
+> > >>>> phase), the sending side writes its data into the pipe, and the re=
+ading
+> > >>>> side reads it until it sees an EOF.  Then, the front-end will chec=
+k for
+> > >>>> success via CHECK_DEVICE_STATE, which on the destination side incl=
+udes
+> > >>>> checking for integrity (i.e. errors during deserialization).
+> > >>>>
+> > >>>> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > >>>> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> > >>>> ---
+> > >>>>    include/hw/virtio/vhost-backend.h |  24 +++++
+> > >>>>    include/hw/virtio/vhost.h         |  79 ++++++++++++++++
+> > >>>>    hw/virtio/vhost-user.c            | 147 +++++++++++++++++++++++=
++++++++
+> > >>>>    hw/virtio/vhost.c                 |  37 ++++++++
+> > >>>>    4 files changed, 287 insertions(+)
+> > >>>>
+> > >>>> diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio=
+/vhost-backend.h
+> > >>>> index ec3fbae58d..5935b32fe3 100644
+> > >>>> --- a/include/hw/virtio/vhost-backend.h
+> > >>>> +++ b/include/hw/virtio/vhost-backend.h
+> > >>>> @@ -26,6 +26,18 @@ typedef enum VhostSetConfigType {
+> > >>>>        VHOST_SET_CONFIG_TYPE_MIGRATION =3D 1,
+> > >>>>    } VhostSetConfigType;
+> > >>>>
+> > >>>> +typedef enum VhostDeviceStateDirection {
+> > >>>> +    /* Transfer state from back-end (device) to front-end */
+> > >>>> +    VHOST_TRANSFER_STATE_DIRECTION_SAVE =3D 0,
+> > >>>> +    /* Transfer state from front-end to back-end (device) */
+> > >>>> +    VHOST_TRANSFER_STATE_DIRECTION_LOAD =3D 1,
+> > >>>> +} VhostDeviceStateDirection;
+> > >>>> +
+> > >>>> +typedef enum VhostDeviceStatePhase {
+> > >>>> +    /* The device (and all its vrings) is stopped */
+> > >>>> +    VHOST_TRANSFER_STATE_PHASE_STOPPED =3D 0,
+> > >>>> +} VhostDeviceStatePhase;
+> > >>> vDPA has:
+> > >>>
+> > >>>     /* Suspend a device so it does not process virtqueue requests a=
+nymore
+> > >>>      *
+> > >>>      * After the return of ioctl the device must preserve all the n=
+ecessary state
+> > >>>      * (the virtqueue vring base plus the possible device specific =
+states) that is
+> > >>>      * required for restoring in the future. The device must not ch=
+ange its
+> > >>>      * configuration after that point.
+> > >>>      */
+> > >>>     #define VHOST_VDPA_SUSPEND      _IO(VHOST_VIRTIO, 0x7D)
+> > >>>
+> > >>>     /* Resume a device so it can resume processing virtqueue reques=
+ts
+> > >>>      *
+> > >>>      * After the return of this ioctl the device will have restored=
+ all the
+> > >>>      * necessary states and it is fully operational to continue pro=
+cessing the
+> > >>>      * virtqueue descriptors.
+> > >>>      */
+> > >>>     #define VHOST_VDPA_RESUME       _IO(VHOST_VIRTIO, 0x7E)
+> > >>>
+> > >>> I wonder if it makes sense to import these into vhost-user so that =
 the
-> > > >    pipe (the end indicated by EOF), the front-end invokes this func=
-tion
-> > > >    to verify success.  There is no in-band way (through the pipe) to
-> > > >    indicate failure, so we need to check explicitly.
-> > > >=20
-> > > > Once the transfer pipe has been established via SET_DEVICE_STATE_FD
-> > > > (which includes establishing the direction of transfer and migration
-> > > > phase), the sending side writes its data into the pipe, and the rea=
-ding
-> > > > side reads it until it sees an EOF.  Then, the front-end will check=
- for
-> > > > success via CHECK_DEVICE_STATE, which on the destination side inclu=
-des
-> > > > checking for integrity (i.e. errors during deserialization).
-> > > >=20
-> > > > Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > > > Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
-> > > > ---
-> > > >   include/hw/virtio/vhost-backend.h |  24 +++++
-> > > >   include/hw/virtio/vhost.h         |  79 ++++++++++++++++
-> > > >   hw/virtio/vhost-user.c            | 147 +++++++++++++++++++++++++=
-+++++
-> > > >   hw/virtio/vhost.c                 |  37 ++++++++
-> > > >   4 files changed, 287 insertions(+)
-> > > >=20
-> > > > diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio/=
-vhost-backend.h
-> > > > index ec3fbae58d..5935b32fe3 100644
-> > > > --- a/include/hw/virtio/vhost-backend.h
-> > > > +++ b/include/hw/virtio/vhost-backend.h
-> > > > @@ -26,6 +26,18 @@ typedef enum VhostSetConfigType {
-> > > >       VHOST_SET_CONFIG_TYPE_MIGRATION =3D 1,
-> > > >   } VhostSetConfigType;
-> > > >=20
-> > > > +typedef enum VhostDeviceStateDirection {
-> > > > +    /* Transfer state from back-end (device) to front-end */
-> > > > +    VHOST_TRANSFER_STATE_DIRECTION_SAVE =3D 0,
-> > > > +    /* Transfer state from front-end to back-end (device) */
-> > > > +    VHOST_TRANSFER_STATE_DIRECTION_LOAD =3D 1,
-> > > > +} VhostDeviceStateDirection;
-> > > > +
-> > > > +typedef enum VhostDeviceStatePhase {
-> > > > +    /* The device (and all its vrings) is stopped */
-> > > > +    VHOST_TRANSFER_STATE_PHASE_STOPPED =3D 0,
-> > > > +} VhostDeviceStatePhase;
-> > > vDPA has:
-> > >=20
-> > >    /* Suspend a device so it does not process virtqueue requests anym=
-ore
-> > >     *
-> > >     * After the return of ioctl the device must preserve all the nece=
-ssary state
-> > >     * (the virtqueue vring base plus the possible device specific sta=
-tes) that is
-> > >     * required for restoring in the future. The device must not chang=
-e its
-> > >     * configuration after that point.
-> > >     */
-> > >    #define VHOST_VDPA_SUSPEND      _IO(VHOST_VIRTIO, 0x7D)
-> > >=20
-> > >    /* Resume a device so it can resume processing virtqueue requests
-> > >     *
-> > >     * After the return of this ioctl the device will have restored al=
-l the
-> > >     * necessary states and it is fully operational to continue proces=
-sing the
-> > >     * virtqueue descriptors.
-> > >     */
-> > >    #define VHOST_VDPA_RESUME       _IO(VHOST_VIRTIO, 0x7E)
-> > >=20
-> > > I wonder if it makes sense to import these into vhost-user so that the
-> > > difference between kernel vhost and vhost-user is minimized. It's okay
-> > > if one of them is ahead of the other, but it would be nice to avoid
-> > > overlapping/duplicated functionality.
-> > >=20
-> > That's what I had in mind in the first versions. I proposed VHOST_STOP
-> > instead of VHOST_VDPA_STOP for this very reason. Later it did change
-> > to SUSPEND.
-> >=20
-> > Generally it is better if we make the interface less parametrized and
-> > we trust in the messages and its semantics in my opinion. In other
-> > words, instead of
-> > vhost_set_device_state_fd_op(VHOST_TRANSFER_STATE_PHASE_STOPPED), send
-> > individually the equivalent of VHOST_VDPA_SUSPEND vhost-user command.
+> > >>> difference between kernel vhost and vhost-user is minimized. It's o=
+kay
+> > >>> if one of them is ahead of the other, but it would be nice to avoid
+> > >>> overlapping/duplicated functionality.
+> > >>>
+> > >>> (And I hope vDPA will import the device state vhost-user messages
+> > >>> introduced in this series.)
+> > >> I don=E2=80=99t understand your suggestion.  (Like, I very simply do=
+n=E2=80=99t
+> > >> understand :))
+> > >>
+> > >> These are vhost messages, right?  What purpose do you have in mind f=
+or
+> > >> them in vhost-user for internal migration?  They=E2=80=99re differen=
+t from the
+> > >> state transfer messages, because they don=E2=80=99t transfer state t=
+o/from the
+> > >> front-end.  Also, the state transfer stuff is supposed to be distinct
+> > >> from starting/stopping the device; right now, it just requires the
+> > >> device to be stopped beforehand (or started only afterwards).  And in
+> > >> the future, new VhostDeviceStatePhase values may allow the messages =
+to
+> > >> be used on devices that aren=E2=80=99t stopped.
+> > >>
+> > >> So they seem to serve very different purposes.  I can imagine using =
+the
+> > >> VDPA_{SUSPEND,RESUME} messages for external migration (what Anton is
+> > >> working on), but they don=E2=80=99t really help with internal migrat=
+ion
+> > >> implemented here.  If I were to add them, they=E2=80=99d just be sen=
+t in
+> > >> addition to the new messages added in this patch here, i.e. SUSPEND =
+on
+> > >> the source before SET_DEVICE_STATE_FD, and RESUME on the destination
+> > >> after CHECK_DEVICE_STATE (we could use RESUME in place of
+> > >> CHECK_DEVICE_STATE on the destination, but we can=E2=80=99t do that =
+on the
+> > >> source, so we still need CHECK_DEVICE_STATE).
+> > > Yes, they are complementary to the device state fd message. I want to
+> > > make sure pre-conditions about the device's state (running vs stopped)
+> > > already take into account the vDPA SUSPEND/RESUME model.
+> > >
+> > > vDPA will need device state save/load in the future. For virtiofs
+> > > devices, for example. This is why I think we should plan for vDPA and
+> > > vhost-user to share the same interface.
+> >
+> > While the paragraph below is more important, I don=E2=80=99t feel like =
+this
+> > would be important right now.  It=E2=80=99s clear that SUSPEND must com=
+e before
+> > transferring any state, and that RESUME must come after transferring
+> > state.  I don=E2=80=99t think we need to clarify this now, it=E2=80=99d=
+ be obvious when
+> > implementing SUSPEND/RESUME.
+> >
+> > > Also, I think the code path you're relying on (vhost_dev_stop()) on
+> > > doesn't work for backends that implement VHOST_USER_PROTOCOL_F_STATUS
+> > > because stopping the backend resets the device and throws away its
+> > > state. SUSPEND/RESUME solve this. This looks like a more general
+> > > problem since vhost_dev_stop() is called any time the VM is paused.
+> > > Maybe it needs to use SUSPEND/RESUME whenever possible.
+> >
+> > That=E2=80=99s a problem.  Quite a problem, to be honest, because this =
+sounds
+> > rather complicated with honestly absolutely no practical benefit right
+> > now.
+> >
+> > Would you require SUSPEND/RESUME for state transfer even if the back-end
+> > does not implement GET/SET_STATUS?  Because then this would also lead to
+> > more complexity in virtiofsd.
+> >
 >=20
-> I.e. you mean that this should simply be stateful instead of
-> re-affirming the current state with a parameter?
+> At this moment the vhost-user net in DPDK suspends at
+> VHOST_GET_VRING_BASE. Not the same case though, as here only the vq
+> indexes / wrap bits are transferred here.
 >=20
-> The problem I see is that transferring states in different phases of
-> migration will require specialized implementations.=C2=A0 So running
-> SET_DEVICE_STATE_FD in a different phase will require support from the
-> back-end.=C2=A0 Same in the front-end, the exact protocol and thus
-> implementation will (probably, difficult to say at this point) depend on
-> the migration phase.=C2=A0 I would therefore prefer to have an explicit
-> distinction in the command itself that affirms the phase we=E2=80=99re
-> targeting.
+> Vhost-vdpa implements the suspend call so it does not need to trust
+> VHOST_GET_VRING_BASE to be the last vring call done. Since virtiofsd
+> is using vhost-user maybe it is not needed to implement it actually.
+
+Careful, if we deliberately make vhost-user and vDPA diverge, then it
+will be hard to share the migration interface.
+
+> > Basically, what I=E2=80=99m hearing is that I need to implement a diffe=
+rent
+> > feature that has no practical impact right now, and also fix bugs around
+> > it along the way...
+> >
 >=20
-> On the other hand, I don=E2=80=99t see the parameter complicating anythin=
-g. The
-> front-end must supply it, but it will know the phase anyway, so this is
-> easy.=C2=A0 The back-end can just choose to ignore it, if it doesn=E2=80=
-=99t feel the
-> need to verify that the phase is what it thinks it is.
+> To fix this properly requires iterative device migration in qemu as
+> far as I know, instead of using VMStates [1]. This way the state is
+> requested to virtiofsd before the device reset.
+
+I don't follow. Many devices are fine with non-iterative migration. They
+shouldn't be forced to do iterative migration.
+
+> What does virtiofsd do when the state is totally sent? Does it keep
+> processing requests and generating new state or is only a one shot
+> that will suspend the daemon? If it is the second I think it still can
+> be done in one shot at the end, always indicating "no more state" at
+> save_live_pending and sending all the state at
+> save_live_complete_precopy.
 >=20
-> > Another way to apply this is with the "direction" parameter. Maybe it
-> > is better to split it into "set_state_fd" and "get_state_fd"?
+> Does that make sense to you?
 >=20
-> Well, it would rather be `set_state_send_fd` and `set_state_receive_fd`.
-> We always negotiate a pipe between front-end and back-end, the question
-> is just whether the back-end gets the receiving (load) or the sending
-> (save) end.
+> Thanks!
 >=20
-> Technically, one can make it fully stateful and say that if the device
-> hasn=E2=80=99t been started already, it=E2=80=99s always a LOAD, and othe=
-rwise always a
-> SAVE.=C2=A0 But as above, I=E2=80=99d prefer to keep the parameter becaus=
-e the
-> implementations are different, so I=E2=80=99d prefer there to be a
-> re-affirmation that front-end and back-end are in sync about what should
-> be done.
+> [1] https://qemu.readthedocs.io/en/latest/devel/migration.html#iterative-=
+device-migration
 >=20
-> Personally, I don=E2=80=99t really see the advantage of having two functi=
-ons
-> instead of one function with an enum with two values.=C2=A0 The thing abo=
-ut
-> SET_DEVICE_STATE_FD is that it itself won=E2=80=99t differ much regardles=
-s of
-> whether we=E2=80=99re loading or saving, it just negotiates the pipe =E2=
-=80=93 the
-> difference is what happens after the pipe has been negotiated.=C2=A0 So i=
-f we
-> split the function into two, both implementations will share most of
-> their code anyway, which makes me think it should be a single function.
 
-I also don't really see an advantage to defining separate messages as
-long as SET_DEVICE_STATE_FD just sets up the pipe. If there are other
-arguments that differ depending on the state/direction, then it's nicer
-to have separate messages so that argument type remains simple (not a
-union).
-
-This brings to mind how iterative migration will work. The interface for
-iterative migration is basically the same as non-iterative migration
-plus a method to query the number of bytes remaining. When the number of
-bytes falls below a threshold, the vCPUs are stopped and the remainder
-of the data is read.
-
-Some details from VFIO migration:
-- The VMM must explicitly change the state when transitioning from
-  iterative and non-iterative migration, but the data transfer fd
-  remains the same.
-- The state of the device (running, stopped, resuming, etc) doesn't
-  change asynchronously, it's always driven by the VMM. However, setting
-  the state can fail and then the new state may be an error state.
-
-Mapping this to SET_DEVICE_STATE_FD:
-- VhostDeviceStatePhase is extended with
-  VHOST_TRANSFER_STATE_PHASE_RUNNING =3D 1 for iterative migration. The
-  frontend sends SET_DEVICE_STATE_FD again with
-  VHOST_TRANSFER_STATE_PHASE_STOPPED when entering non-iterative
-  migration and the frontend sends the iterative fd from the previous
-  SET_DEVICE_STATE_FD call to the backend. The backend may reply with
-  another fd, if necessary. If the backend changes the fd, then the
-  contents of the previous fd must be fully read and transferred before
-  the contents of the new fd are migrated. (Maybe this is too complex
-  and we should forbid changing the fd when going from RUNNING ->
-  STOPPED.)
-- CHECK_DEVICE_STATE can be extended to report the number of bytes
-  remaining. The semantics change so that CHECK_DEVICE_STATE can be
-  called while the VMM is still reading from the fd. It becomes:
-
-    enum CheckDeviceStateResult {
-        Saving(bytes_remaining : usize),
-	Failed(error_code : u64),
-    }
-
-> > In that case, reusing the ioctls as vhost-user messages would be ok.
-> > But that puts this proposal further from the VFIO code, which uses
-> > "migration_set_state(state)", and maybe it is better when the number
-> > of states is high.
->=20
-> I=E2=80=99m not sure what you mean (because I don=E2=80=99t know the VFIO=
- code, I
-> assume).=C2=A0 Are you saying that using a more finely grained
-> migration_set_state() model would conflict with the rather coarse
-> suspend/resume?
-
-I think VFIO is already different because vDPA has SUSPEND/RESUME,
-whereas VFIO controls the state via VFIO_DEVICE_FEATURE
-VFIO_DEVICE_FEATURE_MIG_DEVICE_STATE (which is similar but not identical
-to SET_DEVICE_STATE_FD in this patch series).
-
-Stefan
-
---ETs0/9kgvfmqN2Oo
+--vZ396R7jSJ+Rf8iB
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmQ9YfIACgkQnKSrs4Gr
-c8jdtAf+KPOxQ9hVsQB6emGsWR5f2ARqgYTdvn3qLaXUqXKHnm75BdPI5qK65VJO
-vsZ66Si1wmwZbeX1KgVT5KmwCjGP++ZB7g+xKekuQgRZ8UMOb8Z3UHkK2hAoWJ/4
-3DE7xBLlLZMrlKr43HTjxCkwWgrm5DtXBt+Bd9a4fuob/io/p5MsLRbyYMSjwpxf
-/QsthWOlK1qwJIbQspRW36/cQ6+OXQLU0V7SSGIIq5yY98njT2230il+GjDyFNCy
-+h17RvULL8/LBMUEpmVIYU4Bp0FcUhe/u1Mw6lFQ7KAGdKP3NhdCJwaypHnVopZr
-FS0uCIqaw5rRoiOMKCMCQJO3cmaiuA==
-=iKYQ
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmQ9Y1AACgkQnKSrs4Gr
+c8h4VwgAg9cVpFqggxzhiQVx3IDndktUuefiEWD5VAG/qYcME1rjtB88FWQmt32h
+tGfElFVMk8Tc7GdAzayJBSMnupB+0/pRCFwhyl9Jnk2BeoHn3lWZmb5VZaUAPZse
+5TwwLU4BjXLvWOwjSM6JI84Tyht1FpNLEKMMPU6EP6+nhRQc44Eku9zeqsbK9aIp
+l+penXj21sR08DmrJOXfzGz3F84hSSTtzeYHbM+Svu21dLDZa3cO4jk1LGqR718n
+SoU06IQtt5TfcZPPePivc5L0cMHpeuzccdurH9uNw91FnlQwaE90rIuYQsgHZbfr
+UThmQygE8hVC5dJtKQSqbZhKDI7OtQ==
+=/Zw3
 -----END PGP SIGNATURE-----
 
---ETs0/9kgvfmqN2Oo--
+--vZ396R7jSJ+Rf8iB--

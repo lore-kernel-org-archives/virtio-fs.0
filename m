@@ -1,27 +1,16 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681720961; x=1684312961;
- h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
- :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
- :message-id:reply-to;
- bh=oDogvV/KbDOc2pu5zy/l3hr2DNuh3AepOl08MTTKnHY=;
- b=u3kqZVs+dR+1JG/AH4XjgvjrBFlhwqYlDMd3djN1qHMTkh0YgAghEkHww8hwMVZFOW
- R/p/G50yuHoUT/CqEW5ffg30mMay8iDU3TIQRaxh3lRdtna+nPTxZ6B4wDGMEazzkwlQ
- P/VyGpGlyMP3jtCyfaBPe8rcAcYhn5zx+YBwRDhsJT+CtDk5hG7VLAeRw877rw1m6ZQY
- Mr5r7G3UOy4OrB30hJBY2BPAG32A69gxj0XTRKM/UGp3DKFA/VoiTa6NR/5LjG3a6IvK
- a5RU1d4o0eS7SO6WG9oPpPmt0t+X4SByeqxQkiZ9Ugw6R/amQcsWjkME1T7TRerTAdrV
- t7Sw==
+Return-Path: <armbru@redhat.com>
+From: Markus Armbruster <armbru@redhat.com>
 References: <20230414160433.2096866-1-alex.bennee@linaro.org>
- <20230417042631.ncmvabezvzloxksl@vireshk-i7>
-From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Mon, 17 Apr 2023 09:42:04 +0100
-In-reply-to: <20230417042631.ncmvabezvzloxksl@vireshk-i7>
-Message-ID: <87leiq99xc.fsf@linaro.org>
+ <20230414160433.2096866-9-alex.bennee@linaro.org>
+Date: Mon, 17 Apr 2023 12:02:33 +0200
+In-Reply-To: <20230414160433.2096866-9-alex.bennee@linaro.org> ("Alex
+ =?utf-8?Q?Benn=C3=A9e=22's?= message of "Fri, 14 Apr 2023 17:04:29 +0100")
+Message-ID: <87bkjmddxi.fsf@pond.sub.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH 00/12] virtio: add vhost-user-generic and
- reduce copy and paste
+Subject: Re: [Virtio-fs] [PATCH 08/12] qom: allow for properties to become
+ "fixed"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,25 +19,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: qemu-devel@nongnu.org, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>, =?utf-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Markus Armbruster <armbru@redhat.com>
+To: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Cc: qemu-devel@nongnu.org, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>, "Daniel P. =?utf-8?Q?Berrang=C3=A9?=" <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>
 
+Alex Benn=C3=A9e <alex.bennee@linaro.org> writes:
 
-Viresh Kumar <viresh.kumar@linaro.org> writes:
-
-> On 14-04-23, 17:04, Alex Benn=C3=A9e wrote:
->>  hw/virtio/vhost-user-device-pci.c      |  71 +++++
->>  hw/virtio/vhost-user-device.c          | 359 ++++++++++++++++++++++
->>  hw/virtio/vhost-user-fs.c              |   4 +-
->>  hw/virtio/vhost-user-gpio.c            | 405 +------------------------
->>  hw/virtio/vhost-user-rng.c             | 264 +---------------
+> When specialising general purpose objects it is sometimes useful to
+> "fix" some of the properties that were configurable by the base
+> classes. We will use this facility when specialising
+> vhost-user-device.
 >
-> I wonder why isn't i2c removed as well ?
+> Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+> ---
+>  qapi/qom.json           |  2 ++
+>  include/qom/object.h    | 16 +++++++++++++++-
+>  qom/object.c            | 14 ++++++++++++++
+>  qom/object_interfaces.c |  9 ++++++---
+>  qom/qom-qmp-cmds.c      |  1 +
+>  softmmu/qdev-monitor.c  |  1 +
+>  6 files changed, 39 insertions(+), 4 deletions(-)
+>
+> diff --git a/qapi/qom.json b/qapi/qom.json
+> index a877b879b9..4cda191f00 100644
+> --- a/qapi/qom.json
+> +++ b/qapi/qom.json
+> @@ -33,12 +33,14 @@
+>  # @description: if specified, the description of the property.
+>  #
+>  # @default-value: the default value, if any (since 5.0)
+> +# @fixed: if specified if value has been fixed (since 8.1)
 
-I will do - mainly I want to do a similar dummy device addition to the
-i2c daemon for testing.
+Wat?
 
---=20
-Alex Benn=C3=A9e
-Virtualisation Tech Lead @ Linaro
+>  #
+>  # Since: 1.2
+>  ##
+>  { 'struct': 'ObjectPropertyInfo',
+>    'data': { 'name': 'str',
+>              'type': 'str',
+> +            'fixed': 'bool',
+>              '*description': 'str',
+>              '*default-value': 'any' } }
+>=20=20
 
+qom-list and qom-list-properties return a list of this.  Use cases for
+the new member?
+
+[...]

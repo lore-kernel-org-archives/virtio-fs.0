@@ -1,18 +1,27 @@
-Return-Path: <stefanha@redhat.com>
-Date: Mon, 17 Apr 2023 11:38:10 -0400
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20230417153810.GE3852722@fedora>
-References: <20230411150515.14020-1-hreitz@redhat.com>
- <20230411150515.14020-3-hreitz@redhat.com>
- <20230412210641.GC2813183@fedora>
- <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1681748671; x=1684340671;
+ h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
+ :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=QZwKumCvepBHfmdhF6N8J7XAEcNA1IrJD+sNrVEorvw=;
+ b=t0FjjqAAevVxEwHSOTAQMMmbIvJQZ+qzehj1jhD/3IqflZwy8ovSxFNutwV6i3W/5G
+ M528Os5PWgYv534qzt7/g4pXUij8xWV1BSocR3IiduJPiRFlty0stGPc5am6o34FA/pF
+ DkZ8G/htDQm1KPa1YHzOkvEZzxVNKX/mwL+vg53HS5QJFnC57nk1ie/LjOSSYGYHYJah
+ 3HbitW9KWK6lMCCKBkY5fMdMVPaPfgPh2B7846x3Y6jsb+zOi7og4ygSwTH4O6WsMoBT
+ q30mdNIq5QYohKmpJGn1S+HPjwETtlK1b/34EUVeIHm/AfgJltyZuiwBd/SU12iJWzWv
+ oR9Q==
+References: <20230414160433.2096866-1-alex.bennee@linaro.org>
+ <CAJSP0QURbJrEoFY8FhMnq_B6tx-qYspfu-OB6=6hz5=qAwE=6A@mail.gmail.com>
+From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Mon, 17 Apr 2023 17:14:59 +0100
+In-reply-to: <CAJSP0QURbJrEoFY8FhMnq_B6tx-qYspfu-OB6=6hz5=qAwE=6A@mail.gmail.com>
+Message-ID: <87ttxeeatd.fsf@linaro.org>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="b4l2pi0PgZ69pcAC"
-Content-Disposition: inline
-In-Reply-To: <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
- state transfer
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH 00/12] virtio: add vhost-user-generic and
+ reduce copy and paste
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,157 +30,136 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eugenio Perez Martin <eperezma@redhat.com>
-Cc: Hanna Czenczek <hreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
+To: Stefan Hajnoczi <stefanha@gmail.com>
+Cc: qemu-devel@nongnu.org, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>, =?utf-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Markus Armbruster <armbru@redhat.com>
 
 
---b4l2pi0PgZ69pcAC
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Stefan Hajnoczi <stefanha@gmail.com> writes:
 
-On Thu, Apr 13, 2023 at 12:14:24PM +0200, Eugenio Perez Martin wrote:
-> On Wed, Apr 12, 2023 at 11:06=E2=80=AFPM Stefan Hajnoczi <stefanha@redhat=
-=2Ecom> wrote:
-> >
-> > On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek wrote:
-> > > So-called "internal" virtio-fs migration refers to transporting the
-> > > back-end's (virtiofsd's) state through qemu's migration stream.  To do
-> > > this, we need to be able to transfer virtiofsd's internal state to and
-> > > from virtiofsd.
-> > >
-> > > Because virtiofsd's internal state will not be too large, we believe =
-it
-> > > is best to transfer it as a single binary blob after the streaming
-> > > phase.  Because this method should be useful to other vhost-user
-> > > implementations, too, it is introduced as a general-purpose addition =
-to
-> > > the protocol, not limited to vhost-user-fs.
-> > >
-> > > These are the additions to the protocol:
-> > > - New vhost-user protocol feature VHOST_USER_PROTOCOL_F_MIGRATORY_STA=
-TE:
-> > >   This feature signals support for transferring state, and is added so
-> > >   that migration can fail early when the back-end has no support.
-> > >
-> > > - SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a pi=
-pe
-> > >   over which to transfer the state.  The front-end sends an FD to the
-> > >   back-end into/from which it can write/read its state, and the back-=
-end
-> > >   can decide to either use it, or reply with a different FD for the
-> > >   front-end to override the front-end's choice.
-> > >   The front-end creates a simple pipe to transfer the state, but maybe
-> > >   the back-end already has an FD into/from which it has to write/read
-> > >   its state, in which case it will want to override the simple pipe.
-> > >   Conversely, maybe in the future we find a way to have the front-end
-> > >   get an immediate FD for the migration stream (in some cases), in wh=
-ich
-> > >   case we will want to send this to the back-end instead of creating a
-> > >   pipe.
-> > >   Hence the negotiation: If one side has a better idea than a plain
-> > >   pipe, we will want to use that.
-> > >
-> > > - CHECK_DEVICE_STATE: After the state has been transferred through the
-> > >   pipe (the end indicated by EOF), the front-end invokes this function
-> > >   to verify success.  There is no in-band way (through the pipe) to
-> > >   indicate failure, so we need to check explicitly.
-> > >
-> > > Once the transfer pipe has been established via SET_DEVICE_STATE_FD
-> > > (which includes establishing the direction of transfer and migration
-> > > phase), the sending side writes its data into the pipe, and the readi=
-ng
-> > > side reads it until it sees an EOF.  Then, the front-end will check f=
-or
-> > > success via CHECK_DEVICE_STATE, which on the destination side includes
-> > > checking for integrity (i.e. errors during deserialization).
-> > >
-> > > Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > > Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
-> > > ---
-> > >  include/hw/virtio/vhost-backend.h |  24 +++++
-> > >  include/hw/virtio/vhost.h         |  79 ++++++++++++++++
-> > >  hw/virtio/vhost-user.c            | 147 ++++++++++++++++++++++++++++=
-++
-> > >  hw/virtio/vhost.c                 |  37 ++++++++
-> > >  4 files changed, 287 insertions(+)
-> > >
-> > > diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio/vh=
-ost-backend.h
-> > > index ec3fbae58d..5935b32fe3 100644
-> > > --- a/include/hw/virtio/vhost-backend.h
-> > > +++ b/include/hw/virtio/vhost-backend.h
-> > > @@ -26,6 +26,18 @@ typedef enum VhostSetConfigType {
-> > >      VHOST_SET_CONFIG_TYPE_MIGRATION =3D 1,
-> > >  } VhostSetConfigType;
-> > >
-> > > +typedef enum VhostDeviceStateDirection {
-> > > +    /* Transfer state from back-end (device) to front-end */
-> > > +    VHOST_TRANSFER_STATE_DIRECTION_SAVE =3D 0,
-> > > +    /* Transfer state from front-end to back-end (device) */
-> > > +    VHOST_TRANSFER_STATE_DIRECTION_LOAD =3D 1,
-> > > +} VhostDeviceStateDirection;
-> > > +
-> > > +typedef enum VhostDeviceStatePhase {
-> > > +    /* The device (and all its vrings) is stopped */
-> > > +    VHOST_TRANSFER_STATE_PHASE_STOPPED =3D 0,
-> > > +} VhostDeviceStatePhase;
-> >
-> > vDPA has:
-> >
-> >   /* Suspend a device so it does not process virtqueue requests anymore
-> >    *
-> >    * After the return of ioctl the device must preserve all the necessa=
-ry state
-> >    * (the virtqueue vring base plus the possible device specific states=
-) that is
-> >    * required for restoring in the future. The device must not change i=
-ts
-> >    * configuration after that point.
-> >    */
-> >   #define VHOST_VDPA_SUSPEND      _IO(VHOST_VIRTIO, 0x7D)
-> >
-> >   /* Resume a device so it can resume processing virtqueue requests
-> >    *
-> >    * After the return of this ioctl the device will have restored all t=
-he
-> >    * necessary states and it is fully operational to continue processin=
-g the
-> >    * virtqueue descriptors.
-> >    */
-> >   #define VHOST_VDPA_RESUME       _IO(VHOST_VIRTIO, 0x7E)
-> >
-> > I wonder if it makes sense to import these into vhost-user so that the
-> > difference between kernel vhost and vhost-user is minimized. It's okay
-> > if one of them is ahead of the other, but it would be nice to avoid
-> > overlapping/duplicated functionality.
-> >
->=20
-> That's what I had in mind in the first versions. I proposed VHOST_STOP
-> instead of VHOST_VDPA_STOP for this very reason. Later it did change
-> to SUSPEND.
+> On Fri, 14 Apr 2023 at 12:06, Alex Benn=C3=A9e <alex.bennee@linaro.org> w=
+rote:
+>>
+>> A lot of our vhost-user stubs are large chunks of boilerplate that do
+>> (mostly) the same thing. This series attempts to fix that by defining
+>> a new base class for vhost-user devices and then converting the rng
+>> and gpio devices to be based off them. You can even use
+>> vhost-user-device directly if you supply it with the right magic
+>> numbers (which is helpful for development).
+>>
+>> However the final patch runs into the weeds because I don't yet have a
+>> clean way to represent in QOM the fixing of certain properties for the
+>> specialised classes.
+>>
+>> The series is a net reduction in code and an increase in
+>> documentation but obviously needs to iron out a few more warts. I'm
+>> open to suggestions on the best way to tweak the QOM stuff.
+>
+> --device vhost-user-device is not really possible because vhost-user
+> devices are not full VIRTIO devices. vhost-user devices depend on
+> device-specific code in the VMM by design.
 
-I noticed QEMU only calls ioctl(VHOST_VDPA_SUSPEND) and not
-ioctl(VHOST_VDPA_RESUME).
+What device specific code? You certainly need to instantiate stuff in
+the DTB/ACPI tables for -M virt but everything else can be handed off to
+the vhost-user daemon.
 
-The doc comments in <linux/vdpa.h> don't explain how the device can
-leave the suspended state. Can you clarify this?
+Indeed the split brain is a bit silly in some places. For example is
+QEMU really the best arbiter of a block device config when the actual
+backend is a separate process. We have config passing in the vhost-user
+spec.
 
-Stefan
+> The "subset of a VIRTIO device" design made sense for vhost_net.
+> Nowadays there are other device types that are close to full VIRTIO
+> devices, although the vhost-user protocol doesn't support the full
+> VIRTIO device lifecycle.
 
---b4l2pi0PgZ69pcAC
-Content-Type: application/pgp-signature; name="signature.asc"
+What are we missing?
 
------BEGIN PGP SIGNATURE-----
+> I think a user-creatable --device vhost-user-device is not a good idea
+> today. It creates confusion. Many people aren't aware of the
+> architectural difference between vhost-user and VIRTIO devices. The
+> result is that VMMs and vhost-user backends implement increasingly
+> brittle VIRTIO configuration space and feature bit logic as they
+> knowingly or unknowingly try to paper over the fact that a traditional
+> vhost-user device isn't a full VIRTIO device.
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmQ9Z+IACgkQnKSrs4Gr
-c8glWQf/ZN2qWP0UoPuCrMhwusQi50OkWEGgDY3ZW3iI93Vt/QhZGVAPztUPODdT
-w/yqO4TptcNIXAHzrvC5uT0XuxPb1epuVCSE5Vlxi1DeuzjTY+vlWJe5+814ou3j
-QS5DbjiaWpCUrmM+F+fk+jHxt4Z3DxXfDeu1Up5nSePcSnkyb/sG/Ny5gwV6t/iM
-ifn5JHs9rz/fdjupfULCtkYPXDgFGfPkDb3d0HQi9WJFAMlbvzVJHzecxe8dOtZu
-pkJPVGuuaab0I7vEOHKUr+AWtbIQWRZhq050XBSCEiPF+JRRl1icbErQSFd8Mg0b
-1SkgQg/XnFtapAHJHv/AAFL79Xutlg==
-=DAce
------END PGP SIGNATURE-----
+I've always found the device feature gating in QEMU confusing. Surely we
+can rely on the daemon to properly enumerate the features it supports?
 
---b4l2pi0PgZ69pcAC--
+> It is possible to resolve this difference and make --device
+> vhost-user-device work properly for devices that want to be full
+> VIRTIO devices. See "Making VMM device shims optional" here:
+> https://blog.vmsplice.net/2020/09/on-unifying-vhost-user-and-virtio.html
+>
+> Even after extending the vhost-user protocol to solve the current
+> limitations, existing backends would still only be partial VIRTIO
+> devices that wouldn't work with --device vhost-user-device.
+
+It works for RNG, GPIO (and soon I'll be testing i2c and SCSI). All we
+need is the virtioid and the number of virtio queues.
+
+> Reducing boilerplate is helpful, but I think --device
+> vhost-user-device should not be user-creatable.
+
+After this series lands it will certainly make adding new shims easier
+but having a vhost-user-device will make testing of new backends easier.
+Can we not simply document it as an advanced feature for those who know
+what they are doing? I'm not intending to deprecate the existing shims.
+
+>
+> Stefan
+>
+>>
+>> Alex.
+>>
+>> Alex Benn=C3=A9e (12):
+>>   hw/virtio: fix typo in VIRTIO_CONFIG_IRQ_IDX comments
+>>   include/hw/virtio: document virtio_notify_config
+>>   include/hw/virtio: add kerneldoc for virtio_init
+>>   include/hw/virtio: document some more usage of notifiers
+>>   virtio: add generic vhost-user-device
+>>   virtio: add PCI stub for vhost-user-device
+>>   include: attempt to document device_class_set_props
+>>   qom: allow for properties to become "fixed"
+>>   hw/virtio: derive vhost-user-rng from vhost-user-device
+>>   hw/virtio: add config support to vhost-user-device
+>>   hw/virtio: derive vhost-user-gpio from vhost-user-device (!BROKEN)
+>>   docs/system: add a basic enumeration of vhost-user devices
+>>
+>>  docs/system/devices/vhost-user-rng.rst |   2 +
+>>  docs/system/devices/vhost-user.rst     |  41 +++
+>>  qapi/qom.json                          |   2 +
+>>  include/hw/qdev-core.h                 |   9 +
+>>  include/hw/virtio/vhost-user-device.h  |  33 ++
+>>  include/hw/virtio/vhost-user-gpio.h    |  23 +-
+>>  include/hw/virtio/vhost-user-rng.h     |  11 +-
+>>  include/hw/virtio/virtio.h             |  21 ++
+>>  include/qom/object.h                   |  16 +-
+>>  hw/display/vhost-user-gpu.c            |   4 +-
+>>  hw/net/virtio-net.c                    |   4 +-
+>>  hw/virtio/vhost-user-device-pci.c      |  71 +++++
+>>  hw/virtio/vhost-user-device.c          | 359 ++++++++++++++++++++++
+>>  hw/virtio/vhost-user-fs.c              |   4 +-
+>>  hw/virtio/vhost-user-gpio.c            | 405 +------------------------
+>>  hw/virtio/vhost-user-rng.c             | 264 +---------------
+>>  hw/virtio/vhost-vsock-common.c         |   4 +-
+>>  hw/virtio/virtio-crypto.c              |   4 +-
+>>  qom/object.c                           |  14 +
+>>  qom/object_interfaces.c                |   9 +-
+>>  qom/qom-qmp-cmds.c                     |   1 +
+>>  softmmu/qdev-monitor.c                 |   1 +
+>>  hw/virtio/meson.build                  |   3 +
+>>  23 files changed, 613 insertions(+), 692 deletions(-)
+>>  create mode 100644 include/hw/virtio/vhost-user-device.h
+>>  create mode 100644 hw/virtio/vhost-user-device-pci.c
+>>  create mode 100644 hw/virtio/vhost-user-device.c
+>>
+>> --
+>> 2.39.2
+>>
+>>
+
+
+--=20
+Alex Benn=C3=A9e
+Virtualisation Tech Lead @ Linaro
+

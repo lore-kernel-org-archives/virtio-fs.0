@@ -1,14 +1,26 @@
-Return-Path: <hreitz@redhat.com>
-Message-ID: <e8cc4521-50a1-2e38-1fb3-8cfa7b0c967e@redhat.com>
-Date: Thu, 4 May 2023 18:05:46 +0200
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1681834906; x=1684426906;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=uTkEU0oqDGeWEiEFn49DE5kPkeQF20sGslhQri+i2Js=;
+ b=Qx4KdgdPZjW3qENTPMJcMl8Ulf9v7o9rH1J8gU/pwRgUKgk7FciB6j07A4w9Y4PmeP
+ eSx8DfuLJc262S8OMkXsepujdQ8PVmihiXGn15NkgfJPxKWJKjvto91EBAzWQ8TUSf6C
+ 7piiG2N2DugFTjQx+FykbO5SaBYW5NF7FoqsWPRNSdwmsYM/dIleNZrGqNUrDXlyB4fl
+ k7MHLz4Sy0SiCgqS3rYa1p7sGh0MLaIOxO1jYjPr7CeFO1e8bFbxTgyteR2J6jOPfNlX
+ cfPUGK++kx3ZVxJexecLX/54ut58loJbBsBqibRW2YaEIZfirKgnfmdrHMYAYNjnels6
+ pxCA==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Tue, 18 Apr 2023 17:21:37 +0100
+Message-Id: <20230418162140.373219-11-alex.bennee@linaro.org>
+In-Reply-To: <20230418162140.373219-1-alex.bennee@linaro.org>
+References: <20230418162140.373219-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-References: <20230411150515.14020-1-hreitz@redhat.com>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <20230411150515.14020-1-hreitz@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 0/4] vhost-user-fs: Internal migration
+Subject: [Virtio-fs] [PATCH v2 10/13] hw/virtio: add config support to
+ vhost-user-device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,79 +29,146 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, Eugenio Perez Martin <eperezma@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Jason Wang <jasowang@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Gerd Hoffmann <kraxel@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>
 
-On 11.04.23 17:05, Hanna Czenczek wrote:
+To use the generic device the user will need to provide the config
+region size via the command line. We also add a notifier so the guest
+can be pinged if the remote daemon updates the config.
 
-[...]
+With these changes:
 
-> Hanna Czenczek (4):
->    vhost: Re-enable vrings after setting features
->    vhost-user: Interface for migration state transfer
->    vhost: Add high-level state save/load functions
->    vhost-user-fs: Implement internal migration
+  -device vhost-user-device-pci,virtio-id=41,num_vqs=2,config_size=8
 
-I’m trying to write v2, and my intention was to keep the code 
-conceptually largely the same, but include in the documentation change 
-thoughts and notes on how this interface is to be used in the future, 
-when e.g. vDPA “extensions” come over to vhost-user.  My plan was to, 
-based on that documentation, discuss further.
+is equivalent to:
 
-But now I’m struggling to even write that documentation because it’s not 
-clear to me what exactly the result of the discussion was, so I need to 
-stop even before that.
+  -device vhost-user-gpio-pci
 
-So as far as I understand, we need/want SUSPEND/RESUME for two reasons:
-1. As a signal to the back-end when virt queues are no longer to be 
-processed, so that it is clear that it will not do that when asked for 
-migration state.
-2. Stateful devices that support SET_STATUS receive a status of 0 when 
-the VM is stopped, which supposedly resets the internal state. While 
-suspended, device state is frozen, so as far as I understand, SUSPEND 
-before SET_STATUS would have the status change be deferred until RESUME.
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+---
+ include/hw/virtio/vhost-user-device.h |  1 +
+ hw/virtio/vhost-user-device.c         | 58 ++++++++++++++++++++++++++-
+ 2 files changed, 58 insertions(+), 1 deletion(-)
 
-I don’t want to hang myself up on 2 because it doesn’t really seem 
-important to this series, but: Why does a status of 0 reset the internal 
-state?  [Note: This is all virtio_reset() seems to do, set the status to 
-0.]  The vhost-user specification only points to the virtio 
-specification, which doesn’t say anything to that effect. Instead, an 
-explicit device reset is mentioned, which would be 
-VHOST_USER_RESET_DEVICE, i.e. something completely different. Because 
-RESET_DEVICE directly contradicts SUSPEND’s description, I would like to 
-think that invoking RESET_DEVICE on a SUSPEND-ed device is just invalid.
-
-Is it that a status 0 won’t explicitly reset the internal state, but 
-because it does mean that the driver is unbound, the state should 
-implicitly be reset?
-
-Anyway.  1 seems to be the relevant point for migration.  As far as I 
-understand, currently, a vhost-user back-end has no way of knowing when 
-to stop processing virt queues.  Basically, rings can only transition 
-from stopped to started, but not vice versa.  The vhost-user 
-specification has this bit: “Once the source has finished migration, 
-rings will be stopped by the source. No further update must be done 
-before rings are restarted.”  It just doesn’t say how the front-end lets 
-the back-end know that the rings are (to be) stopped.  So this seems 
-like a pre-existing problem for stateless migration.  Unless this is 
-communicated precisely by setting the device status to 0?
-
-Naturally, what I want to know most of all is whether you believe I can 
-get away without SUSPEND/RESUME for now.  To me, it seems like honestly 
-not really, only when turning two blind eyes, because otherwise we can’t 
-ensure that virtiofsd isn’t still processing pending virt queue requests 
-when the state transfer is begun, even when the guest CPUs are already 
-stopped.  Of course, virtiofsd could stop queue processing right there 
-and then, but…  That feels like a hack that in the grand scheme of 
-things just isn’t necessary when we could “just” introduce 
-SUSPEND/RESUME into vhost-user for exactly this.
-
-Beyond the SUSPEND/RESUME question, I understand everything can stay 
-as-is for now, as the design doesn’t seem to conflict too badly with 
-possible future extensions for other migration phases or more finely 
-grained migration phase control between front-end and back-end.
-
-Did I at least roughly get the gist?
-
-Hanna
+diff --git a/include/hw/virtio/vhost-user-device.h b/include/hw/virtio/vhost-user-device.h
+index 9105011e25..3ddf88a146 100644
+--- a/include/hw/virtio/vhost-user-device.h
++++ b/include/hw/virtio/vhost-user-device.h
+@@ -22,6 +22,7 @@ struct VHostUserBase {
+     CharBackend chardev;
+     uint16_t virtio_id;
+     uint32_t num_vqs;
++    uint32_t config_size;
+     /* State tracking */
+     VhostUserState vhost_user;
+     struct vhost_virtqueue *vhost_vq;
+diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
+index b0239fa033..2b028cae08 100644
+--- a/hw/virtio/vhost-user-device.c
++++ b/hw/virtio/vhost-user-device.c
+@@ -117,6 +117,42 @@ static uint64_t vub_get_features(VirtIODevice *vdev,
+     return vub->vhost_dev.features & ~(1ULL << VHOST_USER_F_PROTOCOL_FEATURES);
+ }
+ 
++/*
++ * To handle VirtIO config we need to know the size of the config
++ * space. We don't cache the config but re-fetch it from the guest
++ * every time in case something has changed.
++ */
++static void vub_get_config(VirtIODevice *vdev, uint8_t *config)
++{
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    Error *local_err = NULL;
++
++    /*
++     * There will have been a warning during vhost_dev_init, but lets
++     * assert here as nothing will go right now.
++     */
++    g_assert(vub->config_size && vub->vhost_user.supports_config == true);
++
++    if (vhost_dev_get_config(&vub->vhost_dev, config,
++                             vub->config_size, &local_err)) {
++        error_report_err(local_err);
++    }
++}
++
++/*
++ * When the daemon signals an update to the config we just need to
++ * signal the guest as we re-read the config on demand above.
++ */
++static int vub_config_notifier(struct vhost_dev *dev)
++{
++    virtio_notify_config(dev->vdev);
++    return 0;
++}
++
++const VhostDevConfigOps vub_config_ops = {
++    .vhost_dev_config_notifier = vub_config_notifier,
++};
++
+ static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+ {
+     /*
+@@ -141,12 +177,21 @@ static int vub_connect(DeviceState *dev)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+     VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    struct vhost_dev *vhost_dev = &vub->vhost_dev;
+ 
+     if (vub->connected) {
+         return 0;
+     }
+     vub->connected = true;
+ 
++    /*
++     * If we support VHOST_USER_GET_CONFIG we must enable the notifier
++     * so we can ping the guest when it updates.
++     */
++    if (vub->vhost_user.supports_config) {
++        vhost_dev_set_config_notifier(vhost_dev, &vub_config_ops);
++    }
++
+     /* restore vhost state */
+     if (virtio_device_started(vdev, vdev->status)) {
+         vub_start(vdev);
+@@ -214,11 +259,20 @@ static void vub_device_realize(DeviceState *dev, Error **errp)
+         vub->num_vqs = 1; /* reasonable default? */
+     }
+ 
++    /*
++     * We can't handle config requests unless we know the size of the
++     * config region, specialisations of the vhost-user-device will be
++     * able to set this.
++     */
++    if (vub->config_size) {
++        vub->vhost_user.supports_config = true;
++    }
++
+     if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
+         return;
+     }
+ 
+-    virtio_init(vdev, vub->virtio_id, 0);
++    virtio_init(vdev, vub->virtio_id, vub->config_size);
+ 
+     /*
+      * Disable guest notifiers, by default all notifications will be via the
+@@ -268,6 +322,7 @@ static void vub_class_init(ObjectClass *klass, void *data)
+     vdc->realize = vub_device_realize;
+     vdc->unrealize = vub_device_unrealize;
+     vdc->get_features = vub_get_features;
++    vdc->get_config = vub_get_config;
+     vdc->set_status = vub_set_status;
+ }
+ 
+@@ -295,6 +350,7 @@ static Property vud_properties[] = {
+     DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+     DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
+     DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
++    DEFINE_PROP_UINT32("config_size", VHostUserBase, config_size, 0),
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
+-- 
+2.39.2
 

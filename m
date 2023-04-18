@@ -4,13 +4,13 @@ References: <20230411150515.14020-1-hreitz@redhat.com>
  <20230411150515.14020-3-hreitz@redhat.com>
  <20230412210641.GC2813183@fedora>
  <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
- <20230417171405.GA3890522@fedora>
- <CAJaqyWePywgd11mA5D=SqSyGOjzdhj1kjNHVkjG1iWv9Ox0ytg@mail.gmail.com>
- <CAJSP0QUriW5D9QNX+=YHYepXVAzOKjL6Dc93zSYihTTZhif0ig@mail.gmail.com>
-In-Reply-To: <CAJSP0QUriW5D9QNX+=YHYepXVAzOKjL6Dc93zSYihTTZhif0ig@mail.gmail.com>
+ <20230417153810.GE3852722@fedora>
+ <CAJaqyWePM_a7AafP9qS40hmYXKHDyMsvn5g24zk=cH8L6s-kUw@mail.gmail.com>
+ <CAJSP0QWUfxzad3EmT3r1hhaWmXDQt9Nj1LRPhPs_w79S9GAb1A@mail.gmail.com>
+In-Reply-To: <CAJSP0QWUfxzad3EmT3r1hhaWmXDQt9Nj1LRPhPs_w79S9GAb1A@mail.gmail.com>
 From: Eugenio Perez Martin <eperezma@redhat.com>
-Date: Tue, 18 Apr 2023 09:54:32 +0200
-Message-ID: <CAJaqyWc_59dhPcXOQDYh3vpMfV_4uZooYpQnRrcCkBBu1QO8tw@mail.gmail.com>
+Date: Tue, 18 Apr 2023 10:09:30 +0200
+Message-ID: <CAJaqyWfaDVZDJtMvPUhdRE283e80rB3WFd3RF9i=buaBYG=PKA@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
@@ -26,13 +26,13 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Stefan Hajnoczi <stefanha@gmail.com>
 Cc: Stefan Hajnoczi <stefanha@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-On Mon, Apr 17, 2023 at 9:21=E2=80=AFPM Stefan Hajnoczi <stefanha@gmail.com=
+On Mon, Apr 17, 2023 at 9:33=E2=80=AFPM Stefan Hajnoczi <stefanha@gmail.com=
 > wrote:
 >
-> On Mon, 17 Apr 2023 at 15:08, Eugenio Perez Martin <eperezma@redhat.com> =
+> On Mon, 17 Apr 2023 at 15:10, Eugenio Perez Martin <eperezma@redhat.com> =
 wrote:
 > >
-> > On Mon, Apr 17, 2023 at 7:14=E2=80=AFPM Stefan Hajnoczi <stefanha@redha=
+> > On Mon, Apr 17, 2023 at 5:38=E2=80=AFPM Stefan Hajnoczi <stefanha@redha=
 t.com> wrote:
 > > >
 > > > On Thu, Apr 13, 2023 at 12:14:24PM +0200, Eugenio Perez Martin wrote:
@@ -183,150 +183,55 @@ TOP
 > > > > instead of VHOST_VDPA_STOP for this very reason. Later it did chang=
 e
 > > > > to SUSPEND.
-> > > >
-> > > > Generally it is better if we make the interface less parametrized a=
-nd
-> > > > we trust in the messages and its semantics in my opinion. In other
-> > > > words, instead of
-> > > > vhost_set_device_state_fd_op(VHOST_TRANSFER_STATE_PHASE_STOPPED), s=
-end
-> > > > individually the equivalent of VHOST_VDPA_SUSPEND vhost-user comman=
-d.
-> > > >
-> > > > Another way to apply this is with the "direction" parameter. Maybe =
-it
-> > > > is better to split it into "set_state_fd" and "get_state_fd"?
-> > > >
-> > > > In that case, reusing the ioctls as vhost-user messages would be ok=
-.
-> > > > But that puts this proposal further from the VFIO code, which uses
-> > > > "migration_set_state(state)", and maybe it is better when the numbe=
-r
-> > > > of states is high.
 > > >
-> > > Hi Eugenio,
-> > > Another question about vDPA suspend/resume:
+> > > I noticed QEMU only calls ioctl(VHOST_VDPA_SUSPEND) and not
+> > > ioctl(VHOST_VDPA_RESUME).
 > > >
-> > >   /* Host notifiers must be enabled at this point. */
-> > >   void vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev, boo=
-l vrings)
-> > >   {
-> > >       int i;
-> > >
-> > >       /* should only be called after backend is connected */
-> > >       assert(hdev->vhost_ops);
-> > >       event_notifier_test_and_clear(
-> > >           &hdev->vqs[VHOST_QUEUE_NUM_CONFIG_INR].masked_config_notifi=
-er);
-> > >       event_notifier_test_and_clear(&vdev->config_notifier);
-> > >
-> > >       trace_vhost_dev_stop(hdev, vdev->name, vrings);
-> > >
-> > >       if (hdev->vhost_ops->vhost_dev_start) {
-> > >           hdev->vhost_ops->vhost_dev_start(hdev, false);
-> > >           ^^^ SUSPEND ^^^
-> > >       }
-> > >       if (vrings) {
-> > >           vhost_dev_set_vring_enable(hdev, false);
-> > >       }
-> > >       for (i =3D 0; i < hdev->nvqs; ++i) {
-> > >           vhost_virtqueue_stop(hdev,
-> > >                                vdev,
-> > >                                hdev->vqs + i,
-> > >                                hdev->vq_index + i);
-> > >         ^^^ fetch virtqueue state from kernel ^^^
-> > >       }
-> > >       if (hdev->vhost_ops->vhost_reset_status) {
-> > >           hdev->vhost_ops->vhost_reset_status(hdev);
-> > >           ^^^ reset device^^^
-> > >
-> > > I noticed the QEMU vDPA code resets the device in vhost_dev_stop() ->
-> > > vhost_reset_status(). The device's migration code runs after
-> > > vhost_dev_stop() and the state will have been lost.
+> > > The doc comments in <linux/vdpa.h> don't explain how the device can
+> > > leave the suspended state. Can you clarify this?
 > > >
 > >
-> > vhost_virtqueue_stop saves the vq state (indexes, vring base) in the
-> > qemu VirtIONet device model. This is for all vhost backends.
+> > Do you mean in what situations or regarding the semantics of _RESUME?
 > >
-> > Regarding the state like mac or mq configuration, SVQ runs for all the
-> > VM run in the CVQ. So it can track all of that status in the device
-> > model too.
-> >
-> > When a migration effectively occurs, all the frontend state is
-> > migrated as a regular emulated device. To route all of the state in a
-> > normalized way for qemu is what leaves open the possibility to do
-> > cross-backends migrations, etc.
-> >
-> > Does that answer your question?
+> > To me resume is an operation mainly to resume the device in the event
+> > of a VM suspension, not a migration. It can be used as a fallback code
+> > in some cases of migration failure though, but it is not currently
+> > used in qemu.
 >
-> I think you're confirming that changes would be necessary in order for
-> vDPA to support the save/load operation that Hanna is introducing.
+> Is a "VM suspension" the QEMU HMP 'stop' command?
+>
+> I guess the reason why QEMU doesn't call RESUME anywhere is that it
+> resets the device in vhost_dev_stop()?
 >
 
-Yes, this first iteration was centered on net, with an eye on block,
-where state can be routed through classical emulated devices. This is
-how vhost-kernel and vhost-user do classically. And it allows
-cross-backend, to not modify qemu migration state, etc.
+The actual reason for not using RESUME is that the ioctl was added
+after the SUSPEND design in qemu. Same as this proposal, it is was not
+needed at the time.
 
-To introduce this opaque state to qemu, that must be fetched after the
-suspend and not before, requires changes in vhost protocol, as
-discussed previously.
+In the case of vhost-vdpa net, the only usage of suspend is to fetch
+the vq indexes, and in case of error vhost already fetches them from
+guest's used ring way before vDPA, so it has little usage.
 
-> > > It looks like vDPA changes are necessary in order to support stateful
-> > > devices even though QEMU already uses SUSPEND. Is my understanding
-> > > correct?
-> > >
-> >
-> > Changes are required elsewhere, as the code to restore the state
-> > properly in the destination has not been merged.
->
-> I'm not sure what you mean by elsewhere?
->
+> Does it make sense to combine SUSPEND and RESUME with Hanna's
+> SET_DEVICE_STATE_FD? For example, non-iterative migration works like
+> this:
+> - Saving the device's state is done by SUSPEND followed by
+> SET_DEVICE_STATE_FD. If the guest needs to continue executing (e.g.
+> savevm command or migration failed), then RESUME is called to
+> continue.
 
-I meant for vdpa *net* devices the changes are not required in vdpa
-ioctls, but mostly in qemu.
+I think the previous steps make sense at vhost_dev_stop, not virtio
+savevm handlers. To start spreading this logic to more places of qemu
+can bring confusion.
 
-If you meant stateful as "it must have a state blob that it must be
-opaque to qemu", then I think the straightforward action is to fetch
-state blob about the same time as vq indexes. But yes, changes (at
-least a new ioctl) is needed for that.
-
-> I'm asking about vDPA ioctls. Right now the sequence is SUSPEND and
-> then VHOST_VDPA_SET_STATUS 0.
->
-> In order to save device state from the vDPA device in the future, it
-> will be necessary to defer the VHOST_VDPA_SET_STATUS 0 call so that
-> the device state can be saved before the device is reset.
->
-> Does that sound right?
+> - Loading the device's state is done by SUSPEND followed by
+> SET_DEVICE_STATE_FD, followed by RESUME.
 >
 
-The split between suspend and reset was added recently for that very
-reason. In all the virtio devices, the frontend is initialized before
-the backend, so I don't think it is a good idea to defer the backend
-cleanup. Especially if we have already set the state is small enough
-to not needing iterative migration from virtiofsd point of view.
-
-If fetching that state at the same time as vq indexes is not valid,
-could it follow the same model as the "in-flight descriptors"?
-vhost-user follows them by using a shared memory region where their
-state is tracked [1]. This allows qemu to survive vhost-user SW
-backend crashes, and does not forbid the cross-backends live migration
-as all the information is there to recover them.
-
-For hw devices this is not convenient as it occupies PCI bandwidth. So
-a possibility is to synchronize this memory region after a
-synchronization point, being the SUSPEND call or GET_VRING_BASE. HW
-devices are not going to crash in the software sense, so all use cases
-remain the same to qemu. And that shared memory information is
-recoverable after vhost_dev_stop.
-
-Does that sound reasonable to virtiofsd? To offer a shared memory
-region where it dumps the state, maybe only after the
-set_state(STATE_PHASE_STOPPED)?
+I think the restore makes more sense after reset and before driver_ok,
+suspend does not seem a right call there. SUSPEND implies there may be
+other operations before, so the device may have processed some
+requests wrong, as it is not in the right state.
 
 Thanks!
-
-[1] https://qemu.readthedocs.io/en/latest/interop/vhost-user.html#inflight-=
-i-o-tracking
 

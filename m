@@ -1,13 +1,26 @@
-Return-Path: <gmaglion@redhat.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1681834904; x=1684426904;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=1A+5QxSTbXGCo55UOJ3nazzxUb4+UhfLG866jSa6yr4=;
+ b=f1mgtZ69k7Kj4ijAMctLgIExd27VV0GYl8ZoJeqILw5TcDiA6VMDGnpLmzyPnBWUHW
+ f56feqkULdz6T5g838ckwfrD2TDGMvol2vfZzqb30tBheX1yBcz5mqU+UU1pYtqxjpvC
+ b6aCgaP8/bIZlKUp1kGL3126f9Eu9qH83/sgyndWcMiFT715RhaRoUFUFfpDdYsTV3HC
+ 5GvfarJtUDIUfvbVa8f1ZQ+NHuhQBMQQaxoXrATs4+8Ez3Eqn8ZhFlh3g0RRPrnqKuMT
+ qGOX8UsgyU1ika6PwVKKBJQnOLhPU6jTy36jRWdJm/+lk4AzUhAebndGsrqMGIObcCec
+ s6Tw==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Tue, 18 Apr 2023 17:21:34 +0100
+Message-Id: <20230418162140.373219-8-alex.bennee@linaro.org>
+In-Reply-To: <20230418162140.373219-1-alex.bennee@linaro.org>
+References: <20230418162140.373219-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-References: <SA1P221MB1018666909025F9520B3A960B57B9@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
-In-Reply-To: <SA1P221MB1018666909025F9520B3A960B57B9@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
-From: German Maglione <gmaglione@redhat.com>
-Date: Sun, 14 May 2023 19:06:59 +0200
-Message-ID: <CAJh=p+7EnxbniPKyQX26waewoAv3jH_v1=3cGvp9b3Jpx9x=fw@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="000000000000ea26c205fbaa5fda"
-Subject: Re: [Virtio-fs] Is there a way to get NFS and/or NFSoRDMA to play
- nice with Virtio-FS?
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 07/13] virtio: add vhost-user-base and a
+ generic vhost-user-device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,171 +29,424 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Ewen Chan <alpha754293@hotmail.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Jason Wang <jasowang@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Gerd Hoffmann <kraxel@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>
 
---000000000000ea26c205fbaa5fda
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+In theory we shouldn't need to repeat so much boilerplate to support
+vhost-user backends. This provides a generic vhost-user-base QOM
+object and a derived vhost-user-device for which the user needs to
+provide the few bits of information that aren't currently provided by
+the vhost-user protocol. This should provide a baseline implementation
+from which the other vhost-user stub can specialise.
 
-Hi Ewen,
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 
-On Sun, May 14, 2023 at 9:49=E2=80=AFAM Ewen Chan <alpha754293@hotmail.com>=
- wrote:
+---
+v2
+  - split into vub and vud
+---
+ include/hw/virtio/vhost-user-device.h |  45 ++++
+ hw/virtio/vhost-user-device.c         | 324 ++++++++++++++++++++++++++
+ hw/virtio/meson.build                 |   2 +
+ 3 files changed, 371 insertions(+)
+ create mode 100644 include/hw/virtio/vhost-user-device.h
+ create mode 100644 hw/virtio/vhost-user-device.c
 
-> To Whom It May Concern:
->
-> I'm using Proxmox 7.3-4 and I have a CentOS 7.7.1908 VM that's able to
-> share data/files via Virtio-FS. That part is working fine.
->
-> However, if I try to export that VirtIO-FS "target" as a NFS export,
-> whenever my other computers connect to that NFS share, it will say that t=
-he
-> folders have stale NFS handles.
->
-> Is there a way to fix/resolve this?
->
-> Here is the output for /etc/exports:
->
-> /export *(rw,async,no_root_squash,no_all_squash,no_subtree_check,fsid=3D4=
-)
->
-> I have tried rebooting the clients multiple times, along with
-> mounting/unmounting said NFS share and it doesn't appear to make any
-> difference.
->
->
-Just to confirm, you want to share a folder using virtiofs with a VM, and
-then that VM running as an NFS server sharing that same folder over nfs, am
-I right?
-
-If that is the case, it's not possible (*) the NFS server requires
-persistent file handles that FUSE does not support.
-
-(*) I'm not sure, but IIRC Miklos said it could work if you disable the
-cache, so you can try running virtiofsd with `--cache=3Dnone` (let me know =
-if
-that work).
-
-
-
-
-> Your help is greatly appreciated.
->
-> Thank you.
->
-> Sincerely,
-> Ewen
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
->
-
-
---=20
-German
-
---000000000000ea26c205fbaa5fda
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div dir=3D"ltr">Hi Ewen,<br></div><br><div class=3D"gmail=
-_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Sun, May 14, 2023 at 9:49=
-=E2=80=AFAM Ewen Chan &lt;<a href=3D"mailto:alpha754293@hotmail.com">alpha7=
-54293@hotmail.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote"=
- style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);p=
-adding-left:1ex"><div class=3D"msg-1746489172721894038">
-
-
-
-
-<div dir=3D"ltr">
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-To Whom It May Concern:<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-<br>
-I&#39;m using Proxmox 7.3-4 and I have a CentOS 7.7.1908 VM that&#39;s able=
- to share data/files via Virtio-FS. That part is working fine.</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-However, if I try to export that VirtIO-FS &quot;target&quot; as a NFS expo=
-rt, whenever my other computers connect to that NFS share, it will say that=
- the folders have stale NFS handles.</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-Is there a way to fix/resolve this?</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-Here is the output for /etc/exports:</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-/export *(rw,async,no_root_squash,no_all_squash,no_subtree_check,fsid=3D4)<=
-/div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-<br>
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-I have tried rebooting the clients multiple times, along with mounting/unmo=
-unting said NFS share and it doesn&#39;t appear to make any difference.</di=
-v>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-<br></div></div></div></blockquote><div><br></div><div>Just to confirm, you=
- want to share a folder using virtiofs with a VM, and then that VM running =
-as an NFS server sharing that same folder over nfs, am I right?</div><div><=
-br></div><div>If that is the case, it&#39;s not possible (*) the NFS server=
- requires persistent file handles that FUSE does not support.</div><div><br=
-></div><div>(*) I&#39;m not sure, but IIRC Miklos said it could work if you=
- disable the cache, so you can try running virtiofsd with `--cache=3Dnone` =
-(let me know if that work).</div><div><br></div><div><br></div><div>=C2=A0<=
-/div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;bo=
-rder-left:1px solid rgb(204,204,204);padding-left:1ex"><div class=3D"msg-17=
-46489172721894038"><div dir=3D"ltr"><div style=3D"font-family:Calibri,Helve=
-tica,sans-serif;font-size:12pt;color:rgb(0,0,0)">
-</div>
-<div style=3D"font-family:Calibri,Helvetica,sans-serif;font-size:12pt;color=
-:rgb(0,0,0)">
-Your help is greatly appreciated.<br>
-<br>
-Thank you.<br>
-<br>
-Sincerely,<br>
-Ewen<br>
-</div>
-</div>
-
-_______________________________________________<br>
-Virtio-fs mailing list<br>
-<a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_blank">Virtio-fs@redhat.=
-com</a><br>
-<a href=3D"https://listman.redhat.com/mailman/listinfo/virtio-fs" rel=3D"no=
-referrer" target=3D"_blank">https://listman.redhat.com/mailman/listinfo/vir=
-tio-fs</a><br>
-</div></blockquote></div><br clear=3D"all"><br><span class=3D"gmail_signatu=
-re_prefix">-- </span><br><div dir=3D"ltr" class=3D"gmail_signature"><div di=
-r=3D"ltr">German<br></div></div></div>
-
---000000000000ea26c205fbaa5fda--
+diff --git a/include/hw/virtio/vhost-user-device.h b/include/hw/virtio/vhost-user-device.h
+new file mode 100644
+index 0000000000..9105011e25
+--- /dev/null
++++ b/include/hw/virtio/vhost-user-device.h
+@@ -0,0 +1,45 @@
++/*
++ * Vhost-user generic virtio device
++ *
++ * Copyright (c) 2023 Linaro Ltd
++ *
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ */
++
++#ifndef QEMU_VHOST_USER_DEVICE_H
++#define QEMU_VHOST_USER_DEVICE_H
++
++#include "hw/virtio/vhost.h"
++#include "hw/virtio/vhost-user.h"
++
++#define TYPE_VHOST_USER_BASE "vhost-user-base"
++
++OBJECT_DECLARE_TYPE(VHostUserBase, VHostUserBaseClass, VHOST_USER_BASE)
++
++struct VHostUserBase {
++    VirtIODevice parent;
++    /* Properties */
++    CharBackend chardev;
++    uint16_t virtio_id;
++    uint32_t num_vqs;
++    /* State tracking */
++    VhostUserState vhost_user;
++    struct vhost_virtqueue *vhost_vq;
++    struct vhost_dev vhost_dev;
++    GPtrArray *vqs;
++    bool connected;
++};
++
++    /* needed so we can use the base realize after specialisation
++       tweaks */
++struct VHostUserBaseClass {
++    /*< private >*/
++    VirtioDeviceClass parent_class;
++    /*< public >*/
++    DeviceRealize parent_realize;
++};
++
++/* shared for the benefit of the derived pci class */
++#define TYPE_VHOST_USER_DEVICE "vhost-user-device"
++
++#endif /* QEMU_VHOST_USER_DEVICE_H */
+diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
+new file mode 100644
+index 0000000000..b0239fa033
+--- /dev/null
++++ b/hw/virtio/vhost-user-device.c
+@@ -0,0 +1,324 @@
++/*
++ * Generic vhost-user stub. This can be used to connect to any
++ * vhost-user backend. All configuration details must be handled by
++ * the vhost-user daemon itself
++ *
++ * Copyright (c) 2023 Linaro Ltd
++ * Author: Alex Bennée <alex.bennee@linaro.org>
++ *
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ */
++
++#include "qemu/osdep.h"
++#include "qapi/error.h"
++#include "hw/qdev-properties.h"
++#include "hw/virtio/virtio-bus.h"
++#include "hw/virtio/vhost-user-device.h"
++#include "qemu/error-report.h"
++
++static void vub_start(VirtIODevice *vdev)
++{
++    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
++    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    int ret, i;
++
++    if (!k->set_guest_notifiers) {
++        error_report("binding does not support guest notifiers");
++        return;
++    }
++
++    ret = vhost_dev_enable_notifiers(&vub->vhost_dev, vdev);
++    if (ret < 0) {
++        error_report("Error enabling host notifiers: %d", -ret);
++        return;
++    }
++
++    ret = k->set_guest_notifiers(qbus->parent, vub->vhost_dev.nvqs, true);
++    if (ret < 0) {
++        error_report("Error binding guest notifier: %d", -ret);
++        goto err_host_notifiers;
++    }
++
++    vub->vhost_dev.acked_features = vdev->guest_features;
++
++    ret = vhost_dev_start(&vub->vhost_dev, vdev, true);
++    if (ret < 0) {
++        error_report("Error starting vhost-user-device: %d", -ret);
++        goto err_guest_notifiers;
++    }
++
++    /*
++     * guest_notifier_mask/pending not used yet, so just unmask
++     * everything here. virtio-pci will do the right thing by
++     * enabling/disabling irqfd.
++     */
++    for (i = 0; i < vub->vhost_dev.nvqs; i++) {
++        vhost_virtqueue_mask(&vub->vhost_dev, vdev, i, false);
++    }
++
++    return;
++
++err_guest_notifiers:
++    k->set_guest_notifiers(qbus->parent, vub->vhost_dev.nvqs, false);
++err_host_notifiers:
++    vhost_dev_disable_notifiers(&vub->vhost_dev, vdev);
++}
++
++static void vub_stop(VirtIODevice *vdev)
++{
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
++    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
++    int ret;
++
++    if (!k->set_guest_notifiers) {
++        return;
++    }
++
++    vhost_dev_stop(&vub->vhost_dev, vdev, true);
++
++    ret = k->set_guest_notifiers(qbus->parent, vub->vhost_dev.nvqs, false);
++    if (ret < 0) {
++        error_report("vhost guest notifier cleanup failed: %d", ret);
++        return;
++    }
++
++    vhost_dev_disable_notifiers(&vub->vhost_dev, vdev);
++}
++
++static void vub_set_status(VirtIODevice *vdev, uint8_t status)
++{
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    bool should_start = virtio_device_should_start(vdev, status);
++
++    if (vhost_dev_is_started(&vub->vhost_dev) == should_start) {
++        return;
++    }
++
++    if (should_start) {
++        vub_start(vdev);
++    } else {
++        vub_stop(vdev);
++    }
++}
++
++/*
++ * For an implementation where everything is delegated to the backend
++ * we don't do anything other than return the full feature set offered
++ * by the daemon (module the reserved feature bit).
++ */
++static uint64_t vub_get_features(VirtIODevice *vdev,
++                                 uint64_t requested_features, Error **errp)
++{
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    /* This should be set when the vhost connection initialises */
++    g_assert(vub->vhost_dev.features);
++    return vub->vhost_dev.features & ~(1ULL << VHOST_USER_F_PROTOCOL_FEATURES);
++}
++
++static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)
++{
++    /*
++     * Not normally called; it's the daemon that handles the queue;
++     * however virtio's cleanup path can call this.
++     */
++}
++
++static void do_vhost_user_cleanup(VirtIODevice *vdev, VHostUserBase *vub)
++{
++    vhost_user_cleanup(&vub->vhost_user);
++
++    for (int i = 0; i < vub->num_vqs; i++) {
++        VirtQueue *vq = g_ptr_array_index(vub->vqs, i);
++        virtio_delete_queue(vq);
++    }
++
++    virtio_cleanup(vdev);
++}
++
++static int vub_connect(DeviceState *dev)
++{
++    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++
++    if (vub->connected) {
++        return 0;
++    }
++    vub->connected = true;
++
++    /* restore vhost state */
++    if (virtio_device_started(vdev, vdev->status)) {
++        vub_start(vdev);
++    }
++
++    return 0;
++}
++
++static void vub_disconnect(DeviceState *dev)
++{
++    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++
++    if (!vub->connected) {
++        return;
++    }
++    vub->connected = false;
++
++    if (vhost_dev_is_started(&vub->vhost_dev)) {
++        vub_stop(vdev);
++    }
++}
++
++static void vub_event(void *opaque, QEMUChrEvent event)
++{
++    DeviceState *dev = opaque;
++    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++
++    switch (event) {
++    case CHR_EVENT_OPENED:
++        if (vub_connect(dev) < 0) {
++            qemu_chr_fe_disconnect(&vub->chardev);
++            return;
++        }
++        break;
++    case CHR_EVENT_CLOSED:
++        vub_disconnect(dev);
++        break;
++    case CHR_EVENT_BREAK:
++    case CHR_EVENT_MUX_IN:
++    case CHR_EVENT_MUX_OUT:
++        /* Ignore */
++        break;
++    }
++}
++
++static void vub_device_realize(DeviceState *dev, Error **errp)
++{
++    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
++    VHostUserBase *vub = VHOST_USER_BASE(dev);
++    int ret;
++
++    if (!vub->chardev.chr) {
++        error_setg(errp, "vhost-user-device: missing chardev");
++        return;
++    }
++
++    if (!vub->virtio_id) {
++        error_setg(errp, "vhost-user-device: need to define device id");
++        return;
++    }
++
++    if (!vub->num_vqs) {
++        vub->num_vqs = 1; /* reasonable default? */
++    }
++
++    if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
++        return;
++    }
++
++    virtio_init(vdev, vub->virtio_id, 0);
++
++    /*
++     * Disable guest notifiers, by default all notifications will be via the
++     * asynchronous vhost-user socket.
++     */
++    vdev->use_guest_notifier_mask = false;
++
++    /* Allocate queues */
++    vub->vqs = g_ptr_array_sized_new(vub->num_vqs);
++    for (int i = 0; i < vub->num_vqs; i++) {
++        g_ptr_array_add(vub->vqs,
++                        virtio_add_queue(vdev, 4, vub_handle_output));
++    }
++
++    vub->vhost_dev.nvqs = vub->num_vqs;
++    vub->vhost_dev.vqs = g_new0(struct vhost_virtqueue, vub->vhost_dev.nvqs);
++
++    /* connect to backend */
++    ret = vhost_dev_init(&vub->vhost_dev, &vub->vhost_user,
++                         VHOST_BACKEND_TYPE_USER, 0, errp);
++
++    if (ret < 0) {
++        do_vhost_user_cleanup(vdev, vub);
++    }
++
++    qemu_chr_fe_set_handlers(&vub->chardev, NULL, NULL, vub_event, NULL,
++                             dev, NULL, true);
++}
++
++static void vub_device_unrealize(DeviceState *dev)
++{
++    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
++    VHostUserBase *vub = VHOST_USER_BASE(dev);
++    struct vhost_virtqueue *vhost_vqs = vub->vhost_dev.vqs;
++
++    /* This will stop vhost backend if appropriate. */
++    vub_set_status(vdev, 0);
++    vhost_dev_cleanup(&vub->vhost_dev);
++    g_free(vhost_vqs);
++    do_vhost_user_cleanup(vdev, vub);
++}
++
++static void vub_class_init(ObjectClass *klass, void *data)
++{
++    VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
++
++    vdc->realize = vub_device_realize;
++    vdc->unrealize = vub_device_unrealize;
++    vdc->get_features = vub_get_features;
++    vdc->set_status = vub_set_status;
++}
++
++static const TypeInfo vub_info = {
++    .name = TYPE_VHOST_USER_BASE,
++    .parent = TYPE_VIRTIO_DEVICE,
++    .instance_size = sizeof(VHostUserBase),
++    .class_init = vub_class_init,
++    .class_size = sizeof(VHostUserBaseClass),
++    .abstract = true
++};
++
++
++/*
++ * The following is a concrete implementation of the base class which
++ * allows the user to define the key parameters via the command line.
++ */
++
++static const VMStateDescription vud_vmstate = {
++    .name = "vhost-user-device",
++    .unmigratable = 1,
++};
++
++static Property vud_properties[] = {
++    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
++    DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
++    DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
++    DEFINE_PROP_END_OF_LIST(),
++};
++
++static void vud_class_init(ObjectClass *klass, void *data)
++{
++    DeviceClass *dc = DEVICE_CLASS(klass);
++
++    device_class_set_props(dc, vud_properties);
++    dc->vmsd = &vud_vmstate;
++    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
++}
++
++static const TypeInfo vud_info = {
++    .name = TYPE_VHOST_USER_DEVICE,
++    .parent = TYPE_VHOST_USER_BASE,
++    .instance_size = sizeof(VHostUserBase),
++    .class_init = vud_class_init,
++    .class_size = sizeof(VHostUserBaseClass),
++};
++
++static void vu_register_types(void)
++{
++    type_register_static(&vub_info);
++    type_register_static(&vud_info);
++}
++
++type_init(vu_register_types)
+diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
+index bdec78bfc6..43e5fa3f7d 100644
+--- a/hw/virtio/meson.build
++++ b/hw/virtio/meson.build
+@@ -10,7 +10,9 @@ specific_virtio_ss.add(files('virtio-config-io.c', 'virtio-qmp.c'))
+ if have_vhost
+   specific_virtio_ss.add(files('vhost.c', 'vhost-backend.c', 'vhost-iova-tree.c'))
+   if have_vhost_user
++    # fixme - this really should be generic
+     specific_virtio_ss.add(files('vhost-user.c'))
++    softmmu_virtio_ss.add(files('vhost-user-device.c'))
+   endif
+   if have_vhost_vdpa
+     specific_virtio_ss.add(files('vhost-vdpa.c', 'vhost-shadow-virtqueue.c'))
+-- 
+2.39.2
 

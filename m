@@ -1,28 +1,25 @@
-Return-Path: <erik.schilling@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681806538; x=1684398538;
- h=content-transfer-encoding:in-reply-to:from:content-language
- :references:cc:to:subject:user-agent:mime-version:date:message-id
- :from:to:cc:subject:date:message-id:reply-to;
- bh=6LvL0HsH/Rp4XNBniooL+fT0q3eCcuW4TJf74hsB+UU=;
- b=tpvHp4P3i1pNUlJOM+WWz8eSl1PGnh64bSGuafTYqIe5fCaoVel09SiviDC3EsvNAF
- U269F/12iiR7a7hmdOsrP8TVNc33A7gAhczSGTdYvRRDJfNL3VhY8VQrQnLqzxJE7p4f
- 8SWU+zCJPrkfmCkiV3qJWrDWprXoSzKdzGLRbkcs70cKjGbPRouH098Xan7r1uxngq0Q
- kPKu9F2r5NnjQy9EzY61/ItudGo9w28vjZdm65PC8i7ZWPNdx16O8uupg6y9ArIIlaD3
- 1uUmB1jQit2LpZjOE7QCQt6NDNUV2falvY/eNyxSg8UKj+5gFdSiLN9hjOKdsy1tvyTL
- TQ4A==
-Message-ID: <650bf2ae-20b9-a5fa-3342-c069f680ddd7@linaro.org>
-Date: Tue, 18 Apr 2023 10:28:56 +0200
+Return-Path: <eperezma@redhat.com>
 MIME-Version: 1.0
-References: <20230414160433.2096866-1-alex.bennee@linaro.org>
- <20230414160433.2096866-7-alex.bennee@linaro.org>
-From: Erik Schilling <erik.schilling@linaro.org>
-In-Reply-To: <20230414160433.2096866-7-alex.bennee@linaro.org>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 06/12] virtio: add PCI stub for
- vhost-user-device
+References: <20230411150515.14020-1-hreitz@redhat.com>
+ <20230411150515.14020-3-hreitz@redhat.com>
+ <20230412210641.GC2813183@fedora>
+ <246691c3-2287-7472-3615-7ec0f074445c@redhat.com>
+ <CAJSP0QU-iDTT+xtkZ_xRf4vX+hM0WY+H1SXSuyS+cjiogz3A_A@mail.gmail.com>
+ <b0cd4f54-94ed-09a4-cec2-e81f36da4008@redhat.com>
+ <CAJaqyWegMfuc8s6bKdxdM4uVixmhy-F3xUUyOCYS1yGDXoiVZA@mail.gmail.com>
+ <20230417151840.GD3852722@fedora>
+ <CAJaqyWeTBXStyxty4G5qpiG=UoZkmOmr75hHaC3H21kJfK=idg@mail.gmail.com>
+ <CAJSP0QWmFgJvVPLDo2eoFapj8GCmDjaaEygAaywZwHuH=_q=rQ@mail.gmail.com>
+ <CAJaqyWd122pfv4XMzQhju7a5DV3FwbXvbedh1Z9s6T5Pw4a0GQ@mail.gmail.com>
+ <CAJSP0QWhivOnFmmkBoZkxui6xbUVjs3oEUc3-QwPN2V3d7t9rg@mail.gmail.com>
+In-Reply-To: <CAJSP0QWhivOnFmmkBoZkxui6xbUVjs3oEUc3-QwPN2V3d7t9rg@mail.gmail.com>
+From: Eugenio Perez Martin <eperezma@redhat.com>
+Date: Tue, 18 Apr 2023 12:09:23 +0200
+Message-ID: <CAJaqyWe_CyPHMj8bvr7x0T+nRuPjQA1FSHzdFqbpaJfhHbUhEw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
+ state transfer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,21 +28,86 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, qemu-devel@nongnu.org
-Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>, =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Markus Armbruster <armbru@redhat.com>
+To: Stefan Hajnoczi <stefanha@gmail.com>
+Cc: Stefan Hajnoczi <stefanha@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
+On Mon, Apr 17, 2023 at 9:46=E2=80=AFPM Stefan Hajnoczi <stefanha@gmail.com=
+> wrote:
+>
+> On Mon, 17 Apr 2023 at 15:12, Eugenio Perez Martin <eperezma@redhat.com> =
+wrote:
+> >
+> > On Mon, Apr 17, 2023 at 9:08=E2=80=AFPM Stefan Hajnoczi <stefanha@gmail=
+.com> wrote:
+> > >
+> > > On Mon, 17 Apr 2023 at 14:56, Eugenio Perez Martin <eperezma@redhat.c=
+om> wrote:
+> > > >
+> > > > On Mon, Apr 17, 2023 at 5:18=E2=80=AFPM Stefan Hajnoczi <stefanha@r=
+edhat.com> wrote:
+> > > > >
+> > > > > On Fri, Apr 14, 2023 at 05:17:02PM +0200, Eugenio Perez Martin wr=
+ote:
+> > > > > > On Thu, Apr 13, 2023 at 7:55=E2=80=AFPM Hanna Czenczek <hreitz@=
+redhat.com> wrote:
+> > > > > > >
+> > > > > > > On 13.04.23 13:38, Stefan Hajnoczi wrote:
+> > > > > > > > On Thu, 13 Apr 2023 at 05:24, Hanna Czenczek <hreitz@redhat=
+.com> wrote:
+> > > > > > > >> On 12.04.23 23:06, Stefan Hajnoczi wrote:
+> > > > > > > >>> On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek =
+wrote:
+> > > > > > > Basically, what I=E2=80=99m hearing is that I need to impleme=
+nt a different
+> > > > > > > feature that has no practical impact right now, and also fix =
+bugs around
+> > > > > > > it along the way...
+> > > > > > >
+> > > > > >
+> > > > > > To fix this properly requires iterative device migration in qem=
+u as
+> > > > > > far as I know, instead of using VMStates [1]. This way the stat=
+e is
+> > > > > > requested to virtiofsd before the device reset.
+> > > > >
+> > > > > I don't follow. Many devices are fine with non-iterative migratio=
+n. They
+> > > > > shouldn't be forced to do iterative migration.
+> > > > >
+> > > >
+> > > > Sorry I think I didn't express myself well. I didn't mean to force
+> > > > virtiofsd to support the iterative migration, but to use the device
+> > > > iterative migration API in QEMU to send the needed commands before
+> > > > vhost_dev_stop. In that regard, the device or the vhost-user comman=
+ds
+> > > > would not require changes.
+> > > >
+> > > > I think it is convenient in the long run for virtiofsd, as if the
+> > > > state grows so much that it's not feasible to fetch it in one shot
+> > > > there is no need to make changes in the qemu migration protocol. I
+> > > > think it is not unlikely in virtiofs, but maybe I'm missing somethi=
+ng
+> > > > obvious and it's state will never grow.
+> > >
+> > > I don't understand. vCPUs are still running at that point and the
+> > > device state could change. It's not safe to save the full device stat=
+e
+> > > until vCPUs have stopped (after vhost_dev_stop).
+> > >
+> >
+> > I think the vCPU is already stopped at save_live_complete_precopy
+> > callback. Maybe my understanding is wrong?
+>
+> Agreed, vCPUs are stopped in save_live_complete_precopy(). However,
+> you wrote "use the device iterative migration API in QEMU to send the
+> needed commands before vhost_dev_stop". save_live_complete_precopy()
+> runs after vhost_dev_stop() so it doesn't seem to solve the problem.
+>
 
+You're right, and it actually makes the most sense.
 
-On 4/14/23 18:04, Alex Bennée wrote:
-> This is all pretty much boilerplate.
-> 
-> Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
-Tested-by: Erik Schilling <erik.schilling@linaro.org>
+So I guess this converges with the other thread, let's follow the
+discussion there.
 
-Tested with d6f9fb0 of a rust-vmm SCSI device [1] and -device 
-vhost-user-device-pci,virtio-id=8,num_vqs=3,config_size=36,chardev=vus
-
-[1] https://github.com/rust-vmm/vhost-device/pull/301
-
-- Erik
+Thanks!
 

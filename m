@@ -1,26 +1,22 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681834906; x=1684426906;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=x87bue2xLVWQrfVBSyRRYhA/dy43njxINkH3kP9vb3k=;
- b=EHRQv7Ju6LENPKauwKEtqNkE2betd0pLn4ZbmX+uOKT0XmzMfyuK0xuf6q4uvaGaK4
- YXj0rT8dWBkUUyO8KAgEktHYo2iAeQsqAmDgY8xsC1LbPTYwNA7AYCcjzJQbMKZPQyMh
- CRGHIQY22jpFqROaBjWVzmt6hBYVikpGQ4K7DO+i7WcyK7C/J7a1alSViAn3Y9DpAoU4
- 5mvNPW0I2BmAjh/IlO6nrcF8fuYD94TpYrWCDwvSaLe5tL7GVq/mu/p72K32I5+SXQO3
- vxQbc36zjkpYBJYoxvInbLzcak00sf3qRwXyiURyR97COHHFf9Ti/dpfJl4BmFCtrwPb
- Wp6A==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Tue, 18 Apr 2023 17:21:39 +0100
-Message-Id: <20230418162140.373219-13-alex.bennee@linaro.org>
-In-Reply-To: <20230418162140.373219-1-alex.bennee@linaro.org>
-References: <20230418162140.373219-1-alex.bennee@linaro.org>
+Return-Path: <stefanha@redhat.com>
+Date: Tue, 18 Apr 2023 13:59:24 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20230418175924.GB4041499@fedora>
+References: <20230411150515.14020-1-hreitz@redhat.com>
+ <20230411150515.14020-3-hreitz@redhat.com>
+ <20230412210641.GC2813183@fedora>
+ <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
+ <20230417153810.GE3852722@fedora>
+ <CAJaqyWePM_a7AafP9qS40hmYXKHDyMsvn5g24zk=cH8L6s-kUw@mail.gmail.com>
+ <CAJSP0QWUfxzad3EmT3r1hhaWmXDQt9Nj1LRPhPs_w79S9GAb1A@mail.gmail.com>
+ <CAJaqyWfaDVZDJtMvPUhdRE283e80rB3WFd3RF9i=buaBYG=PKA@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 12/13] hw/virtio: derive vhost-user-i2c from
- vhost-user-base
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="f4K8DwKKP2BtL63k"
+Content-Disposition: inline
+In-Reply-To: <CAJaqyWfaDVZDJtMvPUhdRE283e80rB3WFd3RF9i=buaBYG=PKA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
+ state transfer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,376 +25,299 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Jason Wang <jasowang@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Gerd Hoffmann <kraxel@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>
+To: Eugenio Perez Martin <eperezma@redhat.com>
+Cc: Stefan Hajnoczi <stefanha@gmail.com>, Hanna Czenczek <hreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-Now we can take advantage of the new base class and make
-vhost-user-i2c a much simpler boilerplate wrapper. Also as this
-doesn't require any target specific hacks we only need to build the
-stubs once.
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+--f4K8DwKKP2BtL63k
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
----
-v2
-  - update to new inheritance scheme
-  - move build to common code
----
- include/hw/virtio/vhost-user-i2c.h |  18 +-
- hw/virtio/vhost-user-i2c.c         | 255 ++---------------------------
- hw/virtio/meson.build              |   5 +-
- 3 files changed, 26 insertions(+), 252 deletions(-)
+On Tue, Apr 18, 2023 at 10:09:30AM +0200, Eugenio Perez Martin wrote:
+> On Mon, Apr 17, 2023 at 9:33=E2=80=AFPM Stefan Hajnoczi <stefanha@gmail.c=
+om> wrote:
+> >
+> > On Mon, 17 Apr 2023 at 15:10, Eugenio Perez Martin <eperezma@redhat.com=
+> wrote:
+> > >
+> > > On Mon, Apr 17, 2023 at 5:38=E2=80=AFPM Stefan Hajnoczi <stefanha@red=
+hat.com> wrote:
+> > > >
+> > > > On Thu, Apr 13, 2023 at 12:14:24PM +0200, Eugenio Perez Martin wrot=
+e:
+> > > > > On Wed, Apr 12, 2023 at 11:06=E2=80=AFPM Stefan Hajnoczi <stefanh=
+a@redhat.com> wrote:
+> > > > > >
+> > > > > > On Tue, Apr 11, 2023 at 05:05:13PM +0200, Hanna Czenczek wrote:
+> > > > > > > So-called "internal" virtio-fs migration refers to transporti=
+ng the
+> > > > > > > back-end's (virtiofsd's) state through qemu's migration strea=
+m.  To do
+> > > > > > > this, we need to be able to transfer virtiofsd's internal sta=
+te to and
+> > > > > > > from virtiofsd.
+> > > > > > >
+> > > > > > > Because virtiofsd's internal state will not be too large, we =
+believe it
+> > > > > > > is best to transfer it as a single binary blob after the stre=
+aming
+> > > > > > > phase.  Because this method should be useful to other vhost-u=
+ser
+> > > > > > > implementations, too, it is introduced as a general-purpose a=
+ddition to
+> > > > > > > the protocol, not limited to vhost-user-fs.
+> > > > > > >
+> > > > > > > These are the additions to the protocol:
+> > > > > > > - New vhost-user protocol feature VHOST_USER_PROTOCOL_F_MIGRA=
+TORY_STATE:
+> > > > > > >   This feature signals support for transferring state, and is=
+ added so
+> > > > > > >   that migration can fail early when the back-end has no supp=
+ort.
+> > > > > > >
+> > > > > > > - SET_DEVICE_STATE_FD function: Front-end and back-end negoti=
+ate a pipe
+> > > > > > >   over which to transfer the state.  The front-end sends an F=
+D to the
+> > > > > > >   back-end into/from which it can write/read its state, and t=
+he back-end
+> > > > > > >   can decide to either use it, or reply with a different FD f=
+or the
+> > > > > > >   front-end to override the front-end's choice.
+> > > > > > >   The front-end creates a simple pipe to transfer the state, =
+but maybe
+> > > > > > >   the back-end already has an FD into/from which it has to wr=
+ite/read
+> > > > > > >   its state, in which case it will want to override the simpl=
+e pipe.
+> > > > > > >   Conversely, maybe in the future we find a way to have the f=
+ront-end
+> > > > > > >   get an immediate FD for the migration stream (in some cases=
+), in which
+> > > > > > >   case we will want to send this to the back-end instead of c=
+reating a
+> > > > > > >   pipe.
+> > > > > > >   Hence the negotiation: If one side has a better idea than a=
+ plain
+> > > > > > >   pipe, we will want to use that.
+> > > > > > >
+> > > > > > > - CHECK_DEVICE_STATE: After the state has been transferred th=
+rough the
+> > > > > > >   pipe (the end indicated by EOF), the front-end invokes this=
+ function
+> > > > > > >   to verify success.  There is no in-band way (through the pi=
+pe) to
+> > > > > > >   indicate failure, so we need to check explicitly.
+> > > > > > >
+> > > > > > > Once the transfer pipe has been established via SET_DEVICE_ST=
+ATE_FD
+> > > > > > > (which includes establishing the direction of transfer and mi=
+gration
+> > > > > > > phase), the sending side writes its data into the pipe, and t=
+he reading
+> > > > > > > side reads it until it sees an EOF.  Then, the front-end will=
+ check for
+> > > > > > > success via CHECK_DEVICE_STATE, which on the destination side=
+ includes
+> > > > > > > checking for integrity (i.e. errors during deserialization).
+> > > > > > >
+> > > > > > > Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > > > > > > Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> > > > > > > ---
+> > > > > > >  include/hw/virtio/vhost-backend.h |  24 +++++
+> > > > > > >  include/hw/virtio/vhost.h         |  79 ++++++++++++++++
+> > > > > > >  hw/virtio/vhost-user.c            | 147 ++++++++++++++++++++=
+++++++++++
+> > > > > > >  hw/virtio/vhost.c                 |  37 ++++++++
+> > > > > > >  4 files changed, 287 insertions(+)
+> > > > > > >
+> > > > > > > diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/v=
+irtio/vhost-backend.h
+> > > > > > > index ec3fbae58d..5935b32fe3 100644
+> > > > > > > --- a/include/hw/virtio/vhost-backend.h
+> > > > > > > +++ b/include/hw/virtio/vhost-backend.h
+> > > > > > > @@ -26,6 +26,18 @@ typedef enum VhostSetConfigType {
+> > > > > > >      VHOST_SET_CONFIG_TYPE_MIGRATION =3D 1,
+> > > > > > >  } VhostSetConfigType;
+> > > > > > >
+> > > > > > > +typedef enum VhostDeviceStateDirection {
+> > > > > > > +    /* Transfer state from back-end (device) to front-end */
+> > > > > > > +    VHOST_TRANSFER_STATE_DIRECTION_SAVE =3D 0,
+> > > > > > > +    /* Transfer state from front-end to back-end (device) */
+> > > > > > > +    VHOST_TRANSFER_STATE_DIRECTION_LOAD =3D 1,
+> > > > > > > +} VhostDeviceStateDirection;
+> > > > > > > +
+> > > > > > > +typedef enum VhostDeviceStatePhase {
+> > > > > > > +    /* The device (and all its vrings) is stopped */
+> > > > > > > +    VHOST_TRANSFER_STATE_PHASE_STOPPED =3D 0,
+> > > > > > > +} VhostDeviceStatePhase;
+> > > > > >
+> > > > > > vDPA has:
+> > > > > >
+> > > > > >   /* Suspend a device so it does not process virtqueue requests=
+ anymore
+> > > > > >    *
+> > > > > >    * After the return of ioctl the device must preserve all the=
+ necessary state
+> > > > > >    * (the virtqueue vring base plus the possible device specifi=
+c states) that is
+> > > > > >    * required for restoring in the future. The device must not =
+change its
+> > > > > >    * configuration after that point.
+> > > > > >    */
+> > > > > >   #define VHOST_VDPA_SUSPEND      _IO(VHOST_VIRTIO, 0x7D)
+> > > > > >
+> > > > > >   /* Resume a device so it can resume processing virtqueue requ=
+ests
+> > > > > >    *
+> > > > > >    * After the return of this ioctl the device will have restor=
+ed all the
+> > > > > >    * necessary states and it is fully operational to continue p=
+rocessing the
+> > > > > >    * virtqueue descriptors.
+> > > > > >    */
+> > > > > >   #define VHOST_VDPA_RESUME       _IO(VHOST_VIRTIO, 0x7E)
+> > > > > >
+> > > > > > I wonder if it makes sense to import these into vhost-user so t=
+hat the
+> > > > > > difference between kernel vhost and vhost-user is minimized. It=
+'s okay
+> > > > > > if one of them is ahead of the other, but it would be nice to a=
+void
+> > > > > > overlapping/duplicated functionality.
+> > > > > >
+> > > > >
+> > > > > That's what I had in mind in the first versions. I proposed VHOST=
+_STOP
+> > > > > instead of VHOST_VDPA_STOP for this very reason. Later it did cha=
+nge
+> > > > > to SUSPEND.
+> > > >
+> > > > I noticed QEMU only calls ioctl(VHOST_VDPA_SUSPEND) and not
+> > > > ioctl(VHOST_VDPA_RESUME).
+> > > >
+> > > > The doc comments in <linux/vdpa.h> don't explain how the device can
+> > > > leave the suspended state. Can you clarify this?
+> > > >
+> > >
+> > > Do you mean in what situations or regarding the semantics of _RESUME?
+> > >
+> > > To me resume is an operation mainly to resume the device in the event
+> > > of a VM suspension, not a migration. It can be used as a fallback code
+> > > in some cases of migration failure though, but it is not currently
+> > > used in qemu.
+> >
+> > Is a "VM suspension" the QEMU HMP 'stop' command?
+> >
+> > I guess the reason why QEMU doesn't call RESUME anywhere is that it
+> > resets the device in vhost_dev_stop()?
+> >
+>=20
+> The actual reason for not using RESUME is that the ioctl was added
+> after the SUSPEND design in qemu. Same as this proposal, it is was not
+> needed at the time.
+>=20
+> In the case of vhost-vdpa net, the only usage of suspend is to fetch
+> the vq indexes, and in case of error vhost already fetches them from
+> guest's used ring way before vDPA, so it has little usage.
+>=20
+> > Does it make sense to combine SUSPEND and RESUME with Hanna's
+> > SET_DEVICE_STATE_FD? For example, non-iterative migration works like
+> > this:
+> > - Saving the device's state is done by SUSPEND followed by
+> > SET_DEVICE_STATE_FD. If the guest needs to continue executing (e.g.
+> > savevm command or migration failed), then RESUME is called to
+> > continue.
+>=20
+> I think the previous steps make sense at vhost_dev_stop, not virtio
+> savevm handlers. To start spreading this logic to more places of qemu
+> can bring confusion.
 
-diff --git a/include/hw/virtio/vhost-user-i2c.h b/include/hw/virtio/vhost-user-i2c.h
-index 0f7acd40e3..47153782d1 100644
---- a/include/hw/virtio/vhost-user-i2c.h
-+++ b/include/hw/virtio/vhost-user-i2c.h
-@@ -12,20 +12,18 @@
- #include "hw/virtio/vhost.h"
- #include "hw/virtio/vhost-user.h"
- 
-+#include "hw/virtio/virtio.h"
-+#include "hw/virtio/vhost.h"
-+#include "hw/virtio/vhost-user.h"
-+#include "hw/virtio/vhost-user-device.h"
-+
- #define TYPE_VHOST_USER_I2C "vhost-user-i2c-device"
- OBJECT_DECLARE_SIMPLE_TYPE(VHostUserI2C, VHOST_USER_I2C)
- 
- struct VHostUserI2C {
--    VirtIODevice parent;
--    CharBackend chardev;
--    struct vhost_virtqueue *vhost_vq;
--    struct vhost_dev vhost_dev;
--    VhostUserState vhost_user;
--    VirtQueue *vq;
--    bool connected;
-+    /*< private >*/
-+    VHostUserBase parent;
-+    /*< public >*/
- };
- 
--/* Virtio Feature bits */
--#define VIRTIO_I2C_F_ZERO_LENGTH_REQUEST		0
--
- #endif /* QEMU_VHOST_USER_I2C_H */
-diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
-index 60eaf0d95b..4a1f644a87 100644
---- a/hw/virtio/vhost-user-i2c.c
-+++ b/hw/virtio/vhost-user-i2c.c
-@@ -14,237 +14,21 @@
- #include "qemu/error-report.h"
- #include "standard-headers/linux/virtio_ids.h"
- 
--static const int feature_bits[] = {
--    VIRTIO_I2C_F_ZERO_LENGTH_REQUEST,
--    VIRTIO_F_RING_RESET,
--    VHOST_INVALID_FEATURE_BIT
-+static Property vi2c_properties[] = {
-+    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
-+    DEFINE_PROP_END_OF_LIST(),
- };
- 
--static void vu_i2c_start(VirtIODevice *vdev)
--{
--    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
--    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--    int ret, i;
--
--    if (!k->set_guest_notifiers) {
--        error_report("binding does not support guest notifiers");
--        return;
--    }
--
--    ret = vhost_dev_enable_notifiers(&i2c->vhost_dev, vdev);
--    if (ret < 0) {
--        error_report("Error enabling host notifiers: %d", -ret);
--        return;
--    }
--
--    ret = k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, true);
--    if (ret < 0) {
--        error_report("Error binding guest notifier: %d", -ret);
--        goto err_host_notifiers;
--    }
--
--    i2c->vhost_dev.acked_features = vdev->guest_features;
--
--    ret = vhost_dev_start(&i2c->vhost_dev, vdev, true);
--    if (ret < 0) {
--        error_report("Error starting vhost-user-i2c: %d", -ret);
--        goto err_guest_notifiers;
--    }
--
--    /*
--     * guest_notifier_mask/pending not used yet, so just unmask
--     * everything here. virtio-pci will do the right thing by
--     * enabling/disabling irqfd.
--     */
--    for (i = 0; i < i2c->vhost_dev.nvqs; i++) {
--        vhost_virtqueue_mask(&i2c->vhost_dev, vdev, i, false);
--    }
--
--    return;
--
--err_guest_notifiers:
--    k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, false);
--err_host_notifiers:
--    vhost_dev_disable_notifiers(&i2c->vhost_dev, vdev);
--}
--
--static void vu_i2c_stop(VirtIODevice *vdev)
--{
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
--    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
--    int ret;
--
--    if (!k->set_guest_notifiers) {
--        return;
--    }
--
--    vhost_dev_stop(&i2c->vhost_dev, vdev, true);
--
--    ret = k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, false);
--    if (ret < 0) {
--        error_report("vhost guest notifier cleanup failed: %d", ret);
--        return;
--    }
--
--    vhost_dev_disable_notifiers(&i2c->vhost_dev, vdev);
--}
--
--static void vu_i2c_set_status(VirtIODevice *vdev, uint8_t status)
--{
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--    bool should_start = virtio_device_should_start(vdev, status);
--
--    if (vhost_dev_is_started(&i2c->vhost_dev) == should_start) {
--        return;
--    }
--
--    if (should_start) {
--        vu_i2c_start(vdev);
--    } else {
--        vu_i2c_stop(vdev);
--    }
--}
--
--static uint64_t vu_i2c_get_features(VirtIODevice *vdev,
--                                    uint64_t requested_features, Error **errp)
--{
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--
--    virtio_add_feature(&requested_features, VIRTIO_I2C_F_ZERO_LENGTH_REQUEST);
--    return vhost_get_features(&i2c->vhost_dev, feature_bits, requested_features);
--}
--
--static void vu_i2c_handle_output(VirtIODevice *vdev, VirtQueue *vq)
--{
--    /*
--     * Not normally called; it's the daemon that handles the queue;
--     * however virtio's cleanup path can call this.
--     */
--}
--
--static void vu_i2c_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
--{
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--
--    vhost_virtqueue_mask(&i2c->vhost_dev, vdev, idx, mask);
--}
--
--static bool vu_i2c_guest_notifier_pending(VirtIODevice *vdev, int idx)
--{
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--
--    return vhost_virtqueue_pending(&i2c->vhost_dev, idx);
--}
--
--static void do_vhost_user_cleanup(VirtIODevice *vdev, VHostUserI2C *i2c)
--{
--    vhost_user_cleanup(&i2c->vhost_user);
--    virtio_delete_queue(i2c->vq);
--    virtio_cleanup(vdev);
--}
--
--static int vu_i2c_connect(DeviceState *dev)
--{
--    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--
--    if (i2c->connected) {
--        return 0;
--    }
--    i2c->connected = true;
--
--    /* restore vhost state */
--    if (virtio_device_started(vdev, vdev->status)) {
--        vu_i2c_start(vdev);
--    }
--
--    return 0;
--}
--
--static void vu_i2c_disconnect(DeviceState *dev)
--{
--    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--
--    if (!i2c->connected) {
--        return;
--    }
--    i2c->connected = false;
--
--    if (vhost_dev_is_started(&i2c->vhost_dev)) {
--        vu_i2c_stop(vdev);
--    }
--}
--
--static void vu_i2c_event(void *opaque, QEMUChrEvent event)
-+static void vi2c_realize(DeviceState *dev, Error **errp)
- {
--    DeviceState *dev = opaque;
--    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
--    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
--
--    switch (event) {
--    case CHR_EVENT_OPENED:
--        if (vu_i2c_connect(dev) < 0) {
--            qemu_chr_fe_disconnect(&i2c->chardev);
--            return;
--        }
--        break;
--    case CHR_EVENT_CLOSED:
--        vu_i2c_disconnect(dev);
--        break;
--    case CHR_EVENT_BREAK:
--    case CHR_EVENT_MUX_IN:
--    case CHR_EVENT_MUX_OUT:
--        /* Ignore */
--        break;
--    }
--}
--
--static void vu_i2c_device_realize(DeviceState *dev, Error **errp)
--{
--    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
--    VHostUserI2C *i2c = VHOST_USER_I2C(dev);
--    int ret;
--
--    if (!i2c->chardev.chr) {
--        error_setg(errp, "vhost-user-i2c: missing chardev");
--        return;
--    }
--
--    if (!vhost_user_init(&i2c->vhost_user, &i2c->chardev, errp)) {
--        return;
--    }
--
--    virtio_init(vdev, VIRTIO_ID_I2C_ADAPTER, 0);
-+    VHostUserBase *vub = VHOST_USER_BASE(dev);
-+    VHostUserBaseClass *vubc = VHOST_USER_BASE_GET_CLASS(dev);
- 
--    i2c->vhost_dev.nvqs = 1;
--    i2c->vq = virtio_add_queue(vdev, 4, vu_i2c_handle_output);
--    i2c->vhost_dev.vqs = g_new0(struct vhost_virtqueue, i2c->vhost_dev.nvqs);
-+    /* Fixed for I2C */
-+    vub->virtio_id = VIRTIO_ID_I2C_ADAPTER;
-+    vub->num_vqs = 1;
- 
--    ret = vhost_dev_init(&i2c->vhost_dev, &i2c->vhost_user,
--                         VHOST_BACKEND_TYPE_USER, 0, errp);
--    if (ret < 0) {
--        g_free(i2c->vhost_dev.vqs);
--        do_vhost_user_cleanup(vdev, i2c);
--    }
--
--    qemu_chr_fe_set_handlers(&i2c->chardev, NULL, NULL, vu_i2c_event, NULL,
--                             dev, NULL, true);
--}
--
--static void vu_i2c_device_unrealize(DeviceState *dev)
--{
--    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
--    VHostUserI2C *i2c = VHOST_USER_I2C(dev);
--    struct vhost_virtqueue *vhost_vqs = i2c->vhost_dev.vqs;
--
--    /* This will stop vhost backend if appropriate. */
--    vu_i2c_set_status(vdev, 0);
--    vhost_dev_cleanup(&i2c->vhost_dev);
--    g_free(vhost_vqs);
--    do_vhost_user_cleanup(vdev, i2c);
-+    vubc->parent_realize(dev, errp);
- }
- 
- static const VMStateDescription vu_i2c_vmstate = {
-@@ -252,30 +36,21 @@ static const VMStateDescription vu_i2c_vmstate = {
-     .unmigratable = 1,
- };
- 
--static Property vu_i2c_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserI2C, chardev),
--    DEFINE_PROP_END_OF_LIST(),
--};
--
- static void vu_i2c_class_init(ObjectClass *klass, void *data)
- {
-     DeviceClass *dc = DEVICE_CLASS(klass);
--    VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
-+    VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
- 
--    device_class_set_props(dc, vu_i2c_properties);
-     dc->vmsd = &vu_i2c_vmstate;
-+    device_class_set_props(dc, vi2c_properties);
-+    device_class_set_parent_realize(dc, vi2c_realize,
-+                                    &vubc->parent_realize);
-     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
--    vdc->realize = vu_i2c_device_realize;
--    vdc->unrealize = vu_i2c_device_unrealize;
--    vdc->get_features = vu_i2c_get_features;
--    vdc->set_status = vu_i2c_set_status;
--    vdc->guest_notifier_mask = vu_i2c_guest_notifier_mask;
--    vdc->guest_notifier_pending = vu_i2c_guest_notifier_pending;
- }
- 
- static const TypeInfo vu_i2c_info = {
-     .name = TYPE_VHOST_USER_I2C,
--    .parent = TYPE_VIRTIO_DEVICE,
-+    .parent = TYPE_VHOST_USER_BASE,
-     .instance_size = sizeof(VHostUserI2C),
-     .class_init = vu_i2c_class_init,
- };
-diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
-index 8c6cb2143d..31c0406f05 100644
---- a/hw/virtio/meson.build
-+++ b/hw/virtio/meson.build
-@@ -10,6 +10,9 @@ softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_RNG'],
- softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_GPIO', if_true: files('vhost-user-gpio.c'))
- softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_GPIO'],
-                       if_true: files('vhost-user-gpio-pci.c'))
-+softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
-+softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_I2C'],
-+                       if_true: files('vhost-user-i2c-pci.c'))
- 
- specific_virtio_ss = ss.source_set()
- specific_virtio_ss.add(files('virtio.c'))
-@@ -39,14 +42,12 @@ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-us
- specific_virtio_ss.add(when: 'CONFIG_VIRTIO_RNG', if_true: files('virtio-rng.c'))
- specific_virtio_ss.add(when: 'CONFIG_VIRTIO_IOMMU', if_true: files('virtio-iommu.c'))
- specific_virtio_ss.add(when: 'CONFIG_VIRTIO_MEM', if_true: files('virtio-mem.c'))
--specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
- specific_virtio_ss.add(when: 'CONFIG_VHOST_VDPA_DEV', if_true: files('vdpa-dev.c'))
- 
- virtio_pci_ss = ss.source_set()
- virtio_pci_ss.add(when: 'CONFIG_VHOST_VSOCK', if_true: files('vhost-vsock-pci.c'))
- virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-user-vsock-pci.c'))
- virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_BLK', if_true: files('vhost-user-blk-pci.c'))
--virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c-pci.c'))
- virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_INPUT', if_true: files('vhost-user-input-pci.c'))
- virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_SCSI', if_true: files('vhost-user-scsi-pci.c'))
- virtio_pci_ss.add(when: 'CONFIG_VHOST_SCSI', if_true: files('vhost-scsi-pci.c'))
--- 
-2.39.2
+I don't think there is a way around extending the QEMU vhost's code
+model. The current model in QEMU's vhost code is that the backend is
+reset when the VM stops. This model worked fine for stateless devices
+but it doesn't work for stateful devices.
 
+Imagine a vdpa-gpu device: you cannot reset the device in
+vhost_dev_stop() and expect the GPU to continue working when
+vhost_dev_start() is called again because all its state has been lost.
+The guest driver will send requests that references a virtio-gpu
+resources that no longer exist.
+
+One solution is to save the device's state in vhost_dev_stop(). I think
+this is what you're suggesting. It requires keeping a copy of the state
+and then loading the state again in vhost_dev_start(). I don't think
+this approach should be used because it requires all stateful devices to
+support live migration (otherwise they break across HMP 'stop'/'cont').
+Also, the device state for some devices may be large and it would also
+become more complicated when iterative migration is added.
+
+Instead, I think the QEMU vhost code needs to be structured so that
+struct vhost_dev has a suspended state:
+
+        ,---------.
+	v         |
+  started ------> stopped
+    \   ^
+     \  |
+      -> suspended
+
+The device doesn't lose state when it enters the suspended state. It can
+be resumed again.
+
+This is why I think SUSPEND/RESUME need to be part of the solution.
+(It's also an argument for not including the phase argument in
+SET_DEVICE_STATE_FD because the SUSPEND message is sent during
+vhost_dev_stop() separately from saving the device's state.)
+
+> > - Loading the device's state is done by SUSPEND followed by
+> > SET_DEVICE_STATE_FD, followed by RESUME.
+> >
+>=20
+> I think the restore makes more sense after reset and before driver_ok,
+> suspend does not seem a right call there. SUSPEND implies there may be
+> other operations before, so the device may have processed some
+> requests wrong, as it is not in the right state.
+
+I find it more elegant to allow SUSPEND -> load -> RESUME if the device
+state is saved using SUSPEND -> save -> RESUME since the operations are
+symmetrical, but requiring the device to be reset works too. Here is my
+understanding of your idea in more detail:
+
+The VIRTIO Device Status Field value must be ACKNOWLEDGE | DRIVER |
+FEATURES_OK, any device initialization configuration space writes must
+be done, and virtqueues must be configured (Step 7 of 3.1.1 Driver
+Requirements in VIRTIO 1.2).
+
+At that point the device is able to parse the device state and set up
+its internal state. Doing it any earlier (before feature negotiation or
+virtqueue configuration) places the device in the awkward situation of
+having to keep the device state in a buffer and defer loading it until
+later, which is complex.
+
+After device state loading is complete, the DRIVER_OK bit is set to
+resume device operation.
+
+Saving device state is only allowed when the DRIVER_OK bit has been set.
+
+Does this sound right?
+
+Stefan
+
+--f4K8DwKKP2BtL63k
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmQ+2nwACgkQnKSrs4Gr
+c8jdxgf+MJ6sJdN0NcQZDgwlhiXcs96Sl1S/+LC6H89oTwqS/MFT3lldEb1WAPpK
+58MWqkwQ+j2ZVhQosZtQz7KLBTwkfHYHcn04jJ101OReKEZ3ou7kkEqCJw/H9Mr0
+zxK0cuW6Fi5H+6Ju4bgYcpwkYRtDOZVUv0Nwv9nVEM2bZPAeQwCMp5JEvJilwmmI
+V3PR26B2PgnfKcMzqXdCv6etjTy+WuYNqwnKbZPMVF1ar+FPQkwrXO/0tLNgiekC
+i2hrvDYz/JrTdTY4vWCFVfWf18lIRyIi8vQj089ZYVIVrvy2Bfm/tG/8507MvNWR
+f3tDiBsPIebcMb9S7ChVZbvuKyj5fQ==
+=q5r9
+-----END PGP SIGNATURE-----
+
+--f4K8DwKKP2BtL63k--

@@ -1,17 +1,26 @@
-Return-Path: <stefanha@redhat.com>
-Date: Tue, 18 Apr 2023 12:04:15 -0400
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20230418160415.GB4048149@fedora>
-References: <20230414160433.2096866-1-alex.bennee@linaro.org>
- <CAJSP0QURbJrEoFY8FhMnq_B6tx-qYspfu-OB6=6hz5=qAwE=6A@mail.gmail.com>
- <87ttxeeatd.fsf@linaro.org>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1681834906; x=1684426906;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=x87bue2xLVWQrfVBSyRRYhA/dy43njxINkH3kP9vb3k=;
+ b=EHRQv7Ju6LENPKauwKEtqNkE2betd0pLn4ZbmX+uOKT0XmzMfyuK0xuf6q4uvaGaK4
+ YXj0rT8dWBkUUyO8KAgEktHYo2iAeQsqAmDgY8xsC1LbPTYwNA7AYCcjzJQbMKZPQyMh
+ CRGHIQY22jpFqROaBjWVzmt6hBYVikpGQ4K7DO+i7WcyK7C/J7a1alSViAn3Y9DpAoU4
+ 5mvNPW0I2BmAjh/IlO6nrcF8fuYD94TpYrWCDwvSaLe5tL7GVq/mu/p72K32I5+SXQO3
+ vxQbc36zjkpYBJYoxvInbLzcak00sf3qRwXyiURyR97COHHFf9Ti/dpfJl4BmFCtrwPb
+ Wp6A==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Tue, 18 Apr 2023 17:21:39 +0100
+Message-Id: <20230418162140.373219-13-alex.bennee@linaro.org>
+In-Reply-To: <20230418162140.373219-1-alex.bennee@linaro.org>
+References: <20230418162140.373219-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="qG0Ivx1WmQAdGIuU"
-Content-Disposition: inline
-In-Reply-To: <87ttxeeatd.fsf@linaro.org>
-Subject: Re: [Virtio-fs] [PATCH 00/12] virtio: add vhost-user-generic and
- reduce copy and paste
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 12/13] hw/virtio: derive vhost-user-i2c from
+ vhost-user-base
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,158 +29,376 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
-Cc: Stefan Hajnoczi <stefanha@gmail.com>, qemu-devel@nongnu.org, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Eric Blake <eblake@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Markus Armbruster <armbru@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Jason Wang <jasowang@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Gerd Hoffmann <kraxel@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>
 
+Now we can take advantage of the new base class and make
+vhost-user-i2c a much simpler boilerplate wrapper. Also as this
+doesn't require any target specific hacks we only need to build the
+stubs once.
 
---qG0Ivx1WmQAdGIuU
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 
-On Mon, Apr 17, 2023 at 05:14:59PM +0100, Alex Benn=E9e wrote:
->=20
-> Stefan Hajnoczi <stefanha@gmail.com> writes:
->=20
-> > On Fri, 14 Apr 2023 at 12:06, Alex Benn=E9e <alex.bennee@linaro.org> wr=
-ote:
-> >>
-> >> A lot of our vhost-user stubs are large chunks of boilerplate that do
-> >> (mostly) the same thing. This series attempts to fix that by defining
-> >> a new base class for vhost-user devices and then converting the rng
-> >> and gpio devices to be based off them. You can even use
-> >> vhost-user-device directly if you supply it with the right magic
-> >> numbers (which is helpful for development).
-> >>
-> >> However the final patch runs into the weeds because I don't yet have a
-> >> clean way to represent in QOM the fixing of certain properties for the
-> >> specialised classes.
-> >>
-> >> The series is a net reduction in code and an increase in
-> >> documentation but obviously needs to iron out a few more warts. I'm
-> >> open to suggestions on the best way to tweak the QOM stuff.
-> >
-> > --device vhost-user-device is not really possible because vhost-user
-> > devices are not full VIRTIO devices. vhost-user devices depend on
-> > device-specific code in the VMM by design.
->=20
-> What device specific code? You certainly need to instantiate stuff in
-> the DTB/ACPI tables for -M virt but everything else can be handed off to
-> the vhost-user daemon.
+---
+v2
+  - update to new inheritance scheme
+  - move build to common code
+---
+ include/hw/virtio/vhost-user-i2c.h |  18 +-
+ hw/virtio/vhost-user-i2c.c         | 255 ++---------------------------
+ hw/virtio/meson.build              |   5 +-
+ 3 files changed, 26 insertions(+), 252 deletions(-)
 
-There are vhost-user device types that lack functionality entirely, like
-vhost-user-net's lack of the controlq virtqueue and configuration space.
-It is not even possible to query the MAC address from a vhost-user-net
-device. It's not a full virtio-net device and the VMM has to fill in the
-gaps to emulate the missing virtqueues and configuration space.
+diff --git a/include/hw/virtio/vhost-user-i2c.h b/include/hw/virtio/vhost-user-i2c.h
+index 0f7acd40e3..47153782d1 100644
+--- a/include/hw/virtio/vhost-user-i2c.h
++++ b/include/hw/virtio/vhost-user-i2c.h
+@@ -12,20 +12,18 @@
+ #include "hw/virtio/vhost.h"
+ #include "hw/virtio/vhost-user.h"
+ 
++#include "hw/virtio/virtio.h"
++#include "hw/virtio/vhost.h"
++#include "hw/virtio/vhost-user.h"
++#include "hw/virtio/vhost-user-device.h"
++
+ #define TYPE_VHOST_USER_I2C "vhost-user-i2c-device"
+ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserI2C, VHOST_USER_I2C)
+ 
+ struct VHostUserI2C {
+-    VirtIODevice parent;
+-    CharBackend chardev;
+-    struct vhost_virtqueue *vhost_vq;
+-    struct vhost_dev vhost_dev;
+-    VhostUserState vhost_user;
+-    VirtQueue *vq;
+-    bool connected;
++    /*< private >*/
++    VHostUserBase parent;
++    /*< public >*/
+ };
+ 
+-/* Virtio Feature bits */
+-#define VIRTIO_I2C_F_ZERO_LENGTH_REQUEST		0
+-
+ #endif /* QEMU_VHOST_USER_I2C_H */
+diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+index 60eaf0d95b..4a1f644a87 100644
+--- a/hw/virtio/vhost-user-i2c.c
++++ b/hw/virtio/vhost-user-i2c.c
+@@ -14,237 +14,21 @@
+ #include "qemu/error-report.h"
+ #include "standard-headers/linux/virtio_ids.h"
+ 
+-static const int feature_bits[] = {
+-    VIRTIO_I2C_F_ZERO_LENGTH_REQUEST,
+-    VIRTIO_F_RING_RESET,
+-    VHOST_INVALID_FEATURE_BIT
++static Property vi2c_properties[] = {
++    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
++    DEFINE_PROP_END_OF_LIST(),
+ };
+ 
+-static void vu_i2c_start(VirtIODevice *vdev)
+-{
+-    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
+-    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-    int ret, i;
+-
+-    if (!k->set_guest_notifiers) {
+-        error_report("binding does not support guest notifiers");
+-        return;
+-    }
+-
+-    ret = vhost_dev_enable_notifiers(&i2c->vhost_dev, vdev);
+-    if (ret < 0) {
+-        error_report("Error enabling host notifiers: %d", -ret);
+-        return;
+-    }
+-
+-    ret = k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, true);
+-    if (ret < 0) {
+-        error_report("Error binding guest notifier: %d", -ret);
+-        goto err_host_notifiers;
+-    }
+-
+-    i2c->vhost_dev.acked_features = vdev->guest_features;
+-
+-    ret = vhost_dev_start(&i2c->vhost_dev, vdev, true);
+-    if (ret < 0) {
+-        error_report("Error starting vhost-user-i2c: %d", -ret);
+-        goto err_guest_notifiers;
+-    }
+-
+-    /*
+-     * guest_notifier_mask/pending not used yet, so just unmask
+-     * everything here. virtio-pci will do the right thing by
+-     * enabling/disabling irqfd.
+-     */
+-    for (i = 0; i < i2c->vhost_dev.nvqs; i++) {
+-        vhost_virtqueue_mask(&i2c->vhost_dev, vdev, i, false);
+-    }
+-
+-    return;
+-
+-err_guest_notifiers:
+-    k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, false);
+-err_host_notifiers:
+-    vhost_dev_disable_notifiers(&i2c->vhost_dev, vdev);
+-}
+-
+-static void vu_i2c_stop(VirtIODevice *vdev)
+-{
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
+-    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
+-    int ret;
+-
+-    if (!k->set_guest_notifiers) {
+-        return;
+-    }
+-
+-    vhost_dev_stop(&i2c->vhost_dev, vdev, true);
+-
+-    ret = k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, false);
+-    if (ret < 0) {
+-        error_report("vhost guest notifier cleanup failed: %d", ret);
+-        return;
+-    }
+-
+-    vhost_dev_disable_notifiers(&i2c->vhost_dev, vdev);
+-}
+-
+-static void vu_i2c_set_status(VirtIODevice *vdev, uint8_t status)
+-{
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-    bool should_start = virtio_device_should_start(vdev, status);
+-
+-    if (vhost_dev_is_started(&i2c->vhost_dev) == should_start) {
+-        return;
+-    }
+-
+-    if (should_start) {
+-        vu_i2c_start(vdev);
+-    } else {
+-        vu_i2c_stop(vdev);
+-    }
+-}
+-
+-static uint64_t vu_i2c_get_features(VirtIODevice *vdev,
+-                                    uint64_t requested_features, Error **errp)
+-{
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-
+-    virtio_add_feature(&requested_features, VIRTIO_I2C_F_ZERO_LENGTH_REQUEST);
+-    return vhost_get_features(&i2c->vhost_dev, feature_bits, requested_features);
+-}
+-
+-static void vu_i2c_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+-{
+-    /*
+-     * Not normally called; it's the daemon that handles the queue;
+-     * however virtio's cleanup path can call this.
+-     */
+-}
+-
+-static void vu_i2c_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+-{
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-
+-    vhost_virtqueue_mask(&i2c->vhost_dev, vdev, idx, mask);
+-}
+-
+-static bool vu_i2c_guest_notifier_pending(VirtIODevice *vdev, int idx)
+-{
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-
+-    return vhost_virtqueue_pending(&i2c->vhost_dev, idx);
+-}
+-
+-static void do_vhost_user_cleanup(VirtIODevice *vdev, VHostUserI2C *i2c)
+-{
+-    vhost_user_cleanup(&i2c->vhost_user);
+-    virtio_delete_queue(i2c->vq);
+-    virtio_cleanup(vdev);
+-}
+-
+-static int vu_i2c_connect(DeviceState *dev)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-
+-    if (i2c->connected) {
+-        return 0;
+-    }
+-    i2c->connected = true;
+-
+-    /* restore vhost state */
+-    if (virtio_device_started(vdev, vdev->status)) {
+-        vu_i2c_start(vdev);
+-    }
+-
+-    return 0;
+-}
+-
+-static void vu_i2c_disconnect(DeviceState *dev)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-
+-    if (!i2c->connected) {
+-        return;
+-    }
+-    i2c->connected = false;
+-
+-    if (vhost_dev_is_started(&i2c->vhost_dev)) {
+-        vu_i2c_stop(vdev);
+-    }
+-}
+-
+-static void vu_i2c_event(void *opaque, QEMUChrEvent event)
++static void vi2c_realize(DeviceState *dev, Error **errp)
+ {
+-    DeviceState *dev = opaque;
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+-
+-    switch (event) {
+-    case CHR_EVENT_OPENED:
+-        if (vu_i2c_connect(dev) < 0) {
+-            qemu_chr_fe_disconnect(&i2c->chardev);
+-            return;
+-        }
+-        break;
+-    case CHR_EVENT_CLOSED:
+-        vu_i2c_disconnect(dev);
+-        break;
+-    case CHR_EVENT_BREAK:
+-    case CHR_EVENT_MUX_IN:
+-    case CHR_EVENT_MUX_OUT:
+-        /* Ignore */
+-        break;
+-    }
+-}
+-
+-static void vu_i2c_device_realize(DeviceState *dev, Error **errp)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserI2C *i2c = VHOST_USER_I2C(dev);
+-    int ret;
+-
+-    if (!i2c->chardev.chr) {
+-        error_setg(errp, "vhost-user-i2c: missing chardev");
+-        return;
+-    }
+-
+-    if (!vhost_user_init(&i2c->vhost_user, &i2c->chardev, errp)) {
+-        return;
+-    }
+-
+-    virtio_init(vdev, VIRTIO_ID_I2C_ADAPTER, 0);
++    VHostUserBase *vub = VHOST_USER_BASE(dev);
++    VHostUserBaseClass *vubc = VHOST_USER_BASE_GET_CLASS(dev);
+ 
+-    i2c->vhost_dev.nvqs = 1;
+-    i2c->vq = virtio_add_queue(vdev, 4, vu_i2c_handle_output);
+-    i2c->vhost_dev.vqs = g_new0(struct vhost_virtqueue, i2c->vhost_dev.nvqs);
++    /* Fixed for I2C */
++    vub->virtio_id = VIRTIO_ID_I2C_ADAPTER;
++    vub->num_vqs = 1;
+ 
+-    ret = vhost_dev_init(&i2c->vhost_dev, &i2c->vhost_user,
+-                         VHOST_BACKEND_TYPE_USER, 0, errp);
+-    if (ret < 0) {
+-        g_free(i2c->vhost_dev.vqs);
+-        do_vhost_user_cleanup(vdev, i2c);
+-    }
+-
+-    qemu_chr_fe_set_handlers(&i2c->chardev, NULL, NULL, vu_i2c_event, NULL,
+-                             dev, NULL, true);
+-}
+-
+-static void vu_i2c_device_unrealize(DeviceState *dev)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserI2C *i2c = VHOST_USER_I2C(dev);
+-    struct vhost_virtqueue *vhost_vqs = i2c->vhost_dev.vqs;
+-
+-    /* This will stop vhost backend if appropriate. */
+-    vu_i2c_set_status(vdev, 0);
+-    vhost_dev_cleanup(&i2c->vhost_dev);
+-    g_free(vhost_vqs);
+-    do_vhost_user_cleanup(vdev, i2c);
++    vubc->parent_realize(dev, errp);
+ }
+ 
+ static const VMStateDescription vu_i2c_vmstate = {
+@@ -252,30 +36,21 @@ static const VMStateDescription vu_i2c_vmstate = {
+     .unmigratable = 1,
+ };
+ 
+-static Property vu_i2c_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserI2C, chardev),
+-    DEFINE_PROP_END_OF_LIST(),
+-};
+-
+ static void vu_i2c_class_init(ObjectClass *klass, void *data)
+ {
+     DeviceClass *dc = DEVICE_CLASS(klass);
+-    VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
++    VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
+ 
+-    device_class_set_props(dc, vu_i2c_properties);
+     dc->vmsd = &vu_i2c_vmstate;
++    device_class_set_props(dc, vi2c_properties);
++    device_class_set_parent_realize(dc, vi2c_realize,
++                                    &vubc->parent_realize);
+     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
+-    vdc->realize = vu_i2c_device_realize;
+-    vdc->unrealize = vu_i2c_device_unrealize;
+-    vdc->get_features = vu_i2c_get_features;
+-    vdc->set_status = vu_i2c_set_status;
+-    vdc->guest_notifier_mask = vu_i2c_guest_notifier_mask;
+-    vdc->guest_notifier_pending = vu_i2c_guest_notifier_pending;
+ }
+ 
+ static const TypeInfo vu_i2c_info = {
+     .name = TYPE_VHOST_USER_I2C,
+-    .parent = TYPE_VIRTIO_DEVICE,
++    .parent = TYPE_VHOST_USER_BASE,
+     .instance_size = sizeof(VHostUserI2C),
+     .class_init = vu_i2c_class_init,
+ };
+diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
+index 8c6cb2143d..31c0406f05 100644
+--- a/hw/virtio/meson.build
++++ b/hw/virtio/meson.build
+@@ -10,6 +10,9 @@ softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_RNG'],
+ softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_GPIO', if_true: files('vhost-user-gpio.c'))
+ softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_GPIO'],
+                       if_true: files('vhost-user-gpio-pci.c'))
++softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
++softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_I2C'],
++                       if_true: files('vhost-user-i2c-pci.c'))
+ 
+ specific_virtio_ss = ss.source_set()
+ specific_virtio_ss.add(files('virtio.c'))
+@@ -39,14 +42,12 @@ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-us
+ specific_virtio_ss.add(when: 'CONFIG_VIRTIO_RNG', if_true: files('virtio-rng.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VIRTIO_IOMMU', if_true: files('virtio-iommu.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VIRTIO_MEM', if_true: files('virtio-mem.c'))
+-specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VHOST_VDPA_DEV', if_true: files('vdpa-dev.c'))
+ 
+ virtio_pci_ss = ss.source_set()
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_VSOCK', if_true: files('vhost-vsock-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-user-vsock-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_BLK', if_true: files('vhost-user-blk-pci.c'))
+-virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_INPUT', if_true: files('vhost-user-input-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_SCSI', if_true: files('vhost-user-scsi-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_SCSI', if_true: files('vhost-scsi-pci.c'))
+-- 
+2.39.2
 
-There are device type-specific vhost-user messages like
-VHOST_USER_SEND_RARP and VHOST_USER_CREATE_CRYPTO_SESSION that can't
-really be supported by a generic --device vhost-user-device.
-
-Live migration is another device-specific aspect that is handled by the
-vhost-user frontend.
-
-> Indeed the split brain is a bit silly in some places. For example is
-> QEMU really the best arbiter of a block device config when the actual
-> backend is a separate process. We have config passing in the vhost-user
-> spec.
-
-Optional vhost-user messages like configuration space access may be in
-the spec, but existing device types cannot rely on them for backwards
-compatibility reasons. Therefore most existing device types don't use
-the configuration space. Those that do may only access parts of the
-configuration space from the backend and emulate the rest.
-
-The blog post I linked mentions a new protocol feature bit
-(VHOST_USER_PROTOCOL_F_VDPA) to distinguish new vhost-user backends that
-are full VIRTIO devices. This doesn't exist today, but I think something
-like that is necessary to detect devices that will work with --device
-vhost-user-device.
-
-> > The "subset of a VIRTIO device" design made sense for vhost_net.
-> > Nowadays there are other device types that are close to full VIRTIO
-> > devices, although the vhost-user protocol doesn't support the full
-> > VIRTIO device lifecycle.
->=20
-> What are we missing?
-
-vhost-user needs:
-- A GET_DEVICE_ID message.
-- A GET_CONFIG_SIZE message. Today it is assumed that the vhost-user
-  frontend already knows the configuration space size.
-- A protocol feature bit indicating that the device is a full VIRTIO
-  device. These devices also need to implement the SET_STATUS message,
-  which is rarely implemented today.
-
-> > I think a user-creatable --device vhost-user-device is not a good idea
-> > today. It creates confusion. Many people aren't aware of the
-> > architectural difference between vhost-user and VIRTIO devices. The
-> > result is that VMMs and vhost-user backends implement increasingly
-> > brittle VIRTIO configuration space and feature bit logic as they
-> > knowingly or unknowingly try to paper over the fact that a traditional
-> > vhost-user device isn't a full VIRTIO device.
->=20
-> I've always found the device feature gating in QEMU confusing. Surely we
-> can rely on the daemon to properly enumerate the features it supports?
-
-The backend's features cannot be passed through to the guest because
-there is also an emulated VIRTIO transport (virtio-pci, virtio-mmio,
-virtio-ccw) involved. The transport may support a different feature set
-=66rom the vhost-user backend. For example, the transport may support
-Packed Virtqueues but the backend may not. So some filtering is
-necessary in the VMM.
-
-Since some of the device-specific functionality may be handled by the
-VMM, then this extends beyond just the transport feature bits.
-
-But I agree with you that it's ugly and complex. I have to re-read the
-code every time because it works in a strange way.
-
-> > It is possible to resolve this difference and make --device
-> > vhost-user-device work properly for devices that want to be full
-> > VIRTIO devices. See "Making VMM device shims optional" here:
-> > https://blog.vmsplice.net/2020/09/on-unifying-vhost-user-and-virtio.html
-> >
-> > Even after extending the vhost-user protocol to solve the current
-> > limitations, existing backends would still only be partial VIRTIO
-> > devices that wouldn't work with --device vhost-user-device.
->=20
-> It works for RNG, GPIO (and soon I'll be testing i2c and SCSI). All we
-> need is the virtioid and the number of virtio queues.
-
-There is already a vhost-user message for querying the number of
-virtqueues: VHOST_USER_GET_QUEUE_NUM.
-
-See above for other missing stuff.
-
-> > Reducing boilerplate is helpful, but I think --device
-> > vhost-user-device should not be user-creatable.
->=20
-> After this series lands it will certainly make adding new shims easier
-> but having a vhost-user-device will make testing of new backends easier.
-> Can we not simply document it as an advanced feature for those who know
-> what they are doing? I'm not intending to deprecate the existing shims.
-
-If you add the missing pieces to vhost-user then --device
-vhost-user-device can be done properly. Two messages and one protocol
-feature bit are required, it's not that bad.
-
-Stefan
-
---qG0Ivx1WmQAdGIuU
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmQ+v38ACgkQnKSrs4Gr
-c8ieHwf8CfoIaa37ul/ZKEojrKqPFoTvHGgzGZpyIQrLEUhmH+3bvyOhOddIGCF2
-LCygbmLX1iv4L8T0FFnw7XmL6xJveN2p2cU2dPmN7i4h+l6tY++tHmyMRwGQ2MSk
-2BZOVdvJd3CS3GKJUjo5Fuu0jdfbBPfDPxTr5BmC5IMx3Wr5ML5lCZr5skrbzbZR
-eoHEzGlFrKPc7iHnq1n16vOH1MMM/Zxv68us7Is2ZHnHSpUwro2em7w0D+ZR0SsG
-1w05q4zam0oW243KDEmmXFqU8R/daLxG3bP0TuH+3rlJabcRdXje/asQzdH2MgyT
-cZa26+nWnLTiJK9kX1V4OzaPC7ALZg==
-=mC+3
------END PGP SIGNATURE-----
-
---qG0Ivx1WmQAdGIuU--

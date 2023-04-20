@@ -5,28 +5,28 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender
  :Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:
  List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=oKIaaA43LEdto76cISwdT3W7LZPO4XuM1D50BhjLAoQ=; b=e2GCXLejeu4UWeS3e2wHrt8fcU
- mWAY8LOhVoKS3L4wijZNH1KUTNZc5/DV+MMAzb9sVh+rv97qthJWBKsP89kSQHAPJFqfCeNf94778
- 76TXVHiDy41t5zzU6LmztwjD7KcPw/Z7Cp/UolBJ3jgef5PZu5ETBQEUfMsqdTifjzsoMBAz2ByhB
- RQkv9lIGlTq0YvI0gFcieJPwISfcY7HiXCEm3nFAqZqegiTk2GWAszXWkGzMF3ep19qQvP8RImwMG
- Hnz4z+2lfsxIXE1KN9l9OM0ORPRRvqLQS7q6xd8aBu/sVgLXhupcg81frNCJlQfMDoVH2DzXSP/dH
- fbpucoQsMsRWYYdTwSjnKkSCpYOIU4qxh2lAl1K22/Y8jrMDiqk6AkglXhuLDOQS2I+0i4hGX25LG
- p//QFScM+JN2jd8A5+nnbDCx1zHfJ8dUhJJuNcP1LQ98LE46Ye4Oer1zLjnVKGiYNoXig0RpTumpM
- u4aVFzYHVAkv/fWzQ9YhEeRUfv2m53ubXVUe1ihfd792g9dUBUH56cpwnhSGbmYwfB9Nr5hukzhss
- XKjEX49ZWnkl3iD80dYo+VH4nx6G66pfnrAIlZhPRBo6Apsarc30fnOkHIjAXtE1/WkAayhfPl1sA
- lc3CCJYoVbds6gb9GTEHC5V5Su1Gy8QymKtpgiqFQ=
-Message-ID: <2e1767b9-c171-40df-1bc9-2c4c14d5292b@ilande.co.uk>
-Date: Thu, 20 Apr 2023 10:21:02 +0100
+ bh=OaHt6vlahyHKBqr2IIc9kKlpuFMPo/c6t2yVwlwsNgc=; b=SZvnWMVD6IO2bTRzUgZ/4zvIdW
+ vfHTO0tfwgYP6aVw7BdoUI77VIacUjQj/tR6CTsRwJdEWHi2RT+K5p4Q+dlao9+x4Rby7CcLvhXTu
+ vf4BCcXPljs8rNeTvYz5Ku/FrFM5Ql+ka8cMJfWuXf7afMEy5HcYkipyygnfy8Ks8fiTpn5lPVhAy
+ hbVASBvFrxrwRblaJGCLSw41sy+2D/glm2aCVq3lwNz425EhnoBwYPKRNFb1EDbraeN4vwG3YKsOo
+ ryIZdqeBaBUpCP5K+PKKBtiefqKEBAA6k1QJKmJ8jkpsI08+inqV+piny/dr/zrV4R1fnacI0AK3v
+ S/V5d70F2oWXRkAm52zLH2J6a2fSP41gIbebtBly2sE1xPvK1oMvbrHTIaWRTZ8EybwiWXeBDDfrE
+ UR1QP3BBu6PW+v0XW8pcx3NTqdBT/ehHgcZeq8jPnQUnUdtS2g07ps1lsk1HCVTKq8mxORPdWyY1R
+ Uz03EtJqxKgQ1SXxucRvq+0O4yazHs0amaT5dFTquygLiEChfXba4U6Gh05qtLRBJnkze4KInqj+y
+ V2XKzejK8YCVBS1FNRKpj/9BIN8IuBejDytAzkzce9fzG14G0k0PoTE5dBim2LZNfSfX5d1jthBZG
+ 9Rk22Bh5K/4GR+QU5rGkuqm/zH2o+ufWLwyLog4HY=
+Message-ID: <c17da9d6-2f47-cd7a-be9b-fa582429b59a@ilande.co.uk>
+Date: Thu, 20 Apr 2023 10:29:10 +0100
 MIME-Version: 1.0
 References: <20230418162140.373219-1-alex.bennee@linaro.org>
- <20230418162140.373219-2-alex.bennee@linaro.org>
+ <20230418162140.373219-6-alex.bennee@linaro.org>
 From: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
-In-Reply-To: <20230418162140.373219-2-alex.bennee@linaro.org>
+In-Reply-To: <20230418162140.373219-6-alex.bennee@linaro.org>
 Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v2 01/13] include: attempt to document
- device_class_set_props
+Subject: Re: [Virtio-fs] [PATCH v2 05/13] include/hw/virtio: add kerneldoc
+ for virtio_init
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -40,56 +40,30 @@ Cc: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, Eduardo Habkost
 
 On 18/04/2023 17:21, Alex Bennée wrote:
 
-> I'm still not sure how I achieve by use case of the parent class
-> defining the following properties:
-> 
->    static Property vud_properties[] = {
->        DEFINE_PROP_CHR("chardev", VHostUserDevice, chardev),
->        DEFINE_PROP_UINT16("id", VHostUserDevice, id, 0),
->        DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
->        DEFINE_PROP_END_OF_LIST(),
->    };
-> 
-> But for the specialisation of the class I want the id to default to
-> the actual device id, e.g.:
-> 
->    static Property vu_rng_properties[] = {
->        DEFINE_PROP_UINT16("id", VHostUserDevice, id, VIRTIO_ID_RNG),
->        DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
->        DEFINE_PROP_END_OF_LIST(),
->    };
-> 
-> And so far the API for doing that isn't super clear.
-> 
 > Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 > ---
->   include/hw/qdev-core.h | 9 +++++++++
->   1 file changed, 9 insertions(+)
+>   include/hw/virtio/virtio.h | 6 ++++++
+>   1 file changed, 6 insertions(+)
 > 
-> diff --git a/include/hw/qdev-core.h b/include/hw/qdev-core.h
-> index bd50ad5ee1..d4bbc30c92 100644
-> --- a/include/hw/qdev-core.h
-> +++ b/include/hw/qdev-core.h
-> @@ -776,6 +776,15 @@ BusState *sysbus_get_default(void);
->   char *qdev_get_fw_dev_path(DeviceState *dev);
->   char *qdev_get_own_fw_dev_path_from_handler(BusState *bus, DeviceState *dev);
+> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+> index 22ec098462..1ba7a9dd74 100644
+> --- a/include/hw/virtio/virtio.h
+> +++ b/include/hw/virtio/virtio.h
+> @@ -217,6 +217,12 @@ struct VirtioDeviceClass {
+>   void virtio_instance_init_common(Object *proxy_obj, void *data,
+>                                    size_t vdev_size, const char *vdev_name);
 >   
 > +/**
-> + * device_class_set_props(): add a set of properties to an device
-> + * @dc: the parent DeviceClass all devices inherit
-> + * @props: an array of properties, terminate by DEFINE_PROP_END_OF_LIST()
-> + *
-> + * This will add a set of properties to the object. It will fault if
-> + * you attempt to add an existing property defined by a parent class.
-> + * To modify an inherited property you need to use????
+> + * virtio_init() - initialise the common VirtIODevice structure
+> + * @vdev: pointer to VirtIODevice
+> + * @device_id: the VirtIO device ID (see virtio_ids.h)
+> + * @config_size: size of the config space
 > + */
->   void device_class_set_props(DeviceClass *dc, Property *props);
+>   void virtio_init(VirtIODevice *vdev, uint16_t device_id, size_t config_size);
 >   
->   /**
+>   void virtio_cleanup(VirtIODevice *vdev);
 
-Can we say that the use case description above is now obsolete with the introduction 
-of the abstract VHOST_USER_BASE class (i.e. it was a modelling issue)? If so, I think 
-the comment is good, except that the last sentence can be removed.
+Reviewed-by: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
 
 
 ATB,

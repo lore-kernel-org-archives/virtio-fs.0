@@ -5,28 +5,28 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender
  :Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:
  List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=F0/sVVcgraFOyRiENBonSA//GXAzALbKNl+br7qYZ9U=; b=xpl+60EEMTr6sFVBmIqajrwKJc
- nFyvTk+9hC1dgU+aQyCNqt8mWRtVrRQwhp/xIx5vGsZ3IZ8Sw0bYwyKUAnHgyUHSolgi+W22d0Qx4
- tCmiQkl94CSBxUyo/9XoexaP3wHglSD2Hx6+shwDAcBbs3VBJ6cV6B6bULldGwAqztAGCJkJWpeaE
- uxxqK0aqSWw24KQNZlrlJskycCA2Ihi/ziwK6EHBUSF962p2Fdtrgoflsl/kZdxPIcJDEy0UTvyeA
- DOGJyFTiMw1VhHLUTqjbza3SMfYbzG5J1Wz+F70GdYSL/BhkY4Z8wJ9KSK3Y2+JcoBAA2aesnjRec
- DFu2qFRztk29aSzgWdBYy7RCsN5XMhHsJHjW8URBivR7TBtFmtY3bSfeVT74qTi79qBq6bjqh5iI4
- Vo7EIaF0AD3ZHeio4ERZ3n9ufXjp6jwMbyJJEDzTb4eyWNEQvhwMzu9zePTUQNrI7XJPxx3jAouX4
- Gd2XgG/XtIIAX2CDU1dEhHyDn0d2aVhSvZhLmaAkSP/LDg67fjlI5jFu7h8b9oIvrdPTlTuAhLLr3
- RptFdfGdjNEbMTjWU1GzQzrq+58zbbiwIKdNn347qvcGDBrRYe4lfEvF5/7vsFWGDyvKesBzGtG1Z
- xWZ8f20zPbMDvSSUr4ALr2UBxLkAeq5P/HgHuvS1Y=
-Message-ID: <05bfbe1b-d915-79ca-1c3a-98a8c892f591@ilande.co.uk>
-Date: Thu, 20 Apr 2023 11:12:39 +0100
+ bh=y5kJvOH9QT4Yalt4ovMgT6YsupEsSPlJi6k4IGmUjwk=; b=C9kX1Eqq8q/j/bzfUAbMs+GvkA
+ WWrUf94LYisxeE6P0G809iwzftWDAHWSW2SeTbH26wqv1W5FkosT5YUZCS48ivnhQgJ/Gqz5Z0KeH
+ ZGLsCm2Xtm/COmf3E6sheBSKXgePSajmYQEON/S3G5sqgGeotgNl3j9cC2FNBPReIpiSU3nqS7QES
+ M8DeulIPusdEsmMOeRnwZGCphgB1E2zGNHQ4EITQIYf2MnZuFopdhL44CjJt5Vvne2ACGpXwO1JhI
+ NFuyBQ2eFkf13wRTe3gsiU5rztY6W4X33dAlNAIEi/1ORzuZ4yg7+buozEmH36NhcrBU3CG2/a6bx
+ LXYTXzCoXXv1BeOkgUf3IJp3YFl/JsQL+L6GTRjrHNVDsDx/Da3zZlMNElO9mBjfCw0CGiZv24LGk
+ kU+1HauYOEpBK4UWfH5KF+SqtllCQQF7kdTAntEEB+SgjfY5X4whY20KpBmXA5fFSBJDneBFPPH5V
+ 2ogufpu+GWDsslKt0aXegu9V7scxpYOiXt9BRLX/7cxpLI5uWXOyGjsMaLvoSLXZCfQUhJNjhwCkq
+ tudNnUpBv33N30euRqJHRMFxjzNjioFcK1mev7ZoamIbM+xpmabhLs2iBtce5Nq0lH7l4hDCRj7Nj
+ VoTYNy/KpR9O+KVmpbbK0JNbsuWJi0QMyMSOLCxkI=
+Message-ID: <cd2c7d64-268f-940d-36aa-2ab30545f503@ilande.co.uk>
+Date: Thu, 20 Apr 2023 11:18:22 +0100
 MIME-Version: 1.0
 References: <20230418162140.373219-1-alex.bennee@linaro.org>
- <20230418162140.373219-12-alex.bennee@linaro.org>
+ <20230418162140.373219-13-alex.bennee@linaro.org>
 From: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
-In-Reply-To: <20230418162140.373219-12-alex.bennee@linaro.org>
+In-Reply-To: <20230418162140.373219-13-alex.bennee@linaro.org>
 Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v2 11/13] hw/virtio: derive vhost-user-gpio
- from vhost-user-device
+Subject: Re: [Virtio-fs] [PATCH v2 12/13] hw/virtio: derive vhost-user-i2c
+ from vhost-user-base
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -40,258 +40,176 @@ Cc: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, Eduardo Habkost
 
 On 18/04/2023 17:21, Alex Bennée wrote:
 
-> Now the new base class supports config handling we can take advantage
-> and make vhost-user-gpio a much simpler boilerplate wrapper. Also as
-> this doesn't require any target specific hacks we only need to build
-> the stubs once.
+> Now we can take advantage of the new base class and make
+> vhost-user-i2c a much simpler boilerplate wrapper. Also as this
+> doesn't require any target specific hacks we only need to build the
+> stubs once.
 > 
 > Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 > 
 > ---
 > v2
->    - use new vhost-user-base
+>    - update to new inheritance scheme
 >    - move build to common code
 > ---
->   include/hw/virtio/vhost-user-gpio.h |  23 +-
->   hw/virtio/vhost-user-gpio.c         | 400 ++--------------------------
->   hw/virtio/meson.build               |   5 +-
->   3 files changed, 22 insertions(+), 406 deletions(-)
+>   include/hw/virtio/vhost-user-i2c.h |  18 +-
+>   hw/virtio/vhost-user-i2c.c         | 255 ++---------------------------
+>   hw/virtio/meson.build              |   5 +-
+>   3 files changed, 26 insertions(+), 252 deletions(-)
 > 
-> diff --git a/include/hw/virtio/vhost-user-gpio.h b/include/hw/virtio/vhost-user-gpio.h
-> index a9d3f9b049..0948654dec 100644
-> --- a/include/hw/virtio/vhost-user-gpio.h
-> +++ b/include/hw/virtio/vhost-user-gpio.h
-> @@ -12,33 +12,14 @@
->   #include "hw/virtio/virtio.h"
+> diff --git a/include/hw/virtio/vhost-user-i2c.h b/include/hw/virtio/vhost-user-i2c.h
+> index 0f7acd40e3..47153782d1 100644
+> --- a/include/hw/virtio/vhost-user-i2c.h
+> +++ b/include/hw/virtio/vhost-user-i2c.h
+> @@ -12,20 +12,18 @@
 >   #include "hw/virtio/vhost.h"
 >   #include "hw/virtio/vhost-user.h"
-> -#include "standard-headers/linux/virtio_gpio.h"
-> -#include "chardev/char-fe.h"
+>   
+> +#include "hw/virtio/virtio.h"
+> +#include "hw/virtio/vhost.h"
+> +#include "hw/virtio/vhost-user.h"
 > +#include "hw/virtio/vhost-user-device.h"
+> +
+>   #define TYPE_VHOST_USER_I2C "vhost-user-i2c-device"
+>   OBJECT_DECLARE_SIMPLE_TYPE(VHostUserI2C, VHOST_USER_I2C)
 >   
->   #define TYPE_VHOST_USER_GPIO "vhost-user-gpio-device"
->   OBJECT_DECLARE_SIMPLE_TYPE(VHostUserGPIO, VHOST_USER_GPIO);
->   
->   struct VHostUserGPIO {
->       /*< private >*/
-> -    VirtIODevice parent_obj;
+>   struct VHostUserI2C {
+> -    VirtIODevice parent;
 > -    CharBackend chardev;
-> -    struct virtio_gpio_config config;
-> -    struct vhost_virtqueue *vhost_vqs;
+> -    struct vhost_virtqueue *vhost_vq;
 > -    struct vhost_dev vhost_dev;
 > -    VhostUserState vhost_user;
-> -    VirtQueue *command_vq;
-> -    VirtQueue *interrupt_vq;
-> -    /**
-> -     * There are at least two steps of initialization of the
-> -     * vhost-user device. The first is a "connect" step and
-> -     * second is a "start" step. Make a separation between
-> -     * those initialization phases by using two fields.
-> -     *
-> -     * @connected: see vu_gpio_connect()/vu_gpio_disconnect()
-> -     * @started_vu: see vu_gpio_start()/vu_gpio_stop()
-> -     */
+> -    VirtQueue *vq;
 > -    bool connected;
-> -    bool started_vu;
+> +    /*< private >*/
 > +    VHostUserBase parent;
->       /*< public >*/
+> +    /*< public >*/
 >   };
 
-As before:
+And same again:
 
-struct VHostUserGPIO {
+struct VHostUserI2C {
      VHostUserBase parent_obj;
 };
 
-> diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
-> index 3b013f2d0f..9f37c25415 100644
-> --- a/hw/virtio/vhost-user-gpio.c
-> +++ b/hw/virtio/vhost-user-gpio.c
-> @@ -11,382 +11,25 @@
->   #include "hw/qdev-properties.h"
->   #include "hw/virtio/virtio-bus.h"
->   #include "hw/virtio/vhost-user-gpio.h"
-> -#include "qemu/error-report.h"
->   #include "standard-headers/linux/virtio_ids.h"
-> -#include "trace.h"
-> +#include "standard-headers/linux/virtio_gpio.h"
->   
-> -#define REALIZE_CONNECTION_RETRIES 3
-> -#define VHOST_NVQS 2
+> -/* Virtio Feature bits */
+> -#define VIRTIO_I2C_F_ZERO_LENGTH_REQUEST		0
 > -
-> -/* Features required from VirtIO */
+>   #endif /* QEMU_VHOST_USER_I2C_H */
+> diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+> index 60eaf0d95b..4a1f644a87 100644
+> --- a/hw/virtio/vhost-user-i2c.c
+> +++ b/hw/virtio/vhost-user-i2c.c
+> @@ -14,237 +14,21 @@
+>   #include "qemu/error-report.h"
+>   #include "standard-headers/linux/virtio_ids.h"
+>   
 > -static const int feature_bits[] = {
-> -    VIRTIO_F_VERSION_1,
-> -    VIRTIO_F_NOTIFY_ON_EMPTY,
-> -    VIRTIO_RING_F_INDIRECT_DESC,
-> -    VIRTIO_RING_F_EVENT_IDX,
-> -    VIRTIO_GPIO_F_IRQ,
+> -    VIRTIO_I2C_F_ZERO_LENGTH_REQUEST,
 > -    VIRTIO_F_RING_RESET,
 > -    VHOST_INVALID_FEATURE_BIT
-> -};
-> -
-> -static void vu_gpio_get_config(VirtIODevice *vdev, uint8_t *config)
-> -{
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
-> -
-> -    memcpy(config, &gpio->config, sizeof(gpio->config));
-> -}
-> -
-> -static int vu_gpio_config_notifier(struct vhost_dev *dev)
-> -{
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(dev->vdev);
-> -
-> -    memcpy(dev->vdev->config, &gpio->config, sizeof(gpio->config));
-> -    virtio_notify_config(dev->vdev);
-> -
-> -    return 0;
-> -}
-> -
-> -const VhostDevConfigOps gpio_ops = {
-> -    .vhost_dev_config_notifier = vu_gpio_config_notifier,
-> +static Property vgpio_properties[] = {
+> +static Property vi2c_properties[] = {
 > +    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
 > +    DEFINE_PROP_END_OF_LIST(),
 >   };
 >   
-> -static int vu_gpio_start(VirtIODevice *vdev)
-> +static void vgpio_realize(DeviceState *dev, Error **errp)
->   {
+> -static void vu_i2c_start(VirtIODevice *vdev)
+> -{
 > -    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
 > -    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
-> -    struct vhost_dev *vhost_dev = &gpio->vhost_dev;
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -    int ret, i;
-> +    VHostUserBase *vub = VHOST_USER_BASE(dev);
-> +    VHostUserBaseClass *vubc = VHOST_USER_BASE_GET_CLASS(dev);
->   
+> -
 > -    if (!k->set_guest_notifiers) {
 > -        error_report("binding does not support guest notifiers");
-> -        return -ENOSYS;
-> -    }
-> +    /* Fixed for GPIO */
-> +    vub->virtio_id = VIRTIO_ID_GPIO;
-> +    vub->num_vqs = 2;
-> +    vub->config_size = sizeof(struct virtio_gpio_config);
->   
-> -    ret = vhost_dev_enable_notifiers(vhost_dev, vdev);
-> -    if (ret < 0) {
-> -        error_report("Error enabling host notifiers: %d", ret);
-> -        return ret;
+> -        return;
 > -    }
 > -
-> -    ret = k->set_guest_notifiers(qbus->parent, vhost_dev->nvqs, true);
+> -    ret = vhost_dev_enable_notifiers(&i2c->vhost_dev, vdev);
 > -    if (ret < 0) {
-> -        error_report("Error binding guest notifier: %d", ret);
+> -        error_report("Error enabling host notifiers: %d", -ret);
+> -        return;
+> -    }
+> -
+> -    ret = k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, true);
+> -    if (ret < 0) {
+> -        error_report("Error binding guest notifier: %d", -ret);
 > -        goto err_host_notifiers;
 > -    }
 > -
-> -    /*
-> -     * Before we start up we need to ensure we have the final feature
-> -     * set needed for the vhost configuration. The backend may also
-> -     * apply backend_features when the feature set is sent.
-> -     */
-> -    vhost_ack_features(&gpio->vhost_dev, feature_bits, vdev->guest_features);
+> -    i2c->vhost_dev.acked_features = vdev->guest_features;
 > -
-> -    ret = vhost_dev_start(&gpio->vhost_dev, vdev, false);
+> -    ret = vhost_dev_start(&i2c->vhost_dev, vdev, true);
 > -    if (ret < 0) {
-> -        error_report("Error starting vhost-user-gpio: %d", ret);
+> -        error_report("Error starting vhost-user-i2c: %d", -ret);
 > -        goto err_guest_notifiers;
 > -    }
-> -    gpio->started_vu = true;
 > -
 > -    /*
 > -     * guest_notifier_mask/pending not used yet, so just unmask
 > -     * everything here. virtio-pci will do the right thing by
 > -     * enabling/disabling irqfd.
 > -     */
-> -    for (i = 0; i < gpio->vhost_dev.nvqs; i++) {
-> -        vhost_virtqueue_mask(&gpio->vhost_dev, vdev, i, false);
+> -    for (i = 0; i < i2c->vhost_dev.nvqs; i++) {
+> -        vhost_virtqueue_mask(&i2c->vhost_dev, vdev, i, false);
 > -    }
 > -
-> -    /*
-> -     * As we must have VHOST_USER_F_PROTOCOL_FEATURES (because
-> -     * VHOST_USER_GET_CONFIG requires it) we need to explicitly enable
-> -     * the vrings.
-> -     */
-> -    g_assert(vhost_dev->vhost_ops &&
-> -             vhost_dev->vhost_ops->vhost_set_vring_enable);
-> -    ret = vhost_dev->vhost_ops->vhost_set_vring_enable(vhost_dev, true);
-> -    if (ret == 0) {
-> -        return 0;
-> -    }
-> -
-> -    error_report("Failed to start vrings for vhost-user-gpio: %d", ret);
+> -    return;
 > -
 > -err_guest_notifiers:
-> -    k->set_guest_notifiers(qbus->parent, gpio->vhost_dev.nvqs, false);
+> -    k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, false);
 > -err_host_notifiers:
-> -    vhost_dev_disable_notifiers(&gpio->vhost_dev, vdev);
-> -
-> -    return ret;
+> -    vhost_dev_disable_notifiers(&i2c->vhost_dev, vdev);
 > -}
 > -
-> -static void vu_gpio_stop(VirtIODevice *vdev)
+> -static void vu_i2c_stop(VirtIODevice *vdev)
 > -{
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
 > -    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
-> -    struct vhost_dev *vhost_dev = &gpio->vhost_dev;
 > -    int ret;
-> -
-> -    if (!gpio->started_vu) {
-> -        return;
-> -    }
-> -    gpio->started_vu = false;
 > -
 > -    if (!k->set_guest_notifiers) {
 > -        return;
 > -    }
 > -
-> -    vhost_dev_stop(vhost_dev, vdev, false);
+> -    vhost_dev_stop(&i2c->vhost_dev, vdev, true);
 > -
-> -    ret = k->set_guest_notifiers(qbus->parent, vhost_dev->nvqs, false);
+> -    ret = k->set_guest_notifiers(qbus->parent, i2c->vhost_dev.nvqs, false);
 > -    if (ret < 0) {
 > -        error_report("vhost guest notifier cleanup failed: %d", ret);
 > -        return;
 > -    }
 > -
-> -    vhost_dev_disable_notifiers(vhost_dev, vdev);
+> -    vhost_dev_disable_notifiers(&i2c->vhost_dev, vdev);
 > -}
 > -
-> -static void vu_gpio_set_status(VirtIODevice *vdev, uint8_t status)
+> -static void vu_i2c_set_status(VirtIODevice *vdev, uint8_t status)
 > -{
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -    bool should_start = virtio_device_should_start(vdev, status);
 > -
-> -    trace_virtio_gpio_set_status(status);
-> -
-> -    if (!gpio->connected) {
-> -        return;
-> -    }
-> -
-> -    if (vhost_dev_is_started(&gpio->vhost_dev) == should_start) {
+> -    if (vhost_dev_is_started(&i2c->vhost_dev) == should_start) {
 > -        return;
 > -    }
 > -
 > -    if (should_start) {
-> -        if (vu_gpio_start(vdev)) {
-> -            qemu_chr_fe_disconnect(&gpio->chardev);
-> -        }
+> -        vu_i2c_start(vdev);
 > -    } else {
-> -        vu_gpio_stop(vdev);
+> -        vu_i2c_stop(vdev);
 > -    }
 > -}
 > -
-> -static uint64_t vu_gpio_get_features(VirtIODevice *vdev, uint64_t features,
-> -                                     Error **errp)
+> -static uint64_t vu_i2c_get_features(VirtIODevice *vdev,
+> -                                    uint64_t requested_features, Error **errp)
 > -{
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -
-> -    return vhost_get_features(&gpio->vhost_dev, feature_bits, features);
+> -    virtio_add_feature(&requested_features, VIRTIO_I2C_F_ZERO_LENGTH_REQUEST);
+> -    return vhost_get_features(&i2c->vhost_dev, feature_bits, requested_features);
 > -}
 > -
-> -static void vu_gpio_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+> -static void vu_i2c_handle_output(VirtIODevice *vdev, VirtQueue *vq)
 > -{
 > -    /*
 > -     * Not normally called; it's the daemon that handles the queue;
@@ -299,103 +217,76 @@ struct VHostUserGPIO {
 > -     */
 > -}
 > -
-> -static void vu_gpio_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+> -static void vu_i2c_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
 > -{
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -
-> -    /*
-> -     * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
-> -     * as the macro of configure interrupt's IDX, If this driver does not
-> -     * support, the function will return
-> -     */
-> -
-> -    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-> -        return;
-> -    }
-> -
-> -    vhost_virtqueue_mask(&gpio->vhost_dev, vdev, idx, mask);
+> -    vhost_virtqueue_mask(&i2c->vhost_dev, vdev, idx, mask);
 > -}
 > -
-> -static void do_vhost_user_cleanup(VirtIODevice *vdev, VHostUserGPIO *gpio)
+> -static bool vu_i2c_guest_notifier_pending(VirtIODevice *vdev, int idx)
 > -{
-> -    virtio_delete_queue(gpio->command_vq);
-> -    virtio_delete_queue(gpio->interrupt_vq);
-> -    g_free(gpio->vhost_vqs);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+> -
+> -    return vhost_virtqueue_pending(&i2c->vhost_dev, idx);
+> -}
+> -
+> -static void do_vhost_user_cleanup(VirtIODevice *vdev, VHostUserI2C *i2c)
+> -{
+> -    vhost_user_cleanup(&i2c->vhost_user);
+> -    virtio_delete_queue(i2c->vq);
 > -    virtio_cleanup(vdev);
-> -    vhost_user_cleanup(&gpio->vhost_user);
 > -}
 > -
-> -static int vu_gpio_connect(DeviceState *dev, Error **errp)
+> -static int vu_i2c_connect(DeviceState *dev)
 > -{
 > -    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
-> -    struct vhost_dev *vhost_dev = &gpio->vhost_dev;
-> -    int ret;
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -
-> -    if (gpio->connected) {
+> -    if (i2c->connected) {
 > -        return 0;
 > -    }
-> -    gpio->connected = true;
-> -
-> -    vhost_dev_set_config_notifier(vhost_dev, &gpio_ops);
-> -    gpio->vhost_user.supports_config = true;
-> -
-> -    gpio->vhost_dev.nvqs = VHOST_NVQS;
-> -    gpio->vhost_dev.vqs = gpio->vhost_vqs;
-> -
-> -    ret = vhost_dev_init(vhost_dev, &gpio->vhost_user,
-> -                         VHOST_BACKEND_TYPE_USER, 0, errp);
-> -    if (ret < 0) {
-> -        return ret;
-> -    }
+> -    i2c->connected = true;
 > -
 > -    /* restore vhost state */
 > -    if (virtio_device_started(vdev, vdev->status)) {
-> -        vu_gpio_start(vdev);
+> -        vu_i2c_start(vdev);
 > -    }
 > -
 > -    return 0;
 > -}
 > -
-> -static void vu_gpio_event(void *opaque, QEMUChrEvent event);
-> -
-> -static void vu_gpio_disconnect(DeviceState *dev)
+> -static void vu_i2c_disconnect(DeviceState *dev)
 > -{
 > -    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -
-> -    if (!gpio->connected) {
+> -    if (!i2c->connected) {
 > -        return;
 > -    }
-> -    gpio->connected = false;
+> -    i2c->connected = false;
 > -
-> -    vu_gpio_stop(vdev);
-> -    vhost_dev_cleanup(&gpio->vhost_dev);
-> -
-> -    /* Re-instate the event handler for new connections */
-> -    qemu_chr_fe_set_handlers(&gpio->chardev,
-> -                             NULL, NULL, vu_gpio_event,
-> -                             NULL, dev, NULL, true);
+> -    if (vhost_dev_is_started(&i2c->vhost_dev)) {
+> -        vu_i2c_stop(vdev);
+> -    }
 > -}
 > -
-> -static void vu_gpio_event(void *opaque, QEMUChrEvent event)
-> -{
+> -static void vu_i2c_event(void *opaque, QEMUChrEvent event)
+> +static void vi2c_realize(DeviceState *dev, Error **errp)
+>   {
 > -    DeviceState *dev = opaque;
 > -    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(vdev);
-> -    Error *local_err = NULL;
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
 > -
 > -    switch (event) {
 > -    case CHR_EVENT_OPENED:
-> -        if (vu_gpio_connect(dev, &local_err) < 0) {
-> -            qemu_chr_fe_disconnect(&gpio->chardev);
+> -        if (vu_i2c_connect(dev) < 0) {
+> -            qemu_chr_fe_disconnect(&i2c->chardev);
 > -            return;
 > -        }
 > -        break;
 > -    case CHR_EVENT_CLOSED:
-> -        /* defer close until later to avoid circular close */
-> -        vhost_user_async_close(dev, &gpio->chardev, &gpio->vhost_dev,
-> -                               vu_gpio_disconnect);
+> -        vu_i2c_disconnect(dev);
 > -        break;
 > -    case CHR_EVENT_BREAK:
 > -    case CHR_EVENT_MUX_IN:
@@ -405,164 +296,125 @@ struct VHostUserGPIO {
 > -    }
 > -}
 > -
-> -static int vu_gpio_realize_connect(VHostUserGPIO *gpio, Error **errp)
+> -static void vu_i2c_device_realize(DeviceState *dev, Error **errp)
 > -{
-> -    VirtIODevice *vdev = &gpio->parent_obj;
-> -    DeviceState *dev = &vdev->parent_obj;
-> -    struct vhost_dev *vhost_dev = &gpio->vhost_dev;
+> -    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(dev);
 > -    int ret;
 > -
-> -    ret = qemu_chr_fe_wait_connected(&gpio->chardev, errp);
-> -    if (ret < 0) {
-> -        return ret;
-> -    }
-> -
-> -    /*
-> -     * vu_gpio_connect() may have already connected (via the event
-> -     * callback) in which case it will just report success.
-> -     */
-> -    ret = vu_gpio_connect(dev, errp);
-> -    if (ret < 0) {
-> -        qemu_chr_fe_disconnect(&gpio->chardev);
-> -        return ret;
-> -    }
-> -    g_assert(gpio->connected);
-> -
-> -    ret = vhost_dev_get_config(vhost_dev, (uint8_t *)&gpio->config,
-> -                               sizeof(gpio->config), errp);
-> -
-> -    if (ret < 0) {
-> -        error_report("vhost-user-gpio: get config failed");
-> -
-> -        qemu_chr_fe_disconnect(&gpio->chardev);
-> -        vhost_dev_cleanup(vhost_dev);
-> -        return ret;
-> -    }
-> -
-> -    return 0;
-> -}
-> -
-> -static void vu_gpio_device_realize(DeviceState *dev, Error **errp)
-> -{
-> -    ERRP_GUARD();
-> -
-> -    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(dev);
-> -    int retries, ret;
-> -
-> -    if (!gpio->chardev.chr) {
-> -        error_setg(errp, "vhost-user-gpio: chardev is mandatory");
+> -    if (!i2c->chardev.chr) {
+> -        error_setg(errp, "vhost-user-i2c: missing chardev");
 > -        return;
 > -    }
 > -
-> -    if (!vhost_user_init(&gpio->vhost_user, &gpio->chardev, errp)) {
+> -    if (!vhost_user_init(&i2c->vhost_user, &i2c->chardev, errp)) {
 > -        return;
 > -    }
 > -
-> -    virtio_init(vdev, VIRTIO_ID_GPIO, sizeof(gpio->config));
+> -    virtio_init(vdev, VIRTIO_ID_I2C_ADAPTER, 0);
+> +    VHostUserBase *vub = VHOST_USER_BASE(dev);
+> +    VHostUserBaseClass *vubc = VHOST_USER_BASE_GET_CLASS(dev);
+>   
+> -    i2c->vhost_dev.nvqs = 1;
+> -    i2c->vq = virtio_add_queue(vdev, 4, vu_i2c_handle_output);
+> -    i2c->vhost_dev.vqs = g_new0(struct vhost_virtqueue, i2c->vhost_dev.nvqs);
+> +    /* Fixed for I2C */
+> +    vub->virtio_id = VIRTIO_ID_I2C_ADAPTER;
+> +    vub->num_vqs = 1;
+>   
+> -    ret = vhost_dev_init(&i2c->vhost_dev, &i2c->vhost_user,
+> -                         VHOST_BACKEND_TYPE_USER, 0, errp);
+> -    if (ret < 0) {
+> -        g_free(i2c->vhost_dev.vqs);
+> -        do_vhost_user_cleanup(vdev, i2c);
+> -    }
 > -
-> -    gpio->command_vq = virtio_add_queue(vdev, 256, vu_gpio_handle_output);
-> -    gpio->interrupt_vq = virtio_add_queue(vdev, 256, vu_gpio_handle_output);
-> -    gpio->vhost_vqs = g_new0(struct vhost_virtqueue, VHOST_NVQS);
-> -
-> -    gpio->connected = false;
-> -
-> -    qemu_chr_fe_set_handlers(&gpio->chardev, NULL, NULL, vu_gpio_event, NULL,
+> -    qemu_chr_fe_set_handlers(&i2c->chardev, NULL, NULL, vu_i2c_event, NULL,
 > -                             dev, NULL, true);
-> -
-> -    retries = REALIZE_CONNECTION_RETRIES;
-> -    g_assert(!*errp);
-> -    do {
-> -        if (*errp) {
-> -            error_prepend(errp, "Reconnecting after error: ");
-> -            error_report_err(*errp);
-> -            *errp = NULL;
-> -        }
-> -        ret = vu_gpio_realize_connect(gpio, errp);
-> -    } while (ret < 0 && retries--);
-> -
-> -    if (ret < 0) {
-> -        do_vhost_user_cleanup(vdev, gpio);
-> -    }
-> -
-> -    return;
 > -}
 > -
-> -static void vu_gpio_device_unrealize(DeviceState *dev)
+> -static void vu_i2c_device_unrealize(DeviceState *dev)
 > -{
 > -    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-> -    VHostUserGPIO *gpio = VHOST_USER_GPIO(dev);
+> -    VHostUserI2C *i2c = VHOST_USER_I2C(dev);
+> -    struct vhost_virtqueue *vhost_vqs = i2c->vhost_dev.vqs;
 > -
-> -    vu_gpio_set_status(vdev, 0);
-> -    qemu_chr_fe_set_handlers(&gpio->chardev, NULL, NULL, NULL, NULL, NULL, NULL,
-> -                             false);
-> -    vhost_dev_cleanup(&gpio->vhost_dev);
-> -    do_vhost_user_cleanup(vdev, gpio);
+> -    /* This will stop vhost backend if appropriate. */
+> -    vu_i2c_set_status(vdev, 0);
+> -    vhost_dev_cleanup(&i2c->vhost_dev);
+> -    g_free(vhost_vqs);
+> -    do_vhost_user_cleanup(vdev, i2c);
 > +    vubc->parent_realize(dev, errp);
 >   }
 >   
->   static const VMStateDescription vu_gpio_vmstate = {
-> @@ -394,30 +37,21 @@ static const VMStateDescription vu_gpio_vmstate = {
+>   static const VMStateDescription vu_i2c_vmstate = {
+> @@ -252,30 +36,21 @@ static const VMStateDescription vu_i2c_vmstate = {
 >       .unmigratable = 1,
 >   };
 >   
-> -static Property vu_gpio_properties[] = {
-> -    DEFINE_PROP_CHR("chardev", VHostUserGPIO, chardev),
+> -static Property vu_i2c_properties[] = {
+> -    DEFINE_PROP_CHR("chardev", VHostUserI2C, chardev),
 > -    DEFINE_PROP_END_OF_LIST(),
 > -};
 > -
->   static void vu_gpio_class_init(ObjectClass *klass, void *data)
+>   static void vu_i2c_class_init(ObjectClass *klass, void *data)
 >   {
 >       DeviceClass *dc = DEVICE_CLASS(klass);
 > -    VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
 > +    VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
 >   
-> -    device_class_set_props(dc, vu_gpio_properties);
->       dc->vmsd = &vu_gpio_vmstate;
-> +    device_class_set_props(dc, vgpio_properties);
-> +    device_class_set_parent_realize(dc, vgpio_realize,
+> -    device_class_set_props(dc, vu_i2c_properties);
+>       dc->vmsd = &vu_i2c_vmstate;
+> +    device_class_set_props(dc, vi2c_properties);
+> +    device_class_set_parent_realize(dc, vi2c_realize,
 > +                                    &vubc->parent_realize);
 >       set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
-> -    vdc->realize = vu_gpio_device_realize;
-> -    vdc->unrealize = vu_gpio_device_unrealize;
-> -    vdc->get_features = vu_gpio_get_features;
-> -    vdc->get_config = vu_gpio_get_config;
-> -    vdc->set_status = vu_gpio_set_status;
-> -    vdc->guest_notifier_mask = vu_gpio_guest_notifier_mask;
+> -    vdc->realize = vu_i2c_device_realize;
+> -    vdc->unrealize = vu_i2c_device_unrealize;
+> -    vdc->get_features = vu_i2c_get_features;
+> -    vdc->set_status = vu_i2c_set_status;
+> -    vdc->guest_notifier_mask = vu_i2c_guest_notifier_mask;
+> -    vdc->guest_notifier_pending = vu_i2c_guest_notifier_pending;
 >   }
 >   
->   static const TypeInfo vu_gpio_info = {
->       .name = TYPE_VHOST_USER_GPIO,
+>   static const TypeInfo vu_i2c_info = {
+>       .name = TYPE_VHOST_USER_I2C,
 > -    .parent = TYPE_VIRTIO_DEVICE,
 > +    .parent = TYPE_VHOST_USER_BASE,
->       .instance_size = sizeof(VHostUserGPIO),
->       .class_init = vu_gpio_class_init,
+>       .instance_size = sizeof(VHostUserI2C),
+>       .class_init = vu_i2c_class_init,
 >   };
 > diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
-> index de442dcb96..8c6cb2143d 100644
+> index 8c6cb2143d..31c0406f05 100644
 > --- a/hw/virtio/meson.build
 > +++ b/hw/virtio/meson.build
-> @@ -7,6 +7,9 @@ softmmu_virtio_ss.add(when: 'CONFIG_VIRTIO_MMIO', if_true: files('virtio-mmio.c'
->   softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_RNG', if_true: files('vhost-user-rng.c'))
->   softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_RNG'],
->                         if_true: files('vhost-user-rng-pci.c'))
-> +softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_GPIO', if_true: files('vhost-user-gpio.c'))
-> +softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_GPIO'],
-> +                      if_true: files('vhost-user-gpio-pci.c'))
+> @@ -10,6 +10,9 @@ softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_RNG'],
+>   softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_GPIO', if_true: files('vhost-user-gpio.c'))
+>   softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_GPIO'],
+>                         if_true: files('vhost-user-gpio-pci.c'))
+> +softmmu_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
+> +softmmu_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_I2C'],
+> +                       if_true: files('vhost-user-i2c-pci.c'))
 >   
 >   specific_virtio_ss = ss.source_set()
 >   specific_virtio_ss.add(files('virtio.c'))
-> @@ -37,8 +40,6 @@ specific_virtio_ss.add(when: 'CONFIG_VIRTIO_RNG', if_true: files('virtio-rng.c')
+> @@ -39,14 +42,12 @@ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-us
+>   specific_virtio_ss.add(when: 'CONFIG_VIRTIO_RNG', if_true: files('virtio-rng.c'))
 >   specific_virtio_ss.add(when: 'CONFIG_VIRTIO_IOMMU', if_true: files('virtio-iommu.c'))
 >   specific_virtio_ss.add(when: 'CONFIG_VIRTIO_MEM', if_true: files('virtio-mem.c'))
->   specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
-> -specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_GPIO', if_true: files('vhost-user-gpio.c'))
-> -specific_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_GPIO'], if_true: files('vhost-user-gpio-pci.c'))
+> -specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
 >   specific_virtio_ss.add(when: 'CONFIG_VHOST_VDPA_DEV', if_true: files('vdpa-dev.c'))
 >   
 >   virtio_pci_ss = ss.source_set()
+>   virtio_pci_ss.add(when: 'CONFIG_VHOST_VSOCK', if_true: files('vhost-vsock-pci.c'))
+>   virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-user-vsock-pci.c'))
+>   virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_BLK', if_true: files('vhost-user-blk-pci.c'))
+> -virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c-pci.c'))
+>   virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_INPUT', if_true: files('vhost-user-input-pci.c'))
+>   virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_SCSI', if_true: files('vhost-user-scsi-pci.c'))
+>   virtio_pci_ss.add(when: 'CONFIG_VHOST_SCSI', if_true: files('vhost-scsi-pci.c'))
 
-Otherwise LGTM:
+Otherwise:
 
 Acked-by: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
 

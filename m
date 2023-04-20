@@ -1,13 +1,13 @@
 Return-Path: <stefanha@redhat.com>
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu, 20 Apr 2023 08:09:47 -0400
-Message-Id: <20230420120948.436661-20-stefanha@redhat.com>
+Date: Thu, 20 Apr 2023 08:09:48 -0400
+Message-Id: <20230420120948.436661-21-stefanha@redhat.com>
 In-Reply-To: <20230420120948.436661-1-stefanha@redhat.com>
 References: <20230420120948.436661-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 19/20] docs/zoned-storage:add zoned emulation use
- case
+Subject: [Virtio-fs] [PULL 20/20] tracing: install trace events file only if
+ necessary
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,56 +17,32 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Julia Suvorova <jusual@redhat.com>, Eric Blake <eblake@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Thomas Huth <thuth@redhat.com>, qemu-block@nongnu.org, Cornelia Huck <cohuck@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, Stefano Garzarella <sgarzare@redhat.com>, kvm@vger.kernel.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Fam Zheng <fam@euphon.net>, Aarushi Mehta <mehta.aaru20@gmail.com>, Sam Li <faithilikerun@gmail.com>
+Cc: Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Julia Suvorova <jusual@redhat.com>, Eric Blake <eblake@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Thomas Huth <thuth@redhat.com>, qemu-block@nongnu.org, Cornelia Huck <cohuck@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, Stefano Garzarella <sgarzare@redhat.com>, kvm@vger.kernel.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Fam Zheng <fam@euphon.net>, Aarushi Mehta <mehta.aaru20@gmail.com>, Carlos Santos <casantos@redhat.com>
 
-From: Sam Li <faithilikerun@gmail.com>
+From: Carlos Santos <casantos@redhat.com>
 
-Add the documentation about the example of using virtio-blk driver
-to pass the zoned block devices through to the guest.
+It is not useful when configuring with --enable-trace-backends=nop.
 
-Signed-off-by: Sam Li <faithilikerun@gmail.com>
-Message-id: 20230407082528.18841-6-faithilikerun@gmail.com
-[Fix Sphinx indentation error by turning command-lines into
-pre-formatted text.
---Stefan]
+Signed-off-by: Carlos Santos <casantos@redhat.com>
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Message-Id: <20230408010410.281263-1-casantos@redhat.com>
 ---
- docs/devel/zoned-storage.rst | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
+ trace/meson.build | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/docs/devel/zoned-storage.rst b/docs/devel/zoned-storage.rst
-index 6a36133e51..e02500c8a3 100644
---- a/docs/devel/zoned-storage.rst
-+++ b/docs/devel/zoned-storage.rst
-@@ -38,6 +38,25 @@ When the BlockBackend's BlockLimits model reports a zoned storage device, users
- like the virtio-blk emulation or the qemu-io-cmds.c utility can use block layer
- APIs for zoned storage emulation or testing.
+diff --git a/trace/meson.build b/trace/meson.build
+index 8e80be895c..30b1d942eb 100644
+--- a/trace/meson.build
++++ b/trace/meson.build
+@@ -64,7 +64,7 @@ trace_events_all = custom_target('trace-events-all',
+                                  input: trace_events_files,
+                                  command: [ 'cat', '@INPUT@' ],
+                                  capture: true,
+-                                 install: true,
++                                 install: get_option('trace_backends') != [ 'nop' ],
+                                  install_dir: qemu_datadir)
  
--For example, to test zone_report on a null_blk device using qemu-io is:
--$ path/to/qemu-io --image-opts -n driver=host_device,filename=/dev/nullb0
---c "zrp offset nr_zones"
-+For example, to test zone_report on a null_blk device using qemu-io is::
-+
-+  $ path/to/qemu-io --image-opts -n driver=host_device,filename=/dev/nullb0 -c "zrp offset nr_zones"
-+
-+To expose the host's zoned block device through virtio-blk, the command line
-+can be (includes the -device parameter)::
-+
-+  -blockdev node-name=drive0,driver=host_device,filename=/dev/nullb0,cache.direct=on \
-+      -device virtio-blk-pci,drive=drive0
-+
-+Or only use the -drive parameter::
-+
-+  -driver driver=host_device,file=/dev/nullb0,if=virtio,cache.direct=on
-+
-+Additionally, QEMU has several ways of supporting zoned storage, including:
-+(1) Using virtio-scsi: --device scsi-block allows for the passing through of
-+SCSI ZBC devices, enabling the attachment of ZBC or ZAC HDDs to QEMU.
-+(2) PCI device pass-through: While NVMe ZNS emulation is available for testing
-+purposes, it cannot yet pass through a zoned device from the host. To pass on
-+the NVMe ZNS device to the guest, use VFIO PCI pass the entire NVMe PCI adapter
-+through to the guest. Likewise, an HDD HBA can be passed on to QEMU all HDDs
-+attached to the HBA.
+ if 'ust' in get_option('trace_backends')
 -- 
 2.39.2
 

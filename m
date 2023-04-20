@@ -1,13 +1,13 @@
 Return-Path: <stefanha@redhat.com>
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu, 20 Apr 2023 08:09:42 -0400
-Message-Id: <20230420120948.436661-15-stefanha@redhat.com>
+Date: Thu, 20 Apr 2023 08:09:45 -0400
+Message-Id: <20230420120948.436661-18-stefanha@redhat.com>
 In-Reply-To: <20230420120948.436661-1-stefanha@redhat.com>
 References: <20230420120948.436661-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 14/20] block: add some trace events for zone
- append
+Subject: [Virtio-fs] [PULL 17/20] block: add accounting for zone append
+ operation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,54 +17,348 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Julia Suvorova <jusual@redhat.com>, Eric Blake <eblake@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Thomas Huth <thuth@redhat.com>, qemu-block@nongnu.org, Cornelia Huck <cohuck@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, Stefano Garzarella <sgarzare@redhat.com>, kvm@vger.kernel.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Fam Zheng <fam@euphon.net>, Aarushi Mehta <mehta.aaru20@gmail.com>, Sam Li <faithilikerun@gmail.com>, Dmitry Fomichev <dmitry.fomichev@wdc.com>
+Cc: Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Julia Suvorova <jusual@redhat.com>, Eric Blake <eblake@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Thomas Huth <thuth@redhat.com>, qemu-block@nongnu.org, Cornelia Huck <cohuck@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, Stefano Garzarella <sgarzare@redhat.com>, kvm@vger.kernel.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Fam Zheng <fam@euphon.net>, Aarushi Mehta <mehta.aaru20@gmail.com>, Sam Li <faithilikerun@gmail.com>
 
 From: Sam Li <faithilikerun@gmail.com>
 
+Taking account of the new zone append write operation for zoned devices,
+BLOCK_ACCT_ZONE_APPEND enum is introduced as other I/O request type (read,
+write, flush).
+
 Signed-off-by: Sam Li <faithilikerun@gmail.com>
-Reviewed-by: Dmitry Fomichev <dmitry.fomichev@wdc.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-id: 20230407081657.17947-5-faithilikerun@gmail.com
+Message-id: 20230407082528.18841-4-faithilikerun@gmail.com
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- block/file-posix.c | 3 +++
- block/trace-events | 2 ++
- 2 files changed, 5 insertions(+)
+ qapi/block-core.json       | 68 ++++++++++++++++++++++++++++++++------
+ qapi/block.json            |  4 +++
+ include/block/accounting.h |  1 +
+ block/qapi-sysemu.c        | 11 ++++++
+ block/qapi.c               | 18 ++++++++++
+ hw/block/virtio-blk.c      |  4 +++
+ 6 files changed, 95 insertions(+), 11 deletions(-)
 
-diff --git a/block/file-posix.c b/block/file-posix.c
-index 444b34dad2..972d641538 100644
---- a/block/file-posix.c
-+++ b/block/file-posix.c
-@@ -2504,6 +2504,8 @@ out:
-             if (!BDRV_ZT_IS_CONV(*wp)) {
-                 if (type & QEMU_AIO_ZONE_APPEND) {
-                     *s->offset = *wp;
-+                    trace_zbd_zone_append_complete(bs, *s->offset
-+                        >> BDRV_SECTOR_BITS);
-                 }
-                 /* Advance the wp if needed */
-                 if (offset + bytes > *wp) {
-@@ -3550,6 +3552,7 @@ static int coroutine_fn raw_co_zone_append(BlockDriverState *bs,
-         len += iov_len;
+diff --git a/qapi/block-core.json b/qapi/block-core.json
+index c05ad0c07e..44a70aad21 100644
+--- a/qapi/block-core.json
++++ b/qapi/block-core.json
+@@ -849,6 +849,10 @@
+ # @min_wr_latency_ns: Minimum latency of write operations in the
+ #                     defined interval, in nanoseconds.
+ #
++# @min_zone_append_latency_ns: Minimum latency of zone append operations
++#                              in the defined interval, in nanoseconds
++#                              (since 8.1)
++#
+ # @min_flush_latency_ns: Minimum latency of flush operations in the
+ #                        defined interval, in nanoseconds.
+ #
+@@ -858,6 +862,10 @@
+ # @max_wr_latency_ns: Maximum latency of write operations in the
+ #                     defined interval, in nanoseconds.
+ #
++# @max_zone_append_latency_ns: Maximum latency of zone append operations
++#                              in the defined interval, in nanoseconds
++#                              (since 8.1)
++#
+ # @max_flush_latency_ns: Maximum latency of flush operations in the
+ #                        defined interval, in nanoseconds.
+ #
+@@ -867,6 +875,10 @@
+ # @avg_wr_latency_ns: Average latency of write operations in the
+ #                     defined interval, in nanoseconds.
+ #
++# @avg_zone_append_latency_ns: Average latency of zone append operations
++#                              in the defined interval, in nanoseconds
++#                              (since 8.1)
++#
+ # @avg_flush_latency_ns: Average latency of flush operations in the
+ #                        defined interval, in nanoseconds.
+ #
+@@ -876,15 +888,23 @@
+ # @avg_wr_queue_depth: Average number of pending write operations
+ #                      in the defined interval.
+ #
++# @avg_zone_append_queue_depth: Average number of pending zone append
++#                               operations in the defined interval
++#                               (since 8.1).
++#
+ # Since: 2.5
+ ##
+ { 'struct': 'BlockDeviceTimedStats',
+   'data': { 'interval_length': 'int', 'min_rd_latency_ns': 'int',
+             'max_rd_latency_ns': 'int', 'avg_rd_latency_ns': 'int',
+             'min_wr_latency_ns': 'int', 'max_wr_latency_ns': 'int',
+-            'avg_wr_latency_ns': 'int', 'min_flush_latency_ns': 'int',
+-            'max_flush_latency_ns': 'int', 'avg_flush_latency_ns': 'int',
+-            'avg_rd_queue_depth': 'number', 'avg_wr_queue_depth': 'number' } }
++            'avg_wr_latency_ns': 'int', 'min_zone_append_latency_ns': 'int',
++            'max_zone_append_latency_ns': 'int',
++            'avg_zone_append_latency_ns': 'int',
++            'min_flush_latency_ns': 'int', 'max_flush_latency_ns': 'int',
++            'avg_flush_latency_ns': 'int', 'avg_rd_queue_depth': 'number',
++            'avg_wr_queue_depth': 'number',
++            'avg_zone_append_queue_depth': 'number'  } }
+ 
+ ##
+ # @BlockDeviceStats:
+@@ -895,12 +915,18 @@
+ #
+ # @wr_bytes: The number of bytes written by the device.
+ #
++# @zone_append_bytes: The number of bytes appended by the zoned devices
++#                     (since 8.1)
++#
+ # @unmap_bytes: The number of bytes unmapped by the device (Since 4.2)
+ #
+ # @rd_operations: The number of read operations performed by the device.
+ #
+ # @wr_operations: The number of write operations performed by the device.
+ #
++# @zone_append_operations: The number of zone append operations performed
++#                          by the zoned devices (since 8.1)
++#
+ # @flush_operations: The number of cache flush operations performed by the
+ #                    device (since 0.15)
+ #
+@@ -911,6 +937,9 @@
+ #
+ # @wr_total_time_ns: Total time spent on writes in nanoseconds (since 0.15).
+ #
++# @zone_append_total_time_ns: Total time spent on zone append writes
++#                             in nanoseconds (since 8.1)
++#
+ # @flush_total_time_ns: Total time spent on cache flushes in nanoseconds
+ #                       (since 0.15).
+ #
+@@ -928,6 +957,9 @@
+ # @wr_merged: Number of write requests that have been merged into another
+ #             request (Since 2.3).
+ #
++# @zone_append_merged: Number of zone append requests that have been merged
++#                      into another request (since 8.1)
++#
+ # @unmap_merged: Number of unmap requests that have been merged into another
+ #                request (Since 4.2)
+ #
+@@ -941,6 +973,10 @@
+ # @failed_wr_operations: The number of failed write operations
+ #                        performed by the device (Since 2.5)
+ #
++# @failed_zone_append_operations: The number of failed zone append write
++#                                 operations performed by the zoned devices
++#                                 (since 8.1)
++#
+ # @failed_flush_operations: The number of failed flush operations
+ #                           performed by the device (Since 2.5)
+ #
+@@ -953,6 +989,9 @@
+ # @invalid_wr_operations: The number of invalid write operations
+ #                         performed by the device (Since 2.5)
+ #
++# @invalid_zone_append_operations: The number of invalid zone append operations
++#                                  performed by the zoned device (since 8.1)
++#
+ # @invalid_flush_operations: The number of invalid flush operations
+ #                            performed by the device (Since 2.5)
+ #
+@@ -972,27 +1011,34 @@
+ #
+ # @wr_latency_histogram: @BlockLatencyHistogramInfo. (Since 4.0)
+ #
++# @zone_append_latency_histogram: @BlockLatencyHistogramInfo. (since 8.1)
++#
+ # @flush_latency_histogram: @BlockLatencyHistogramInfo. (Since 4.0)
+ #
+ # Since: 0.14
+ ##
+ { 'struct': 'BlockDeviceStats',
+-  'data': {'rd_bytes': 'int', 'wr_bytes': 'int', 'unmap_bytes' : 'int',
+-           'rd_operations': 'int', 'wr_operations': 'int',
++  'data': {'rd_bytes': 'int', 'wr_bytes': 'int', 'zone_append_bytes': 'int',
++           'unmap_bytes' : 'int', 'rd_operations': 'int',
++           'wr_operations': 'int', 'zone_append_operations': 'int',
+            'flush_operations': 'int', 'unmap_operations': 'int',
+            'rd_total_time_ns': 'int', 'wr_total_time_ns': 'int',
+-           'flush_total_time_ns': 'int', 'unmap_total_time_ns': 'int',
+-           'wr_highest_offset': 'int',
+-           'rd_merged': 'int', 'wr_merged': 'int', 'unmap_merged': 'int',
+-           '*idle_time_ns': 'int',
++           'zone_append_total_time_ns': 'int', 'flush_total_time_ns': 'int',
++           'unmap_total_time_ns': 'int', 'wr_highest_offset': 'int',
++           'rd_merged': 'int', 'wr_merged': 'int', 'zone_append_merged': 'int',
++           'unmap_merged': 'int', '*idle_time_ns': 'int',
+            'failed_rd_operations': 'int', 'failed_wr_operations': 'int',
+-           'failed_flush_operations': 'int', 'failed_unmap_operations': 'int',
+-           'invalid_rd_operations': 'int', 'invalid_wr_operations': 'int',
++           'failed_zone_append_operations': 'int',
++           'failed_flush_operations': 'int',
++           'failed_unmap_operations': 'int', 'invalid_rd_operations': 'int',
++           'invalid_wr_operations': 'int',
++           'invalid_zone_append_operations': 'int',
+            'invalid_flush_operations': 'int', 'invalid_unmap_operations': 'int',
+            'account_invalid': 'bool', 'account_failed': 'bool',
+            'timed_stats': ['BlockDeviceTimedStats'],
+            '*rd_latency_histogram': 'BlockLatencyHistogramInfo',
+            '*wr_latency_histogram': 'BlockLatencyHistogramInfo',
++           '*zone_append_latency_histogram': 'BlockLatencyHistogramInfo',
+            '*flush_latency_histogram': 'BlockLatencyHistogramInfo' } }
+ 
+ ##
+diff --git a/qapi/block.json b/qapi/block.json
+index 5fe068f903..5a57ef4a9f 100644
+--- a/qapi/block.json
++++ b/qapi/block.json
+@@ -525,6 +525,9 @@
+ # @boundaries-write: list of interval boundary values for write latency
+ #                    histogram.
+ #
++# @boundaries-zap: list of interval boundary values for zone append write
++#                  latency histogram.
++#
+ # @boundaries-flush: list of interval boundary values for flush latency
+ #                    histogram.
+ #
+@@ -573,5 +576,6 @@
+            '*boundaries': ['uint64'],
+            '*boundaries-read': ['uint64'],
+            '*boundaries-write': ['uint64'],
++           '*boundaries-zap': ['uint64'],
+            '*boundaries-flush': ['uint64'] },
+   'allow-preconfig': true }
+diff --git a/include/block/accounting.h b/include/block/accounting.h
+index b9caad60d5..a59e39f49d 100644
+--- a/include/block/accounting.h
++++ b/include/block/accounting.h
+@@ -37,6 +37,7 @@ enum BlockAcctType {
+     BLOCK_ACCT_READ,
+     BLOCK_ACCT_WRITE,
+     BLOCK_ACCT_FLUSH,
++    BLOCK_ACCT_ZONE_APPEND,
+     BLOCK_ACCT_UNMAP,
+     BLOCK_MAX_IOTYPE,
+ };
+diff --git a/block/qapi-sysemu.c b/block/qapi-sysemu.c
+index 7bd7554150..cec3c1afb4 100644
+--- a/block/qapi-sysemu.c
++++ b/block/qapi-sysemu.c
+@@ -517,6 +517,7 @@ void qmp_block_latency_histogram_set(
+     bool has_boundaries, uint64List *boundaries,
+     bool has_boundaries_read, uint64List *boundaries_read,
+     bool has_boundaries_write, uint64List *boundaries_write,
++    bool has_boundaries_append, uint64List *boundaries_append,
+     bool has_boundaries_flush, uint64List *boundaries_flush,
+     Error **errp)
+ {
+@@ -557,6 +558,16 @@ void qmp_block_latency_histogram_set(
+         }
      }
  
-+    trace_zbd_zone_append(bs, *offset >> BDRV_SECTOR_BITS);
-     return raw_co_prw(bs, *offset, len, qiov, QEMU_AIO_ZONE_APPEND);
- }
- #endif
-diff --git a/block/trace-events b/block/trace-events
-index 3f4e1d088a..32665158d6 100644
---- a/block/trace-events
-+++ b/block/trace-events
-@@ -211,6 +211,8 @@ file_hdev_is_sg(int type, int version) "SG device found: type=%d, version=%d"
- file_flush_fdatasync_failed(int err) "errno %d"
- zbd_zone_report(void *bs, unsigned int nr_zones, int64_t sector) "bs %p report %d zones starting at sector offset 0x%" PRIx64 ""
- zbd_zone_mgmt(void *bs, const char *op_name, int64_t sector, int64_t len) "bs %p %s starts at sector offset 0x%" PRIx64 " over a range of 0x%" PRIx64 " sectors"
-+zbd_zone_append(void *bs, int64_t sector) "bs %p append at sector offset 0x%" PRIx64 ""
-+zbd_zone_append_complete(void *bs, int64_t sector) "bs %p returns append sector 0x%" PRIx64 ""
++    if (has_boundaries || has_boundaries_append) {
++        ret = block_latency_histogram_set(
++                stats, BLOCK_ACCT_ZONE_APPEND,
++                has_boundaries_append ? boundaries_append : boundaries);
++        if (ret) {
++            error_setg(errp, "Device '%s' set append write boundaries fail", id);
++            return;
++        }
++    }
++
+     if (has_boundaries || has_boundaries_flush) {
+         ret = block_latency_histogram_set(
+             stats, BLOCK_ACCT_FLUSH,
+diff --git a/block/qapi.c b/block/qapi.c
+index c84147849d..2684484e9d 100644
+--- a/block/qapi.c
++++ b/block/qapi.c
+@@ -533,27 +533,36 @@ static void bdrv_query_blk_stats(BlockDeviceStats *ds, BlockBackend *blk)
  
- # ssh.c
- sftp_error(const char *op, const char *ssh_err, int ssh_err_code, int sftp_err_code) "%s failed: %s (libssh error code: %d, sftp error code: %d)"
+     ds->rd_bytes = stats->nr_bytes[BLOCK_ACCT_READ];
+     ds->wr_bytes = stats->nr_bytes[BLOCK_ACCT_WRITE];
++    ds->zone_append_bytes = stats->nr_bytes[BLOCK_ACCT_ZONE_APPEND];
+     ds->unmap_bytes = stats->nr_bytes[BLOCK_ACCT_UNMAP];
+     ds->rd_operations = stats->nr_ops[BLOCK_ACCT_READ];
+     ds->wr_operations = stats->nr_ops[BLOCK_ACCT_WRITE];
++    ds->zone_append_operations = stats->nr_ops[BLOCK_ACCT_ZONE_APPEND];
+     ds->unmap_operations = stats->nr_ops[BLOCK_ACCT_UNMAP];
+ 
+     ds->failed_rd_operations = stats->failed_ops[BLOCK_ACCT_READ];
+     ds->failed_wr_operations = stats->failed_ops[BLOCK_ACCT_WRITE];
++    ds->failed_zone_append_operations =
++        stats->failed_ops[BLOCK_ACCT_ZONE_APPEND];
+     ds->failed_flush_operations = stats->failed_ops[BLOCK_ACCT_FLUSH];
+     ds->failed_unmap_operations = stats->failed_ops[BLOCK_ACCT_UNMAP];
+ 
+     ds->invalid_rd_operations = stats->invalid_ops[BLOCK_ACCT_READ];
+     ds->invalid_wr_operations = stats->invalid_ops[BLOCK_ACCT_WRITE];
++    ds->invalid_zone_append_operations =
++        stats->invalid_ops[BLOCK_ACCT_ZONE_APPEND];
+     ds->invalid_flush_operations =
+         stats->invalid_ops[BLOCK_ACCT_FLUSH];
+     ds->invalid_unmap_operations = stats->invalid_ops[BLOCK_ACCT_UNMAP];
+ 
+     ds->rd_merged = stats->merged[BLOCK_ACCT_READ];
+     ds->wr_merged = stats->merged[BLOCK_ACCT_WRITE];
++    ds->zone_append_merged = stats->merged[BLOCK_ACCT_ZONE_APPEND];
+     ds->unmap_merged = stats->merged[BLOCK_ACCT_UNMAP];
+     ds->flush_operations = stats->nr_ops[BLOCK_ACCT_FLUSH];
+     ds->wr_total_time_ns = stats->total_time_ns[BLOCK_ACCT_WRITE];
++    ds->zone_append_total_time_ns =
++        stats->total_time_ns[BLOCK_ACCT_ZONE_APPEND];
+     ds->rd_total_time_ns = stats->total_time_ns[BLOCK_ACCT_READ];
+     ds->flush_total_time_ns = stats->total_time_ns[BLOCK_ACCT_FLUSH];
+     ds->unmap_total_time_ns = stats->total_time_ns[BLOCK_ACCT_UNMAP];
+@@ -571,6 +580,7 @@ static void bdrv_query_blk_stats(BlockDeviceStats *ds, BlockBackend *blk)
+ 
+         TimedAverage *rd = &ts->latency[BLOCK_ACCT_READ];
+         TimedAverage *wr = &ts->latency[BLOCK_ACCT_WRITE];
++        TimedAverage *zap = &ts->latency[BLOCK_ACCT_ZONE_APPEND];
+         TimedAverage *fl = &ts->latency[BLOCK_ACCT_FLUSH];
+ 
+         dev_stats->interval_length = ts->interval_length;
+@@ -583,6 +593,10 @@ static void bdrv_query_blk_stats(BlockDeviceStats *ds, BlockBackend *blk)
+         dev_stats->max_wr_latency_ns = timed_average_max(wr);
+         dev_stats->avg_wr_latency_ns = timed_average_avg(wr);
+ 
++        dev_stats->min_zone_append_latency_ns = timed_average_min(zap);
++        dev_stats->max_zone_append_latency_ns = timed_average_max(zap);
++        dev_stats->avg_zone_append_latency_ns = timed_average_avg(zap);
++
+         dev_stats->min_flush_latency_ns = timed_average_min(fl);
+         dev_stats->max_flush_latency_ns = timed_average_max(fl);
+         dev_stats->avg_flush_latency_ns = timed_average_avg(fl);
+@@ -591,6 +605,8 @@ static void bdrv_query_blk_stats(BlockDeviceStats *ds, BlockBackend *blk)
+             block_acct_queue_depth(ts, BLOCK_ACCT_READ);
+         dev_stats->avg_wr_queue_depth =
+             block_acct_queue_depth(ts, BLOCK_ACCT_WRITE);
++        dev_stats->avg_zone_append_queue_depth =
++            block_acct_queue_depth(ts, BLOCK_ACCT_ZONE_APPEND);
+ 
+         QAPI_LIST_PREPEND(ds->timed_stats, dev_stats);
+     }
+@@ -600,6 +616,8 @@ static void bdrv_query_blk_stats(BlockDeviceStats *ds, BlockBackend *blk)
+         = bdrv_latency_histogram_stats(&hgram[BLOCK_ACCT_READ]);
+     ds->wr_latency_histogram
+         = bdrv_latency_histogram_stats(&hgram[BLOCK_ACCT_WRITE]);
++    ds->zone_append_latency_histogram
++        = bdrv_latency_histogram_stats(&hgram[BLOCK_ACCT_ZONE_APPEND]);
+     ds->flush_latency_histogram
+         = bdrv_latency_histogram_stats(&hgram[BLOCK_ACCT_FLUSH]);
+ }
+diff --git a/hw/block/virtio-blk.c b/hw/block/virtio-blk.c
+index 8b6030b1a5..a9d3168770 100644
+--- a/hw/block/virtio-blk.c
++++ b/hw/block/virtio-blk.c
+@@ -919,6 +919,10 @@ static int virtio_blk_handle_zone_append(VirtIOBlockReq *req,
+     data->in_num = in_num;
+     data->zone_append_data.offset = offset;
+     qemu_iovec_init_external(&req->qiov, out_iov, out_num);
++
++    block_acct_start(blk_get_stats(s->blk), &req->acct, len,
++                     BLOCK_ACCT_ZONE_APPEND);
++
+     blk_aio_zone_append(s->blk, &data->zone_append_data.offset, &req->qiov, 0,
+                         virtio_blk_zone_append_complete, data);
+     return 0;
 -- 
 2.39.2
 

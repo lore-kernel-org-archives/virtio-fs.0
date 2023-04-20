@@ -1,23 +1,12 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681834901; x=1684426901;
- h=content-transfer-encoding:mime-version:message-id:date:subject:cc
- :to:from:from:to:cc:subject:date:message-id:reply-to;
- bh=5lUakfgj7bHmml2pB9qRm9X+2uzhwj9Z43jrFiMKuUs=;
- b=sNwN5GM215cHic7A4Xs+MSOgmAjeHBJqnN4WsRNV6Z/nyjF5zDcSY9YqRy+vo/hubt
- GjiaK5aHQS8WYAbSLUSChebbGmImafadNYrajmfigwiEv1F9L94+5seDUqBqxrmeA382
- 9822+z+rC5kWflHOsPG8G1AV23RPZjfsxuzAgfhU07CyN05scD0eLD4tbjqShCwwXbOH
- Lwt0/+nH2ynIQzlbrX82UlpXlru1qmLabISEX1sBVore2D/VJXJ3qcRyIXZJDf53OQxk
- kCYJ9asTIaE58iy+0VLSRcKpooRqh/xxX7rg3kTYiDAtgcBeV0NSQ30bq1LJnBekV5ln
- IwkQ==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Tue, 18 Apr 2023 17:21:27 +0100
-Message-Id: <20230418162140.373219-1-alex.bennee@linaro.org>
+Return-Path: <stefanha@redhat.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Thu, 20 Apr 2023 08:09:41 -0400
+Message-Id: <20230420120948.436661-14-stefanha@redhat.com>
+In-Reply-To: <20230420120948.436661-1-stefanha@redhat.com>
+References: <20230420120948.436661-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 00/13] virtio: add vhost-user-generic and
- reduce copy and paste
+Subject: [Virtio-fs] [PULL 13/20] qemu-iotests: test zone append operation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,99 +16,170 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Jason Wang <jasowang@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Gerd Hoffmann <kraxel@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>
+Cc: Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Julia Suvorova <jusual@redhat.com>, Eric Blake <eblake@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@linaro.org>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Thomas Huth <thuth@redhat.com>, qemu-block@nongnu.org, Cornelia Huck <cohuck@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, Stefano Garzarella <sgarzare@redhat.com>, kvm@vger.kernel.org, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Fam Zheng <fam@euphon.net>, Aarushi Mehta <mehta.aaru20@gmail.com>, Sam Li <faithilikerun@gmail.com>
 
-A lot of our vhost-user stubs are large chunks of boilerplate that do
-(mostly) the same thing. This series attempts to fix that by defining
-a new base class (vhost-user-base) which is used by a generic
-vhost-user-device implementation. Then the rng, gpio and i2c
-vhost-user devices become simple specialisations of the common base
-defining the ID, number of queues and potentially the config handling.
+From: Sam Li <faithilikerun@gmail.com>
 
-In theory we could convert the rest of the vhost-user stubs but there
-are complications caused by the config being split between the daemon
-and QEMU. For example:
+The patch tests zone append writes by reporting the zone wp after
+the completion of the call. "zap -p" option can print the sector
+offset value after completion, which should be the start sector
+where the append write begins.
 
- -device vhost-user-device-pci,chardev=vus,virtio-id=8,num_vqs=3,config_size=36
+Signed-off-by: Sam Li <faithilikerun@gmail.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Message-id: 20230407081657.17947-4-faithilikerun@gmail.com
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ qemu-io-cmds.c                     | 75 ++++++++++++++++++++++++++++++
+ tests/qemu-iotests/tests/zoned     | 16 +++++++
+ tests/qemu-iotests/tests/zoned.out | 16 +++++++
+ 3 files changed, 107 insertions(+)
 
-works with the WIP vhost-user-scsi backend:
-
-  https://github.com/rust-vmm/vhost-device/pull/301
-
-but the concrete vhost-user-scsi-pci device fails because it expects
-to handle config via the command line. You will see the report:
-
-  qemu-system-aarch64: -device vhost-user-scsi-pci,chardev=vus:
-  warning: vhost-user backend supports VHOST_USER_PROTOCOL_F_CONFIG
-  but QEMU does not.
-
-if you try. We could make the device a bit smarter but then we would
-need to untangle the vhost_scsi_common_() logic which is shared with
-the pure in kernel vhost implementation. The vhost-user-vsock stub
-might be another one worth re-factoring although that has a similar
-split architecture.
-
-The overall diffstat shows a net deletion of code as well as
-introducing some more documentation and moving the stubs into the
-common build, further reducing redundancy.
-
-Next Steps
-----------
-
->From Stefan's last email to the v1 posting we need:
-
-vhost-user needs:
-- A GET_DEVICE_ID message.
-- A GET_CONFIG_SIZE message. Today it is assumed that the vhost-user
-  frontend already knows the configuration space size.
-- A protocol feature bit indicating that the device is a full VIRTIO
-  device. These devices also need to implement the SET_STATUS message,
-  which is rarely implemented today.
-
-and implementing the VHOST_USER_GET_QUEUE_NUM and SET_STATUS messages
-to make the generic device "self configuring".
-
-Alex.
-
-Alex Bennée (13):
-  include: attempt to document device_class_set_props
-  include/hw: document the device_class_set_parent_* fns
-  hw/virtio: fix typo in VIRTIO_CONFIG_IRQ_IDX comments
-  include/hw/virtio: document virtio_notify_config
-  include/hw/virtio: add kerneldoc for virtio_init
-  include/hw/virtio: document some more usage of notifiers
-  virtio: add vhost-user-base and a generic vhost-user-device
-  virtio: add PCI stub for vhost-user-device
-  hw/virtio: derive vhost-user-rng from vhost-user-device
-  hw/virtio: add config support to vhost-user-device
-  hw/virtio: derive vhost-user-gpio from vhost-user-device
-  hw/virtio: derive vhost-user-i2c from vhost-user-base
-  docs/system: add a basic enumeration of vhost-user devices
-
- docs/system/devices/vhost-user-rng.rst |   2 +
- docs/system/devices/vhost-user.rst     |  41 +++
- include/hw/qdev-core.h                 |  36 +++
- include/hw/virtio/vhost-user-device.h  |  46 +++
- include/hw/virtio/vhost-user-gpio.h    |  23 +-
- include/hw/virtio/vhost-user-i2c.h     |  18 +-
- include/hw/virtio/vhost-user-rng.h     |  11 +-
- include/hw/virtio/virtio.h             |  21 ++
- hw/display/vhost-user-gpu.c            |   4 +-
- hw/net/virtio-net.c                    |   4 +-
- hw/virtio/vhost-user-device-pci.c      |  71 +++++
- hw/virtio/vhost-user-device.c          | 380 +++++++++++++++++++++++
- hw/virtio/vhost-user-fs.c              |   4 +-
- hw/virtio/vhost-user-gpio.c            | 400 ++-----------------------
- hw/virtio/vhost-user-i2c.c             | 255 +---------------
- hw/virtio/vhost-user-rng.c             | 277 ++---------------
- hw/virtio/vhost-vsock-common.c         |   4 +-
- hw/virtio/virtio-crypto.c              |   4 +-
- hw/virtio/meson.build                  |  20 +-
- 19 files changed, 686 insertions(+), 935 deletions(-)
- create mode 100644 include/hw/virtio/vhost-user-device.h
- create mode 100644 hw/virtio/vhost-user-device-pci.c
- create mode 100644 hw/virtio/vhost-user-device.c
-
+diff --git a/qemu-io-cmds.c b/qemu-io-cmds.c
+index f35ea627d7..3f75d2f5a6 100644
+--- a/qemu-io-cmds.c
++++ b/qemu-io-cmds.c
+@@ -1874,6 +1874,80 @@ static const cmdinfo_t zone_reset_cmd = {
+     .oneline = "reset a zone write pointer in zone block device",
+ };
+ 
++static int do_aio_zone_append(BlockBackend *blk, QEMUIOVector *qiov,
++                              int64_t *offset, int flags, int *total)
++{
++    int async_ret = NOT_DONE;
++
++    blk_aio_zone_append(blk, offset, qiov, flags, aio_rw_done, &async_ret);
++    while (async_ret == NOT_DONE) {
++        main_loop_wait(false);
++    }
++
++    *total = qiov->size;
++    return async_ret < 0 ? async_ret : 1;
++}
++
++static int zone_append_f(BlockBackend *blk, int argc, char **argv)
++{
++    int ret;
++    bool pflag = false;
++    int flags = 0;
++    int total = 0;
++    int64_t offset;
++    char *buf;
++    int c, nr_iov;
++    int pattern = 0xcd;
++    QEMUIOVector qiov;
++
++    if (optind > argc - 3) {
++        return -EINVAL;
++    }
++
++    if ((c = getopt(argc, argv, "p")) != -1) {
++        pflag = true;
++    }
++
++    offset = cvtnum(argv[optind]);
++    if (offset < 0) {
++        print_cvtnum_err(offset, argv[optind]);
++        return offset;
++    }
++    optind++;
++    nr_iov = argc - optind;
++    buf = create_iovec(blk, &qiov, &argv[optind], nr_iov, pattern,
++                       flags & BDRV_REQ_REGISTERED_BUF);
++    if (buf == NULL) {
++        return -EINVAL;
++    }
++    ret = do_aio_zone_append(blk, &qiov, &offset, flags, &total);
++    if (ret < 0) {
++        printf("zone append failed: %s\n", strerror(-ret));
++        goto out;
++    }
++
++    if (pflag) {
++        printf("After zap done, the append sector is 0x%" PRIx64 "\n",
++               tosector(offset));
++    }
++
++out:
++    qemu_io_free(blk, buf, qiov.size,
++                 flags & BDRV_REQ_REGISTERED_BUF);
++    qemu_iovec_destroy(&qiov);
++    return ret;
++}
++
++static const cmdinfo_t zone_append_cmd = {
++    .name = "zone_append",
++    .altname = "zap",
++    .cfunc = zone_append_f,
++    .argmin = 3,
++    .argmax = 4,
++    .args = "offset len [len..]",
++    .oneline = "append write a number of bytes at a specified offset",
++};
++
+ static int truncate_f(BlockBackend *blk, int argc, char **argv);
+ static const cmdinfo_t truncate_cmd = {
+     .name       = "truncate",
+@@ -2672,6 +2746,7 @@ static void __attribute((constructor)) init_qemuio_commands(void)
+     qemuio_add_command(&zone_close_cmd);
+     qemuio_add_command(&zone_finish_cmd);
+     qemuio_add_command(&zone_reset_cmd);
++    qemuio_add_command(&zone_append_cmd);
+     qemuio_add_command(&truncate_cmd);
+     qemuio_add_command(&length_cmd);
+     qemuio_add_command(&info_cmd);
+diff --git a/tests/qemu-iotests/tests/zoned b/tests/qemu-iotests/tests/zoned
+index 56f60616b5..3d23ce9cc1 100755
+--- a/tests/qemu-iotests/tests/zoned
++++ b/tests/qemu-iotests/tests/zoned
+@@ -82,6 +82,22 @@ echo "(5) resetting the second zone"
+ $QEMU_IO $IMG -c "zrs 268435456 268435456"
+ echo "After resetting a zone:"
+ $QEMU_IO $IMG -c "zrp 268435456 1"
++echo
++echo
++echo "(6) append write" # the physical block size of the device is 4096
++$QEMU_IO $IMG -c "zrp 0 1"
++$QEMU_IO $IMG -c "zap -p 0 0x1000 0x2000"
++echo "After appending the first zone firstly:"
++$QEMU_IO $IMG -c "zrp 0 1"
++$QEMU_IO $IMG -c "zap -p 0 0x1000 0x2000"
++echo "After appending the first zone secondly:"
++$QEMU_IO $IMG -c "zrp 0 1"
++$QEMU_IO $IMG -c "zap -p 268435456 0x1000 0x2000"
++echo "After appending the second zone firstly:"
++$QEMU_IO $IMG -c "zrp 268435456 1"
++$QEMU_IO $IMG -c "zap -p 268435456 0x1000 0x2000"
++echo "After appending the second zone secondly:"
++$QEMU_IO $IMG -c "zrp 268435456 1"
+ 
+ # success, all done
+ echo "*** done"
+diff --git a/tests/qemu-iotests/tests/zoned.out b/tests/qemu-iotests/tests/zoned.out
+index b2d061da49..fe53ba4744 100644
+--- a/tests/qemu-iotests/tests/zoned.out
++++ b/tests/qemu-iotests/tests/zoned.out
+@@ -50,4 +50,20 @@ start: 0x80000, len 0x80000, cap 0x80000, wptr 0x100000, zcond:14, [type: 2]
+ (5) resetting the second zone
+ After resetting a zone:
+ start: 0x80000, len 0x80000, cap 0x80000, wptr 0x80000, zcond:1, [type: 2]
++
++
++(6) append write
++start: 0x0, len 0x80000, cap 0x80000, wptr 0x0, zcond:1, [type: 2]
++After zap done, the append sector is 0x0
++After appending the first zone firstly:
++start: 0x0, len 0x80000, cap 0x80000, wptr 0x18, zcond:2, [type: 2]
++After zap done, the append sector is 0x18
++After appending the first zone secondly:
++start: 0x0, len 0x80000, cap 0x80000, wptr 0x30, zcond:2, [type: 2]
++After zap done, the append sector is 0x80000
++After appending the second zone firstly:
++start: 0x80000, len 0x80000, cap 0x80000, wptr 0x80018, zcond:2, [type: 2]
++After zap done, the append sector is 0x80018
++After appending the second zone secondly:
++start: 0x80000, len 0x80000, cap 0x80000, wptr 0x80030, zcond:2, [type: 2]
+ *** done
 -- 
 2.39.2
 

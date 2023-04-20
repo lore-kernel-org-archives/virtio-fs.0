@@ -5,28 +5,28 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender
  :Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:
  List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=ilJ8b7wm08S5cNoMRwZ7ZSj6f8FugSRGvC6Ht3a3z10=; b=ETDxgF05+SdySMi9w7rxYHTrLE
- n1JLIy8oaPIM68A71Q6B2Kd7WNYWpQ7B5ySITdQpxxAA6SOWp6Nc7JF6SEDweZCVWFnzWT4j+5nlE
- 3+H0gMh0H4f9ss7D1tVNCtTdk/aP2/ozsMMYF2sN1DFjLsGwjz1v5DUI3/HE0/Mk4/kAxCkzGYRMX
- SL+K9n3B6fp2nrdmbeqO5MfyrxFxtLKd5EMA2JitPNHUdPDkC0GmpKM/jQVUfpOoYcA86iKkICjHz
- xVVrF6Kj1672ouT0Sh9/iA32sDoxGK9Y+Ajuk19DGB1bYwMqaXFktKhQbvO7Afj9JGAjsnpv/LggK
- DR2zaxBdPCYMgkW/5/+fyVLlgrPgSCZcHZdSJJZQ0BnncWM4szCJUuWWDv46x2DqRJws4/f0TrwfV
- j34KLL+bmIYhw1KtKrHHsz6ZBDkR160wAQPbx9cUKoXU/NQ8HeMfsUddIvly8lEpEPIeNGGky1sAe
- IdaJbhFUk7cHn/Jj5leiCir1BiXqr/+BqhSZ2w3WazHFuNCWS32eyKPOuf/E3VcJbtsMI/nTh55lh
- ICW6OMRrp/T0EHfkh/91tBHiZrvPJbTJWPa+QZf2vPlgXTPZXEhc9C3mcymS0Ep4paAhSJRIGvqDe
- /Rkd+MJ+CA3YCIetyMhTmMqMKnesyo+LjgNnyNCB8=
-Message-ID: <ae8405c3-4c14-8e5c-8353-d1c96455c8e4@ilande.co.uk>
-Date: Thu, 20 Apr 2023 10:24:34 +0100
+ bh=9Rp4pXqrqBxqrjyT8Er3156X38qoB0KtAgmbhPvuofE=; b=J35jEi9v9XhkDbV0xVPG/J8bjx
+ 6XWNt7xZaVS1l9KRwa9ZzjlfbD5SiSPdTM9lAoRSgekc0DetN2tu43UTg3hNf4PhQLeh2X3aTgyzv
+ eAJ8KfDfdeiplXD9dhQIB6cLHaqC6Y353n8G2aNRzsIF/hAPX60u9EuMiFSXPCa8FrIGuwT6nduSm
+ 7Gr7yfM6PcNUvN7oYjhPuUwOx/KFYoS6Lcn8pme7i3kyEGSJvao9WyxV1QGOgvTcRx51DQ0HjiANz
+ iUi8WP+ek7gdHB+PFgLhRRiq2aznM7uWlZhS7p+3M+qAx3NWZPaO1OCPsEeefCJUMXExVNgwe8HTI
+ x4VFEztO7SbZs6EEzCUECEjv5obtoJd8U3770qc+JDTyuRgpwZvREhyczoiBAThypZ/NqcRzSqbWm
+ CWp2VYn3uyzek9HHYbP6+d1D4BWMd9OaappH471ypB9ampndNKg51VAZLqrkNNXaSut4ViY/oScdQ
+ I/HuZNlk1SNWDEfuPplR6H0deNF/Mce+2Qw1w43dlLb7TJKWqBcnu9TH2jJKl7QUIrVQs5ubHgg2J
+ kAXHYQeLhfLjUOlJvPoh4IU60Qvk+6pLpY1mTLNFSu1JXgpfmwAcewRZbXpIaIj9S/yTzWcYEzywI
+ Vqkg8G9IMZdACkEwXSLgZOp5BA3NNd8+7hBVRF5Vk=
+Message-ID: <55bf17e5-9875-f193-e1d7-ee688333bc78@ilande.co.uk>
+Date: Thu, 20 Apr 2023 10:25:24 +0100
 MIME-Version: 1.0
 References: <20230418162140.373219-1-alex.bennee@linaro.org>
- <20230418162140.373219-3-alex.bennee@linaro.org>
+ <20230418162140.373219-4-alex.bennee@linaro.org>
 From: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
-In-Reply-To: <20230418162140.373219-3-alex.bennee@linaro.org>
+In-Reply-To: <20230418162140.373219-4-alex.bennee@linaro.org>
 Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v2 02/13] include/hw: document the
- device_class_set_parent_* fns
+Subject: Re: [Virtio-fs] [PATCH v2 03/13] hw/virtio: fix typo in
+ VIRTIO_CONFIG_IRQ_IDX comments
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -40,63 +40,141 @@ Cc: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, Eduardo Habkost
 
 On 18/04/2023 17:21, Alex Bennée wrote:
 
-> These are useful functions for when you want proper inheritance of
-> functionality across realize/unrealize calls.
-> 
+> Fixes: 544f0278af (virtio: introduce macro VIRTIO_CONFIG_IRQ_IDX)
 > Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 > ---
->   include/hw/qdev-core.h | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
+>   hw/display/vhost-user-gpu.c    | 4 ++--
+>   hw/net/virtio-net.c            | 4 ++--
+>   hw/virtio/vhost-user-fs.c      | 4 ++--
+>   hw/virtio/vhost-user-gpio.c    | 2 +-
+>   hw/virtio/vhost-vsock-common.c | 4 ++--
+>   hw/virtio/virtio-crypto.c      | 4 ++--
+>   6 files changed, 11 insertions(+), 11 deletions(-)
 > 
-> diff --git a/include/hw/qdev-core.h b/include/hw/qdev-core.h
-> index d4bbc30c92..b1d194b561 100644
-> --- a/include/hw/qdev-core.h
-> +++ b/include/hw/qdev-core.h
-> @@ -795,9 +795,36 @@ void device_class_set_props(DeviceClass *dc, Property *props);
->   void device_class_set_parent_reset(DeviceClass *dc,
->                                      DeviceReset dev_reset,
->                                      DeviceReset *parent_reset);
-> +
-> +/**
-> + * device_class_set_parent_realize(): set up for chaining realize fns
-> + * @dc: The device class
-> + * @dev_realize: the device realize function
-> + * @parent_realize: somewhere to save the parents realize function
-> + *
-> + * This is intended to be used when the new realize function will
-> + * eventually call its parent realization function during creation.
-> + * This requires storing the function call somewhere (usually in the
-> + * instance structure) so you can eventually call:
+> diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
+> index 71dfd956b8..7c61a7c3ac 100644
+> --- a/hw/display/vhost-user-gpu.c
+> +++ b/hw/display/vhost-user-gpu.c
+> @@ -489,7 +489,7 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> @@ -506,7 +506,7 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
+> index 53e1c32643..c53616a080 100644
+> --- a/hw/net/virtio-net.c
+> +++ b/hw/net/virtio-net.c
+> @@ -3359,7 +3359,7 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
+>       }
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return false
+>        */
+>   
+> @@ -3391,7 +3391,7 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
+>       }
+>       /*
+>        *Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index 83fc20e49e..49d699ffc2 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -161,7 +161,7 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> @@ -177,7 +177,7 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
+> index d6927b610a..3b013f2d0f 100644
+> --- a/hw/virtio/vhost-user-gpio.c
+> +++ b/hw/virtio/vhost-user-gpio.c
+> @@ -194,7 +194,7 @@ static void vu_gpio_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
+> index d2b5519d5a..623bdf91cc 100644
+> --- a/hw/virtio/vhost-vsock-common.c
+> +++ b/hw/virtio/vhost-vsock-common.c
+> @@ -129,7 +129,7 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> @@ -146,7 +146,7 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
+> index 802e1b9659..6b3e607329 100644
+> --- a/hw/virtio/virtio-crypto.c
+> +++ b/hw/virtio/virtio-crypto.c
+> @@ -1208,7 +1208,7 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
+>   
+> @@ -1227,7 +1227,7 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
+>   
+>       /*
+>        * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+> -     * as the Marco of configure interrupt's IDX, If this driver does not
+> +     * as the macro of configure interrupt's IDX, If this driver does not
+>        * support, the function will return
+>        */
 
-I think this should be the class structure, since it is the only possible location 
-for the parent realize() function to exist given that these functions are called from 
-the .class_init function.
-
-> + *   my_dev->parent_realize(dev, errp);
-> + */
->   void device_class_set_parent_realize(DeviceClass *dc,
->                                        DeviceRealize dev_realize,
->                                        DeviceRealize *parent_realize);
-> +
-> +
-> +/**
-> + * device_class_set_parent_unrealize(): set up for chaining unrealize fns
-> + * @dc: The device class
-> + * @dev_unrealize: the device realize function
-> + * @parent_unrealize: somewhere to save the parents unrealize function
-> + *
-> + * This is intended to be used when the new unrealize function will
-> + * eventually call its parent unrealization function during the
-> + * unrealize phase. This requires storing the function call somewhere
-> + * (usually in the instance structure) so you can eventually call:
-> + *   my_dev->parent_unrealize(dev);
-
-And same here of course.
-
-> + */
->   void device_class_set_parent_unrealize(DeviceClass *dc,
->                                          DeviceUnrealize dev_unrealize,
->                                          DeviceUnrealize *parent_unrealize);
+Reviewed-by: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
 
 
 ATB,

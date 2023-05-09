@@ -1,26 +1,26 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681835360; x=1684427360;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=QuJZaLubT8BhFuE9ylcD4Gy9hPKTq8TPugnpWu/KBiw=;
- b=t3HCEI064XFBRsR+tvVoJjytqVHXY8E+Nut66xpWqyIdLmbKR9S8pt8L1SFUjT+mPJ
- 3a5FjtnWl0y7ilDrcPUhfSa/4jIctYVL/GGYLdkAi/zWxb57VkBphyc8IzLt3QGYFInz
- NdRy9drlJF+0E7pNxveRiUsUr0NBlbBGF9D/E2n73mepPZvF86mN9Q+OrmOicQPVND72
- 4lWs+C87PwoNPKz3TShgfK1zRu7LiuZaRzAZRUIfBQ+prohi0R1gRLTT3T0JKEbKdUqp
- HKDBK1NlL8ZtRu6kdKrcqdBJz7wKFcHmAoxrHS/z+VGRwUbJxliSNzUj03ApLuh5Fu59
- hY3A==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Tue, 18 Apr 2023 17:21:40 +0100
-Message-Id: <20230418162140.373219-14-alex.bennee@linaro.org>
-In-Reply-To: <20230418162140.373219-1-alex.bennee@linaro.org>
-References: <20230418162140.373219-1-alex.bennee@linaro.org>
+Return-Path: <hreitz@redhat.com>
+Message-ID: <c082fe16-6c83-3445-67fc-26da718d5479@redhat.com>
+Date: Tue, 9 May 2023 11:01:27 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+References: <20230412210641.GC2813183@fedora>
+ <CAJaqyWfm=g_hr9=WpsnwJ4hdpVb7K7p5rirWjvx=PxKYUp8trA@mail.gmail.com>
+ <20230417153810.GE3852722@fedora>
+ <CAJaqyWePM_a7AafP9qS40hmYXKHDyMsvn5g24zk=cH8L6s-kUw@mail.gmail.com>
+ <CAJSP0QWUfxzad3EmT3r1hhaWmXDQt9Nj1LRPhPs_w79S9GAb1A@mail.gmail.com>
+ <CAJaqyWfaDVZDJtMvPUhdRE283e80rB3WFd3RF9i=buaBYG=PKA@mail.gmail.com>
+ <20230418175924.GB4041499@fedora>
+ <CAJaqyWd9Ec7hpfv_NUDxOuwK4weyRTm-cVNOuv8VTiGVzyYjHQ@mail.gmail.com>
+ <CAJSP0QWx_9TJa_0QRfhNg6JQemAWCc0ZagvkSxj15bbM5tGD4w@mail.gmail.com>
+ <a95c1ad494ce5f8d7f27af788708966e7ba1925a.camel@redhat.com>
+ <20230508191235.GA926999@fedora>
+ <CAJaqyWdAyVaLJykLEkHwK3BpcvP2RPJQ1ok02F9LRe26QT75Aw@mail.gmail.com>
+From: Hanna Czenczek <hreitz@redhat.com>
+In-Reply-To: <CAJaqyWdAyVaLJykLEkHwK3BpcvP2RPJQ1ok02F9LRe26QT75Aw@mail.gmail.com>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 13/13] docs/system: add a basic enumeration
- of vhost-user devices
+Subject: Re: [Virtio-fs] [PATCH 2/4] vhost-user: Interface for migration
+ state transfer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,83 +29,33 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Jason Wang <jasowang@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Gerd Hoffmann <kraxel@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>
+To: Eugenio Perez Martin <eperezma@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Stefan Hajnoczi <stefanha@gmail.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Juan Quintela <quintela@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
 
-Make it clear the vhost-user-device is intended for expert use only.
+On 09.05.23 08:31, Eugenio Perez Martin wrote:
+> On Mon, May 8, 2023 at 9:12 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+[...]
 
----
-v2
-  - make clear vhost-user-device for expert use
----
- docs/system/devices/vhost-user-rng.rst |  2 ++
- docs/system/devices/vhost-user.rst     | 41 ++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+)
+>> VHOST_USER_GET_VRING_BASE itself isn't really enough because it stops a
+>> specific virtqueue but not the whole device. Unfortunately stopping all
+>> virtqueues is not the same as SUSPEND since spontaneous device activity
+>> is possible independent of any virtqueue (e.g. virtio-scsi events and
+>> maybe virtio-net link status).
+>>
+>> That's why I think SUSPEND is necessary for a solution that's generic
+>> enough to cover all device types.
+>>
+> I agree.
+>
+> In particular virtiofsd is already resetting all the device at
+> VHOST_USER_GET_VRING_BASE if I'm not wrong, so that's even more of a
+> reason to implement suspend call.
 
-diff --git a/docs/system/devices/vhost-user-rng.rst b/docs/system/devices/vhost-user-rng.rst
-index a145d4105c..ead1405326 100644
---- a/docs/system/devices/vhost-user-rng.rst
-+++ b/docs/system/devices/vhost-user-rng.rst
-@@ -1,3 +1,5 @@
-+.. _vhost_user_rng:
-+
- QEMU vhost-user-rng - RNG emulation
- ===================================
- 
-diff --git a/docs/system/devices/vhost-user.rst b/docs/system/devices/vhost-user.rst
-index 86128114fa..7038cece3e 100644
---- a/docs/system/devices/vhost-user.rst
-+++ b/docs/system/devices/vhost-user.rst
-@@ -15,6 +15,47 @@ to the guest. The code is mostly boilerplate although each device has
- a ``chardev`` option which specifies the ID of the ``--chardev``
- device that connects via a socket to the vhost-user *daemon*.
- 
-+Each device will have an virtio-mmio and virtio-pci variant. See your
-+platform details for what sort of virtio bus to use.
-+
-+.. list-table:: vhost-user devices
-+  :widths: 20 20 60
-+  :header-rows: 1
-+
-+  * - Device
-+    - Type
-+    - Notes
-+  * - vhost-user-device
-+    - Generic Development Device
-+    - You must manually specify ``virtio-id`` and the correct ``num_vqs``. Intended for expert use.
-+  * - vhost-user-blk
-+    - Block storage
-+    -
-+  * - vhost-user-fs
-+    - File based storage driver
-+    - See https://gitlab.com/virtio-fs/virtiofsd
-+  * - vhost-user-scsi
-+    - SCSI based storage
-+    - See contrib/vhost-user/scsi
-+  * - vhost-user-gpio
-+    - Proxy gpio pins to host
-+    - See https://github.com/rust-vmm/vhost-device
-+  * - vhost-user-i2c
-+    - Proxy i2c devices to host
-+    - See https://github.com/rust-vmm/vhost-device
-+  * - vhost-user-input
-+    - Generic input driver
-+    - See contrib/vhost-user-input
-+  * - vhost-user-rng
-+    - Entropy driver
-+    - :ref:`vhost_user_rng`
-+  * - vhost-user-gpu
-+    - GPU driver
-+    -
-+  * - vhost-user-vsock
-+    - Socket based communication
-+    - See https://github.com/rust-vmm/vhost-device
-+
- vhost-user daemon
- =================
- 
--- 
-2.39.2
+Oh, no, just the vring in question.  Not the whole device.
+
+In addition, we still need the GET_VRING_BASE call anyway, because, 
+well, we want to restore the vring on the destination via SET_VRING_BASE.
+
+Hanna
 

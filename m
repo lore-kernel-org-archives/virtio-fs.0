@@ -1,26 +1,21 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1681834904; x=1684426904;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=1A+5QxSTbXGCo55UOJ3nazzxUb4+UhfLG866jSa6yr4=;
- b=f1mgtZ69k7Kj4ijAMctLgIExd27VV0GYl8ZoJeqILw5TcDiA6VMDGnpLmzyPnBWUHW
- f56feqkULdz6T5g838ckwfrD2TDGMvol2vfZzqb30tBheX1yBcz5mqU+UU1pYtqxjpvC
- b6aCgaP8/bIZlKUp1kGL3126f9Eu9qH83/sgyndWcMiFT715RhaRoUFUFfpDdYsTV3HC
- 5GvfarJtUDIUfvbVa8f1ZQ+NHuhQBMQQaxoXrATs4+8Ez3Eqn8ZhFlh3g0RRPrnqKuMT
- qGOX8UsgyU1ika6PwVKKBJQnOLhPU6jTy36jRWdJm/+lk4AzUhAebndGsrqMGIObcCec
- s6Tw==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Tue, 18 Apr 2023 17:21:34 +0100
-Message-Id: <20230418162140.373219-8-alex.bennee@linaro.org>
-In-Reply-To: <20230418162140.373219-1-alex.bennee@linaro.org>
-References: <20230418162140.373219-1-alex.bennee@linaro.org>
+Return-Path: <alpha754293@hotmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=hotmail.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=sBiOvvXnTA5RkZDI4SDAk1Nrg5xQHn8rVX23nYZspeI=;
+ b=YyWOeBnNUsWfNbEUCV79ukl9AlqLTGwNcg7prt3TDzLQwxoc6bv84A+ALBfW7ZdowjWau83hXs4LBbuzDIXdIqnHwGz54RKX8xKAPPJVXkjbd7nUzDV29WLLWYDMiY7G7YzJj/4yDatnj105QcCcZwSXwU+VVaqDaE0Bv2VUmNnSo2DVEhzuWiTHeLrX7jKRXmDHkVViCPh7T03f0EaCQIvkfyYSEJBQg4FTn5Xo2QKNbZbJaGUVQVvqn9FexsJIyxHdqIJBqD0mozSuFnJrvcFHRAfIuOKuvwoHLfmybo0KmNQiz+Qaqceb29E8PPmGHR5iRDBBy6zy6qEDQQkiKA==
+From: Ewen Chan <alpha754293@hotmail.com>
+Date: Mon, 15 May 2023 01:55:31 +0000
+Message-ID: <SA1P221MB101825F8F2EE882A69D22504B5789@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
+References: <SA1P221MB1018666909025F9520B3A960B57B9@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
+ <CAJh=p+7EnxbniPKyQX26waewoAv3jH_v1=3cGvp9b3Jpx9x=fw@mail.gmail.com>
+In-Reply-To: <CAJh=p+7EnxbniPKyQX26waewoAv3jH_v1=3cGvp9b3Jpx9x=fw@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 07/13] virtio: add vhost-user-base and a
- generic vhost-user-device
+Content-Language: en-CA
+Content-Type: multipart/alternative;
+ boundary="_000_SA1P221MB101825F8F2EE882A69D22504B5789SA1P221MB1018NAMP_"
+Subject: Re: [Virtio-fs] Is there a way to get NFS and/or NFSoRDMA to play
+ nice with Virtio-FS?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,424 +24,171 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Jason Wang <jasowang@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Gerd Hoffmann <kraxel@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Eric Blake <eblake@redhat.com>
+To: German Maglione <gmaglione@redhat.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-In theory we shouldn't need to repeat so much boilerplate to support
-vhost-user backends. This provides a generic vhost-user-base QOM
-object and a derived vhost-user-device for which the user needs to
-provide the few bits of information that aren't currently provided by
-the vhost-user protocol. This should provide a baseline implementation
-from which the other vhost-user stub can specialise.
+--_000_SA1P221MB101825F8F2EE882A69D22504B5789SA1P221MB1018NAMP_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+R2VybWFuOg0KDQpZZXMsIHRoYXQgaXMgY29ycmVjdC4NCg0KKFRoZSBiYWNrZ3JvdW5kIG1vdGl2
+YXRpb24gZm9yIHRoaXMgdnMuIHJ1bm5pbmcgTkZTIG9uIFByb3htb3ggaXRzZWxmIGlzIGJlY2F1
+c2UgQ2VudE9TIHN1cHBvcnRzIE5GU29SRE1BIHdoZXJlYXMgUHJveG1veCwgYmVpbmcgRGViaWFu
+IGJhc2VkLCBkb2VzIG5vdC4pDQoNCkkgd2lsbCBoYXZlIHRvIHRlc3QgdGhlICItLWNhY2hlPW5v
+bmUiIG9wdGlvbiBvdXQgaW4gYSBmZXcgZGF5cy4NCg0KVGhhbmsgeW91Lg0KDQpTaW5jZXJlbHks
+DQpFd2VuDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXw0KRnJvbTogR2VybWFuIE1h
+Z2xpb25lIDxnbWFnbGlvbmVAcmVkaGF0LmNvbT4NClNlbnQ6IE1heSAxNCwgMjAyMyAxOjA2IFBN
+DQpUbzogRXdlbiBDaGFuIDxhbHBoYTc1NDI5M0Bob3RtYWlsLmNvbT4NCkNjOiB2aXJ0aW8tZnNA
+cmVkaGF0LmNvbSA8dmlydGlvLWZzQHJlZGhhdC5jb20+DQpTdWJqZWN0OiBSZTogW1ZpcnRpby1m
+c10gSXMgdGhlcmUgYSB3YXkgdG8gZ2V0IE5GUyBhbmQvb3IgTkZTb1JETUEgdG8gcGxheSBuaWNl
+IHdpdGggVmlydGlvLUZTPw0KDQpIaSBFd2VuLA0KDQpPbiBTdW4sIE1heSAxNCwgMjAyMyBhdCA5
+OjQ54oCvQU0gRXdlbiBDaGFuIDxhbHBoYTc1NDI5M0Bob3RtYWlsLmNvbTxtYWlsdG86YWxwaGE3
+NTQyOTNAaG90bWFpbC5jb20+PiB3cm90ZToNClRvIFdob20gSXQgTWF5IENvbmNlcm46DQoNCkkn
+bSB1c2luZyBQcm94bW94IDcuMy00IGFuZCBJIGhhdmUgYSBDZW50T1MgNy43LjE5MDggVk0gdGhh
+dCdzIGFibGUgdG8gc2hhcmUgZGF0YS9maWxlcyB2aWEgVmlydGlvLUZTLiBUaGF0IHBhcnQgaXMg
+d29ya2luZyBmaW5lLg0KDQpIb3dldmVyLCBpZiBJIHRyeSB0byBleHBvcnQgdGhhdCBWaXJ0SU8t
+RlMgInRhcmdldCIgYXMgYSBORlMgZXhwb3J0LCB3aGVuZXZlciBteSBvdGhlciBjb21wdXRlcnMg
+Y29ubmVjdCB0byB0aGF0IE5GUyBzaGFyZSwgaXQgd2lsbCBzYXkgdGhhdCB0aGUgZm9sZGVycyBo
+YXZlIHN0YWxlIE5GUyBoYW5kbGVzLg0KDQpJcyB0aGVyZSBhIHdheSB0byBmaXgvcmVzb2x2ZSB0
+aGlzPw0KDQpIZXJlIGlzIHRoZSBvdXRwdXQgZm9yIC9ldGMvZXhwb3J0czoNCg0KL2V4cG9ydCAq
+KHJ3LGFzeW5jLG5vX3Jvb3Rfc3F1YXNoLG5vX2FsbF9zcXVhc2gsbm9fc3VidHJlZV9jaGVjayxm
+c2lkPTQpDQoNCkkgaGF2ZSB0cmllZCByZWJvb3RpbmcgdGhlIGNsaWVudHMgbXVsdGlwbGUgdGlt
+ZXMsIGFsb25nIHdpdGggbW91bnRpbmcvdW5tb3VudGluZyBzYWlkIE5GUyBzaGFyZSBhbmQgaXQg
+ZG9lc24ndCBhcHBlYXIgdG8gbWFrZSBhbnkgZGlmZmVyZW5jZS4NCg0KDQpKdXN0IHRvIGNvbmZp
+cm0sIHlvdSB3YW50IHRvIHNoYXJlIGEgZm9sZGVyIHVzaW5nIHZpcnRpb2ZzIHdpdGggYSBWTSwg
+YW5kIHRoZW4gdGhhdCBWTSBydW5uaW5nIGFzIGFuIE5GUyBzZXJ2ZXIgc2hhcmluZyB0aGF0IHNh
+bWUgZm9sZGVyIG92ZXIgbmZzLCBhbSBJIHJpZ2h0Pw0KDQpJZiB0aGF0IGlzIHRoZSBjYXNlLCBp
+dCdzIG5vdCBwb3NzaWJsZSAoKikgdGhlIE5GUyBzZXJ2ZXIgcmVxdWlyZXMgcGVyc2lzdGVudCBm
+aWxlIGhhbmRsZXMgdGhhdCBGVVNFIGRvZXMgbm90IHN1cHBvcnQuDQoNCigqKSBJJ20gbm90IHN1
+cmUsIGJ1dCBJSVJDIE1pa2xvcyBzYWlkIGl0IGNvdWxkIHdvcmsgaWYgeW91IGRpc2FibGUgdGhl
+IGNhY2hlLCBzbyB5b3UgY2FuIHRyeSBydW5uaW5nIHZpcnRpb2ZzZCB3aXRoIGAtLWNhY2hlPW5v
+bmVgIChsZXQgbWUga25vdyBpZiB0aGF0IHdvcmspLg0KDQoNCg0KWW91ciBoZWxwIGlzIGdyZWF0
+bHkgYXBwcmVjaWF0ZWQuDQoNClRoYW5rIHlvdS4NCg0KU2luY2VyZWx5LA0KRXdlbg0KX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18NClZpcnRpby1mcyBtYWls
+aW5nIGxpc3QNClZpcnRpby1mc0ByZWRoYXQuY29tPG1haWx0bzpWaXJ0aW8tZnNAcmVkaGF0LmNv
+bT4NCmh0dHBzOi8vbGlzdG1hbi5yZWRoYXQuY29tL21haWxtYW4vbGlzdGluZm8vdmlydGlvLWZz
+DQoNCg0KLS0NCkdlcm1hbg0K
+--_000_SA1P221MB101825F8F2EE882A69D22504B5789SA1P221MB1018NAMP_
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: base64
 
----
-v2
-  - split into vub and vud
----
- include/hw/virtio/vhost-user-device.h |  45 ++++
- hw/virtio/vhost-user-device.c         | 324 ++++++++++++++++++++++++++
- hw/virtio/meson.build                 |   2 +
- 3 files changed, 371 insertions(+)
- create mode 100644 include/hw/virtio/vhost-user-device.h
- create mode 100644 hw/virtio/vhost-user-device.c
-
-diff --git a/include/hw/virtio/vhost-user-device.h b/include/hw/virtio/vhost-user-device.h
-new file mode 100644
-index 0000000000..9105011e25
---- /dev/null
-+++ b/include/hw/virtio/vhost-user-device.h
-@@ -0,0 +1,45 @@
-+/*
-+ * Vhost-user generic virtio device
-+ *
-+ * Copyright (c) 2023 Linaro Ltd
-+ *
-+ * SPDX-License-Identifier: GPL-2.0-or-later
-+ */
-+
-+#ifndef QEMU_VHOST_USER_DEVICE_H
-+#define QEMU_VHOST_USER_DEVICE_H
-+
-+#include "hw/virtio/vhost.h"
-+#include "hw/virtio/vhost-user.h"
-+
-+#define TYPE_VHOST_USER_BASE "vhost-user-base"
-+
-+OBJECT_DECLARE_TYPE(VHostUserBase, VHostUserBaseClass, VHOST_USER_BASE)
-+
-+struct VHostUserBase {
-+    VirtIODevice parent;
-+    /* Properties */
-+    CharBackend chardev;
-+    uint16_t virtio_id;
-+    uint32_t num_vqs;
-+    /* State tracking */
-+    VhostUserState vhost_user;
-+    struct vhost_virtqueue *vhost_vq;
-+    struct vhost_dev vhost_dev;
-+    GPtrArray *vqs;
-+    bool connected;
-+};
-+
-+    /* needed so we can use the base realize after specialisation
-+       tweaks */
-+struct VHostUserBaseClass {
-+    /*< private >*/
-+    VirtioDeviceClass parent_class;
-+    /*< public >*/
-+    DeviceRealize parent_realize;
-+};
-+
-+/* shared for the benefit of the derived pci class */
-+#define TYPE_VHOST_USER_DEVICE "vhost-user-device"
-+
-+#endif /* QEMU_VHOST_USER_DEVICE_H */
-diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
-new file mode 100644
-index 0000000000..b0239fa033
---- /dev/null
-+++ b/hw/virtio/vhost-user-device.c
-@@ -0,0 +1,324 @@
-+/*
-+ * Generic vhost-user stub. This can be used to connect to any
-+ * vhost-user backend. All configuration details must be handled by
-+ * the vhost-user daemon itself
-+ *
-+ * Copyright (c) 2023 Linaro Ltd
-+ * Author: Alex Bennée <alex.bennee@linaro.org>
-+ *
-+ * SPDX-License-Identifier: GPL-2.0-or-later
-+ */
-+
-+#include "qemu/osdep.h"
-+#include "qapi/error.h"
-+#include "hw/qdev-properties.h"
-+#include "hw/virtio/virtio-bus.h"
-+#include "hw/virtio/vhost-user-device.h"
-+#include "qemu/error-report.h"
-+
-+static void vub_start(VirtIODevice *vdev)
-+{
-+    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
-+    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
-+    VHostUserBase *vub = VHOST_USER_BASE(vdev);
-+    int ret, i;
-+
-+    if (!k->set_guest_notifiers) {
-+        error_report("binding does not support guest notifiers");
-+        return;
-+    }
-+
-+    ret = vhost_dev_enable_notifiers(&vub->vhost_dev, vdev);
-+    if (ret < 0) {
-+        error_report("Error enabling host notifiers: %d", -ret);
-+        return;
-+    }
-+
-+    ret = k->set_guest_notifiers(qbus->parent, vub->vhost_dev.nvqs, true);
-+    if (ret < 0) {
-+        error_report("Error binding guest notifier: %d", -ret);
-+        goto err_host_notifiers;
-+    }
-+
-+    vub->vhost_dev.acked_features = vdev->guest_features;
-+
-+    ret = vhost_dev_start(&vub->vhost_dev, vdev, true);
-+    if (ret < 0) {
-+        error_report("Error starting vhost-user-device: %d", -ret);
-+        goto err_guest_notifiers;
-+    }
-+
-+    /*
-+     * guest_notifier_mask/pending not used yet, so just unmask
-+     * everything here. virtio-pci will do the right thing by
-+     * enabling/disabling irqfd.
-+     */
-+    for (i = 0; i < vub->vhost_dev.nvqs; i++) {
-+        vhost_virtqueue_mask(&vub->vhost_dev, vdev, i, false);
-+    }
-+
-+    return;
-+
-+err_guest_notifiers:
-+    k->set_guest_notifiers(qbus->parent, vub->vhost_dev.nvqs, false);
-+err_host_notifiers:
-+    vhost_dev_disable_notifiers(&vub->vhost_dev, vdev);
-+}
-+
-+static void vub_stop(VirtIODevice *vdev)
-+{
-+    VHostUserBase *vub = VHOST_USER_BASE(vdev);
-+    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
-+    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
-+    int ret;
-+
-+    if (!k->set_guest_notifiers) {
-+        return;
-+    }
-+
-+    vhost_dev_stop(&vub->vhost_dev, vdev, true);
-+
-+    ret = k->set_guest_notifiers(qbus->parent, vub->vhost_dev.nvqs, false);
-+    if (ret < 0) {
-+        error_report("vhost guest notifier cleanup failed: %d", ret);
-+        return;
-+    }
-+
-+    vhost_dev_disable_notifiers(&vub->vhost_dev, vdev);
-+}
-+
-+static void vub_set_status(VirtIODevice *vdev, uint8_t status)
-+{
-+    VHostUserBase *vub = VHOST_USER_BASE(vdev);
-+    bool should_start = virtio_device_should_start(vdev, status);
-+
-+    if (vhost_dev_is_started(&vub->vhost_dev) == should_start) {
-+        return;
-+    }
-+
-+    if (should_start) {
-+        vub_start(vdev);
-+    } else {
-+        vub_stop(vdev);
-+    }
-+}
-+
-+/*
-+ * For an implementation where everything is delegated to the backend
-+ * we don't do anything other than return the full feature set offered
-+ * by the daemon (module the reserved feature bit).
-+ */
-+static uint64_t vub_get_features(VirtIODevice *vdev,
-+                                 uint64_t requested_features, Error **errp)
-+{
-+    VHostUserBase *vub = VHOST_USER_BASE(vdev);
-+    /* This should be set when the vhost connection initialises */
-+    g_assert(vub->vhost_dev.features);
-+    return vub->vhost_dev.features & ~(1ULL << VHOST_USER_F_PROTOCOL_FEATURES);
-+}
-+
-+static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)
-+{
-+    /*
-+     * Not normally called; it's the daemon that handles the queue;
-+     * however virtio's cleanup path can call this.
-+     */
-+}
-+
-+static void do_vhost_user_cleanup(VirtIODevice *vdev, VHostUserBase *vub)
-+{
-+    vhost_user_cleanup(&vub->vhost_user);
-+
-+    for (int i = 0; i < vub->num_vqs; i++) {
-+        VirtQueue *vq = g_ptr_array_index(vub->vqs, i);
-+        virtio_delete_queue(vq);
-+    }
-+
-+    virtio_cleanup(vdev);
-+}
-+
-+static int vub_connect(DeviceState *dev)
-+{
-+    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-+    VHostUserBase *vub = VHOST_USER_BASE(vdev);
-+
-+    if (vub->connected) {
-+        return 0;
-+    }
-+    vub->connected = true;
-+
-+    /* restore vhost state */
-+    if (virtio_device_started(vdev, vdev->status)) {
-+        vub_start(vdev);
-+    }
-+
-+    return 0;
-+}
-+
-+static void vub_disconnect(DeviceState *dev)
-+{
-+    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-+    VHostUserBase *vub = VHOST_USER_BASE(vdev);
-+
-+    if (!vub->connected) {
-+        return;
-+    }
-+    vub->connected = false;
-+
-+    if (vhost_dev_is_started(&vub->vhost_dev)) {
-+        vub_stop(vdev);
-+    }
-+}
-+
-+static void vub_event(void *opaque, QEMUChrEvent event)
-+{
-+    DeviceState *dev = opaque;
-+    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-+    VHostUserBase *vub = VHOST_USER_BASE(vdev);
-+
-+    switch (event) {
-+    case CHR_EVENT_OPENED:
-+        if (vub_connect(dev) < 0) {
-+            qemu_chr_fe_disconnect(&vub->chardev);
-+            return;
-+        }
-+        break;
-+    case CHR_EVENT_CLOSED:
-+        vub_disconnect(dev);
-+        break;
-+    case CHR_EVENT_BREAK:
-+    case CHR_EVENT_MUX_IN:
-+    case CHR_EVENT_MUX_OUT:
-+        /* Ignore */
-+        break;
-+    }
-+}
-+
-+static void vub_device_realize(DeviceState *dev, Error **errp)
-+{
-+    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-+    VHostUserBase *vub = VHOST_USER_BASE(dev);
-+    int ret;
-+
-+    if (!vub->chardev.chr) {
-+        error_setg(errp, "vhost-user-device: missing chardev");
-+        return;
-+    }
-+
-+    if (!vub->virtio_id) {
-+        error_setg(errp, "vhost-user-device: need to define device id");
-+        return;
-+    }
-+
-+    if (!vub->num_vqs) {
-+        vub->num_vqs = 1; /* reasonable default? */
-+    }
-+
-+    if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
-+        return;
-+    }
-+
-+    virtio_init(vdev, vub->virtio_id, 0);
-+
-+    /*
-+     * Disable guest notifiers, by default all notifications will be via the
-+     * asynchronous vhost-user socket.
-+     */
-+    vdev->use_guest_notifier_mask = false;
-+
-+    /* Allocate queues */
-+    vub->vqs = g_ptr_array_sized_new(vub->num_vqs);
-+    for (int i = 0; i < vub->num_vqs; i++) {
-+        g_ptr_array_add(vub->vqs,
-+                        virtio_add_queue(vdev, 4, vub_handle_output));
-+    }
-+
-+    vub->vhost_dev.nvqs = vub->num_vqs;
-+    vub->vhost_dev.vqs = g_new0(struct vhost_virtqueue, vub->vhost_dev.nvqs);
-+
-+    /* connect to backend */
-+    ret = vhost_dev_init(&vub->vhost_dev, &vub->vhost_user,
-+                         VHOST_BACKEND_TYPE_USER, 0, errp);
-+
-+    if (ret < 0) {
-+        do_vhost_user_cleanup(vdev, vub);
-+    }
-+
-+    qemu_chr_fe_set_handlers(&vub->chardev, NULL, NULL, vub_event, NULL,
-+                             dev, NULL, true);
-+}
-+
-+static void vub_device_unrealize(DeviceState *dev)
-+{
-+    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-+    VHostUserBase *vub = VHOST_USER_BASE(dev);
-+    struct vhost_virtqueue *vhost_vqs = vub->vhost_dev.vqs;
-+
-+    /* This will stop vhost backend if appropriate. */
-+    vub_set_status(vdev, 0);
-+    vhost_dev_cleanup(&vub->vhost_dev);
-+    g_free(vhost_vqs);
-+    do_vhost_user_cleanup(vdev, vub);
-+}
-+
-+static void vub_class_init(ObjectClass *klass, void *data)
-+{
-+    VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
-+
-+    vdc->realize = vub_device_realize;
-+    vdc->unrealize = vub_device_unrealize;
-+    vdc->get_features = vub_get_features;
-+    vdc->set_status = vub_set_status;
-+}
-+
-+static const TypeInfo vub_info = {
-+    .name = TYPE_VHOST_USER_BASE,
-+    .parent = TYPE_VIRTIO_DEVICE,
-+    .instance_size = sizeof(VHostUserBase),
-+    .class_init = vub_class_init,
-+    .class_size = sizeof(VHostUserBaseClass),
-+    .abstract = true
-+};
-+
-+
-+/*
-+ * The following is a concrete implementation of the base class which
-+ * allows the user to define the key parameters via the command line.
-+ */
-+
-+static const VMStateDescription vud_vmstate = {
-+    .name = "vhost-user-device",
-+    .unmigratable = 1,
-+};
-+
-+static Property vud_properties[] = {
-+    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
-+    DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
-+    DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
-+    DEFINE_PROP_END_OF_LIST(),
-+};
-+
-+static void vud_class_init(ObjectClass *klass, void *data)
-+{
-+    DeviceClass *dc = DEVICE_CLASS(klass);
-+
-+    device_class_set_props(dc, vud_properties);
-+    dc->vmsd = &vud_vmstate;
-+    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
-+}
-+
-+static const TypeInfo vud_info = {
-+    .name = TYPE_VHOST_USER_DEVICE,
-+    .parent = TYPE_VHOST_USER_BASE,
-+    .instance_size = sizeof(VHostUserBase),
-+    .class_init = vud_class_init,
-+    .class_size = sizeof(VHostUserBaseClass),
-+};
-+
-+static void vu_register_types(void)
-+{
-+    type_register_static(&vub_info);
-+    type_register_static(&vud_info);
-+}
-+
-+type_init(vu_register_types)
-diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
-index bdec78bfc6..43e5fa3f7d 100644
---- a/hw/virtio/meson.build
-+++ b/hw/virtio/meson.build
-@@ -10,7 +10,9 @@ specific_virtio_ss.add(files('virtio-config-io.c', 'virtio-qmp.c'))
- if have_vhost
-   specific_virtio_ss.add(files('vhost.c', 'vhost-backend.c', 'vhost-iova-tree.c'))
-   if have_vhost_user
-+    # fixme - this really should be generic
-     specific_virtio_ss.add(files('vhost-user.c'))
-+    softmmu_virtio_ss.add(files('vhost-user-device.c'))
-   endif
-   if have_vhost_vdpa
-     specific_virtio_ss.add(files('vhost-vdpa.c', 'vhost-shadow-virtqueue.c'))
--- 
-2.39.2
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyIgc3R5bGU9
+ImRpc3BsYXk6bm9uZTsiPiBQIHttYXJnaW4tdG9wOjA7bWFyZ2luLWJvdHRvbTowO30gPC9zdHls
+ZT4NCjwvaGVhZD4NCjxib2R5IGRpcj0ibHRyIj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBD
+YWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJn
+YigwLCAwLCAwKTsiIGNsYXNzPSJlbGVtZW50VG9Qcm9vZiI+DQpHZXJtYW46PC9kaXY+DQo8ZGl2
+IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250
+LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2Yi
+Pg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0
+aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBj
+bGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KWWVzLCB0aGF0IGlzIGNvcnJlY3QuPC9kaXY+DQo8ZGl2
+IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250
+LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2Yi
+Pg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0
+aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBj
+bGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KKFRoZSBiYWNrZ3JvdW5kIG1vdGl2YXRpb24gZm9yIHRo
+aXMgdnMuIHJ1bm5pbmcgTkZTIG9uIFByb3htb3ggaXRzZWxmIGlzIGJlY2F1c2UgQ2VudE9TIHN1
+cHBvcnRzIE5GU29SRE1BIHdoZXJlYXMgUHJveG1veCwgYmVpbmcgRGViaWFuIGJhc2VkLCBkb2Vz
+IG5vdC4pPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNh
+LCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFz
+cz0iZWxlbWVudFRvUHJvb2YiPg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWls
+eTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9y
+OiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KSSB3aWxsIGhhdmUgdG8g
+dGVzdCB0aGUgJnF1b3Q7LS1jYWNoZT1ub25lJnF1b3Q7IG9wdGlvbiBvdXQgaW4gYSBmZXcgZGF5
+cy48L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNh
+bnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAwKTsiIGNsYXNzPSJl
+bGVtZW50VG9Qcm9vZiI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBD
+YWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJn
+YigwLCAwLCAwKTsiIGNsYXNzPSJlbGVtZW50VG9Qcm9vZiI+DQpUaGFuayB5b3UuPC9kaXY+DQo8
+ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBm
+b250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJv
+b2YiPg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVs
+dmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7
+IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KU2luY2VyZWx5LDwvZGl2Pg0KPGRpdiBzdHlsZT0i
+Zm9udC1mYW1pbHk6IENhbGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAx
+MnB0OyBjb2xvcjogcmdiKDAsIDAsIDApOyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIj4NCkV3ZW48
+YnI+DQo8L2Rpdj4NCjxkaXYgaWQ9ImFwcGVuZG9uc2VuZCI+PC9kaXY+DQo8aHIgc3R5bGU9ImRp
+c3BsYXk6aW5saW5lLWJsb2NrO3dpZHRoOjk4JSIgdGFiaW5kZXg9Ii0xIj4NCjxkaXYgaWQ9ImRp
+dlJwbHlGd2RNc2ciIGRpcj0ibHRyIj48Zm9udCBmYWNlPSJDYWxpYnJpLCBzYW5zLXNlcmlmIiBz
+dHlsZT0iZm9udC1zaXplOjExcHQiIGNvbG9yPSIjMDAwMDAwIj48Yj5Gcm9tOjwvYj4gR2VybWFu
+IE1hZ2xpb25lICZsdDtnbWFnbGlvbmVAcmVkaGF0LmNvbSZndDs8YnI+DQo8Yj5TZW50OjwvYj4g
+TWF5IDE0LCAyMDIzIDE6MDYgUE08YnI+DQo8Yj5Ubzo8L2I+IEV3ZW4gQ2hhbiAmbHQ7YWxwaGE3
+NTQyOTNAaG90bWFpbC5jb20mZ3Q7PGJyPg0KPGI+Q2M6PC9iPiB2aXJ0aW8tZnNAcmVkaGF0LmNv
+bSAmbHQ7dmlydGlvLWZzQHJlZGhhdC5jb20mZ3Q7PGJyPg0KPGI+U3ViamVjdDo8L2I+IFJlOiBb
+VmlydGlvLWZzXSBJcyB0aGVyZSBhIHdheSB0byBnZXQgTkZTIGFuZC9vciBORlNvUkRNQSB0byBw
+bGF5IG5pY2Ugd2l0aCBWaXJ0aW8tRlM/PC9mb250Pg0KPGRpdj4mbmJzcDs8L2Rpdj4NCjwvZGl2
+Pg0KPGRpdj4NCjxkaXYgZGlyPSJsdHIiPg0KPGRpdiBkaXI9Imx0ciI+SGkgRXdlbiw8YnI+DQo8
+L2Rpdj4NCjxicj4NCjxkaXYgY2xhc3M9InhfZ21haWxfcXVvdGUiPg0KPGRpdiBkaXI9Imx0ciIg
+Y2xhc3M9InhfZ21haWxfYXR0ciI+T24gU3VuLCBNYXkgMTQsIDIwMjMgYXQgOTo0OeKAr0FNIEV3
+ZW4gQ2hhbiAmbHQ7PGEgaHJlZj0ibWFpbHRvOmFscGhhNzU0MjkzQGhvdG1haWwuY29tIj5hbHBo
+YTc1NDI5M0Bob3RtYWlsLmNvbTwvYT4mZ3Q7IHdyb3RlOjxicj4NCjwvZGl2Pg0KPGJsb2NrcXVv
+dGUgY2xhc3M9InhfZ21haWxfcXVvdGUiIHN0eWxlPSJtYXJnaW46MHB4IDBweCAwcHggMC44ZXg7
+IGJvcmRlci1sZWZ0OjFweCBzb2xpZCByZ2IoMjA0LDIwNCwyMDQpOyBwYWRkaW5nLWxlZnQ6MWV4
+Ij4NCjxkaXYgY2xhc3M9InhfbXNnLTE3NDY0ODkxNzI3MjE4OTQwMzgiPg0KPGRpdiBkaXI9Imx0
+ciI+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlm
+OyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQpUbyBXaG9tIEl0IE1heSBDb25j
+ZXJuOjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRp
+Y2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KPGJyPg0K
+SSdtIHVzaW5nIFByb3htb3ggNy4zLTQgYW5kIEkgaGF2ZSBhIENlbnRPUyA3LjcuMTkwOCBWTSB0
+aGF0J3MgYWJsZSB0byBzaGFyZSBkYXRhL2ZpbGVzIHZpYSBWaXJ0aW8tRlMuIFRoYXQgcGFydCBp
+cyB3b3JraW5nIGZpbmUuPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhl
+bHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQo8
+YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmksSGVsdmV0aWNhLHNh
+bnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApIj4NCkhvd2V2ZXIsIGlm
+IEkgdHJ5IHRvIGV4cG9ydCB0aGF0IFZpcnRJTy1GUyAmcXVvdDt0YXJnZXQmcXVvdDsgYXMgYSBO
+RlMgZXhwb3J0LCB3aGVuZXZlciBteSBvdGhlciBjb21wdXRlcnMgY29ubmVjdCB0byB0aGF0IE5G
+UyBzaGFyZSwgaXQgd2lsbCBzYXkgdGhhdCB0aGUgZm9sZGVycyBoYXZlIHN0YWxlIE5GUyBoYW5k
+bGVzLjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fu
+cy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KPGJyPg0KPC9kaXY+
+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBm
+b250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQpJcyB0aGVyZSBhIHdheSB0byBmaXgv
+cmVzb2x2ZSB0aGlzPzwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2
+ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KPGJy
+Pg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5z
+LXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQpIZXJlIGlzIHRoZSBv
+dXRwdXQgZm9yIC9ldGMvZXhwb3J0czo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNh
+bGlicmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCww
+LDApIj4NCjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2
+ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KL2V4
+cG9ydCAqKHJ3LGFzeW5jLG5vX3Jvb3Rfc3F1YXNoLG5vX2FsbF9zcXVhc2gsbm9fc3VidHJlZV9j
+aGVjayxmc2lkPTQpPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZl
+dGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQo8YnI+
+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmksSGVsdmV0aWNhLHNhbnMt
+c2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApIj4NCkkgaGF2ZSB0cmllZCBy
+ZWJvb3RpbmcgdGhlIGNsaWVudHMgbXVsdGlwbGUgdGltZXMsIGFsb25nIHdpdGggbW91bnRpbmcv
+dW5tb3VudGluZyBzYWlkIE5GUyBzaGFyZSBhbmQgaXQgZG9lc24ndCBhcHBlYXIgdG8gbWFrZSBh
+bnkgZGlmZmVyZW5jZS48L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmksSGVs
+dmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApIj4NCjxi
+cj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2Rpdj4NCjwvYmxvY2txdW90ZT4NCjxkaXY+PGJyPg0KPC9k
+aXY+DQo8ZGl2Pkp1c3QgdG8gY29uZmlybSwgeW91IHdhbnQgdG8gc2hhcmUgYSBmb2xkZXIgdXNp
+bmcgdmlydGlvZnMgd2l0aCBhIFZNLCBhbmQgdGhlbiB0aGF0IFZNIHJ1bm5pbmcgYXMgYW4gTkZT
+IHNlcnZlciBzaGFyaW5nIHRoYXQgc2FtZSBmb2xkZXIgb3ZlciBuZnMsIGFtIEkgcmlnaHQ/PC9k
+aXY+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj5JZiB0aGF0IGlzIHRoZSBjYXNlLCBpdCdzIG5v
+dCBwb3NzaWJsZSAoKikgdGhlIE5GUyBzZXJ2ZXIgcmVxdWlyZXMgcGVyc2lzdGVudCBmaWxlIGhh
+bmRsZXMgdGhhdCBGVVNFIGRvZXMgbm90IHN1cHBvcnQuPC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2
+Pg0KPGRpdj4oKikgSSdtIG5vdCBzdXJlLCBidXQgSUlSQyBNaWtsb3Mgc2FpZCBpdCBjb3VsZCB3
+b3JrIGlmIHlvdSBkaXNhYmxlIHRoZSBjYWNoZSwgc28geW91IGNhbiB0cnkgcnVubmluZyB2aXJ0
+aW9mc2Qgd2l0aCBgLS1jYWNoZT1ub25lYCAobGV0IG1lIGtub3cgaWYgdGhhdCB3b3JrKS48L2Rp
+dj4NCjxkaXY+PGJyPg0KPC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj4mbmJzcDs8L2Rp
+dj4NCjxibG9ja3F1b3RlIGNsYXNzPSJ4X2dtYWlsX3F1b3RlIiBzdHlsZT0ibWFyZ2luOjBweCAw
+cHggMHB4IDAuOGV4OyBib3JkZXItbGVmdDoxcHggc29saWQgcmdiKDIwNCwyMDQsMjA0KTsgcGFk
+ZGluZy1sZWZ0OjFleCI+DQo8ZGl2IGNsYXNzPSJ4X21zZy0xNzQ2NDg5MTcyNzIxODk0MDM4Ij4N
+CjxkaXYgZGlyPSJsdHIiPg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRp
+Y2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KPC9kaXY+
+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBm
+b250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQpZb3VyIGhlbHAgaXMgZ3JlYXRseSBh
+cHByZWNpYXRlZC48YnI+DQo8YnI+DQpUaGFuayB5b3UuPGJyPg0KPGJyPg0KU2luY2VyZWx5LDxi
+cj4NCkV3ZW48YnI+DQo8L2Rpdj4NCjwvZGl2Pg0KX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX188YnI+DQpWaXJ0aW8tZnMgbWFpbGluZyBsaXN0PGJyPg0KPGEg
+aHJlZj0ibWFpbHRvOlZpcnRpby1mc0ByZWRoYXQuY29tIiB0YXJnZXQ9Il9ibGFuayI+VmlydGlv
+LWZzQHJlZGhhdC5jb208L2E+PGJyPg0KPGEgaHJlZj0iaHR0cHM6Ly9saXN0bWFuLnJlZGhhdC5j
+b20vbWFpbG1hbi9saXN0aW5mby92aXJ0aW8tZnMiIHJlbD0ibm9yZWZlcnJlciIgdGFyZ2V0PSJf
+YmxhbmsiPmh0dHBzOi8vbGlzdG1hbi5yZWRoYXQuY29tL21haWxtYW4vbGlzdGluZm8vdmlydGlv
+LWZzPC9hPjxicj4NCjwvZGl2Pg0KPC9ibG9ja3F1b3RlPg0KPC9kaXY+DQo8YnIgY2xlYXI9ImFs
+bCI+DQo8YnI+DQo8c3BhbiBjbGFzcz0ieF9nbWFpbF9zaWduYXR1cmVfcHJlZml4Ij4tLSA8L3Nw
+YW4+PGJyPg0KPGRpdiBkaXI9Imx0ciIgY2xhc3M9InhfZ21haWxfc2lnbmF0dXJlIj4NCjxkaXYg
+ZGlyPSJsdHIiPkdlcm1hbjxicj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9i
+b2R5Pg0KPC9odG1sPg0K
+--_000_SA1P221MB101825F8F2EE882A69D22504B5789SA1P221MB1018NAMP_--
 

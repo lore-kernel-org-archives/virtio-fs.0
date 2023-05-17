@@ -1,22 +1,25 @@
-Return-Path: <alex.bennee@linaro.org>
+Return-Path: <stefanha@gmail.com>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1684338768; x=1686930768;
- h=content-transfer-encoding:mime-version:message-id:date:subject:cc
- :to:from:user-agent:from:to:cc:subject:date:message-id:reply-to;
- bh=2zgawbbiH3ZN+t5cl5i5se7wIX3B/JzZA+6PRyvIIdQ=;
- b=g5vI9spJJGk0AQg2nrDscgqmqP0hfliUsHdlmHIo3Us/3MCHru8MSL5VhuY5GT2/mq
- dRoS9rGKH+DSY0Pk6SGac+3nIrPcqrixW/J4kbvJqqzBVSCbZ8xOFTu/ib1xQ7zviDZk
- ibs2kc+8BOqHSss7aGDvVd5cDpfR14sdXJxylUPWqT/o/PqQ4hY9XSf+wHEmCaQh4q94
- FdFDSJGxvGseU3ZcQCFrHKeAwnWn++N0N3NhMWfDwCBhXlwgBEWuTh1Zzuy6AvkocsEa
- JF4hTrpK1NZCFMuLudbaFaQY4XnlK7TfXMkMNOZzzhktmkAMiz6g0Gc46Sl6Jd0zwx3/
- nMSQ==
-From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Wed, 17 May 2023 16:23:46 +0100
-Message-ID: <87v8grlzu9.fsf@linaro.org>
+ d=gmail.com; s=20221208; t=1684340790; x=1686932790;
+ h=content-transfer-encoding:cc:to:subject:message-id:date:from
+ :in-reply-to:references:mime-version:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=UX4HKKHpNiRzFE0v0DdgFekowRAr8FyedNbPUk28AJM=;
+ b=YVzI/wgRtBQx4tu240Krf5VZArDABoV5F8dslpeWUZLLyIWuHaFvqyraaIVlWNv44c
+ aQck01zzosFejAn+yYYD9ClrPLpJ1GJDgZ9sKL9vFYW0uZJT0f3D8yD5ft/Lib+HUSfq
+ wRSd0AZTPJ2VYnhnNRZmNSkD6+oGMRPSI3/h/f5UOF/Zvc9j4JOKCbTLgHEh1rpNmjOc
+ euOJ4E/mSS4xGQb0A7dexFuL/jsZ68wzOcRZoVR3aYgASAt1jd/X2FvfkWO49zlFlTeE
+ Zy8W7Cums0LOzHTB0KrGKHP2jsRY36fD+Zj+gocBrLXwGPlD2myiTlVkI6pLAQCo230J
+ pE3w==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+References: <87v8grlzu9.fsf@linaro.org>
+In-Reply-To: <87v8grlzu9.fsf@linaro.org>
+From: Stefan Hajnoczi <stefanha@gmail.com>
+Date: Wed, 17 May 2023 12:26:18 -0400
+Message-ID: <CAJSP0QX+NeJ8Z5d+2ocUUVj4EGopxKT+trmEfacgvhE7TqCokQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
-Subject: [Virtio-fs] Status of DAX for virtio-fs/virtiofsd?
+Subject: Re: [Virtio-fs] Status of DAX for virtio-fs/virtiofsd?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,56 +28,83 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: QEMU Developers <qemu-devel@nongnu.org>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>
+To: =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>
+Cc: QEMU Developers <qemu-devel@nongnu.org>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>, Vivek Goyal <vgoyal@redhat.com>
 
-Hi,
+On Wed, 17 May 2023 at 11:54, Alex Benn=C3=A9e <alex.bennee@linaro.org> wro=
+te:
+Hi Alex,
+There were two unresolved issues:
 
-I remember from the dim and distant past (probably a KVM Forum) that one
-of the touted features of virtio-fs was the ability to get memory
-efficiency savings by having a direct memory mapping the host pages into
-the guest address space.
+1. How to inject SIGBUS when the guest accesses a page that's beyond
+the end-of-file.
+2. Implementing the vhost-user messages for mapping ranges of files to
+the vhost-user frontend.
 
-AFAICT the kernel side was merged a while ago, see 22f3787 (virtiofs:
-set up virtio_fs dax_device) and related. However when investigating
-what would be needed to support this for Xen guests using virtio-fs we
-were confused as to what else was needed.
+The harder problem is SIGBUS. An mmap area may be larger than the
+length of the file. Or another process could truncate the file while
+it's mmapped, causing a previously correctly sized mmap to become
+longer than the actual file. When a page beyond the end of file is
+accessed, the kernel raises SIGBUS.
 
-There were some patches for the old C daemon:
+When this scenario occurs in the DAX Window, kvm.ko gets some type of
+vmexit (fault) and the code currently enters an infinite loop because
+it expects KVM memory regions to resolve faults. Since there is no
+page backing that part of the vma, the fault handling fails and the
+code loops trying to do this forever.
 
-  Subject: [PATCH v3 00/26] virtiofs dax patches
-  Date: Wed, 28 Apr 2021 12:00:34 +0100=09[thread overview]
-  Message-ID: <20210428110100.27757-1-dgilbert@redhat.com>
+There needs to be a way to inject this fault back into the guest.
+However, we did not found a way to do that. We considered Machine
+Check Exceptions (MCEs), x86 interrupts, and paravirtualized
+approaches. None of them looked like a clean and sane way to do this.
+The Linux maintainers for MCEs and kvm.ko were not excited about
+supporting this.
 
-although they look like they were never merged and the C version of
-virtiofsd has since been dropped from tools.
+So in the end, SIGBUS was never solved. It leads to a DoS because the
+host kernel will enter an infinite loop. We decided that until there
+is progress on SIGBUS, we can't go ahead with DAX Windows in
+production.
 
-Looking at the supporting rust code (vhost_user/message.rs) there are a
-number of additional messages:
+The easier problem is adding new vhost-user messages. It does lead to
+a fundamental change in the vhost-user protocol: the presence of the
+DAX Window means there are memory ranges that cannot be accessed via
+shared memory. Imagine Device A has a DAX Window and Device B needs to
+DMA to/from it. That doesn't work because the mmaps happen inside the
+frontend (QEMU), so Device B doesn't have access to the current
+mappings. The fundamental change to vhost-user is that virtqueue
+descriptor mapping code must now deal with the situation where guest
+addresses are absent from the shared memory regions and instead send
+vhost-user protocol messages to read/write to/from bounce buffers
+instead. The rest of the device backend does not require modification.
+This is a slow path, but at least it works whereas currently the I/O
+would fail because the memory is absent. Other solutions to the
+vhost-user DMA problem exist, but this is the one that Dave and I last
+discussed.
 
-    /// Virtio-fs draft: map file content into the window.
-    FS_MAP =3D 6,
-    /// Virtio-fs draft: unmap file content from the window.
-    FS_UNMAP =3D 7,
-    /// Virtio-fs draft: sync file content.
-    FS_SYNC =3D 8,
-    /// Virtio-fs draft: perform a read/write from an fd directly to GPA.
-    FS_IO =3D 9,
-    /// Upper bound of valid commands.
-    MAX_CMD =3D 10,
+In the end, there is still work to do to make the DAX Window
+supportable. There is experimental code out there that kind of works,
+but we felt it was incomplete.
 
-that don't appear in the current canonical vhost-user reference in the
-QEMU repository and the QEMU code certainly doesn't have implementations
-for any of them. So I have some questions:
+To your specific questions:
 
- * What VMM/daemon combinations has DAX been tested on?
- * Isn't it time the vhost-user spec is updated?
- * Is anyone picking up Dave's patches for the QEMU side of support?
+>  * What VMM/daemon combinations has DAX been tested on?
 
-Thanks,
+Only the experimental virtio-fs Kata Containers kernels and QEMU
+builds that were available a few years ago. I don't think the code has
+been rebased.
 
+>  * Isn't it time the vhost-user spec is updated?
 
---=20
-Alex Benn=C3=A9e
-Virtualisation Tech Lead @ Linaro
+I don't know if Dave ever wrote the spec for or implemented the final
+version of the vhost-user protocol messages we discussed.
+
+>  * Is anyone picking up Dave's patches for the QEMU side of support?
+
+Not at the moment. It would be nice to support, but someone needs the
+energy/time/focus to deal with the outstanding issues I mentioned.
+
+If you want to work on it, feel free to include me. I can help dig up
+old discussions and give input.
+
+Stefan
 

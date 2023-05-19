@@ -1,15 +1,23 @@
-Return-Path: <vgoyal@redhat.com>
-Date: Thu, 18 May 2023 15:45:46 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <ZGaAalXSMhPb3eqe@redhat.com>
-References: <87v8grlzu9.fsf@linaro.org>
- <CAJSP0QX+NeJ8Z5d+2ocUUVj4EGopxKT+trmEfacgvhE7TqCokQ@mail.gmail.com>
+Return-Path: <gary.bechtel@globalgns.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=globalgns.com; s=google; t=1684489147; x=1687081147;
+ h=to:subject:message-id:date:from:sender:mime-version:from:to:cc
+ :subject:date:message-id:reply-to;
+ bh=OlwoOngHXwqJeOMzsHd8fStV29pvpOIPWlDDfP3R4vU=;
+ b=mzpfI1XEHdE6klZFm7UCkbeW6nuwkQY9JcjkMCRfm8atIc2905pPNlSMpRFLkJ1mbn
+ BaD60RsMM9gUVnV70+IYzkE2oGRRKm9a6dvQ8I12DXwsctY6P9RV8N/iBWLT2R5CAufS
+ 06YNmlhQ9SiQwKUBtV0/s1xYG2cRN1mcksoQByCzvPP8kwJzEEDLHHOse6H5bbLo5HCS
+ KMFZyLcaVQfVDqcSIfhuSlIfCgVwfVhdtshxYPrjZELs5RA9OBEBwq/GQj7dmza/qw9E
+ K5apdk8NUoY2F+yuVsN5yUKWAJbMQ6R0uPUMuU0lgfncvCiB0fWBoFoTxabJGZFL5jXS
+ Z8Lg==
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <CAJSP0QX+NeJ8Z5d+2ocUUVj4EGopxKT+trmEfacgvhE7TqCokQ@mail.gmail.com>
-Subject: Re: [Virtio-fs] Status of DAX for virtio-fs/virtiofsd?
+Sender: Gary Bechtel <gary.bechtel@globalgns.com>
+From: Gary Bechtel <gary.bechtel@globalgns.com>
+Date: Fri, 19 May 2023 02:39:07 -0700
+Message-ID: <CAP1WZhOtCbwwWYTVOX+cBVBmGzuzrRszzADTybowRhFkdeaowA@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="00000000000043037305fc08b17d"
+Subject: Re: [Virtio-fs] virtio-fs.gitlab.io : Attract Local Customers with
+ Local SEO Optimization.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,110 +26,131 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@gmail.com>
-Cc: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>, QEMU Developers <qemu-devel@nongnu.org>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com, Erik Schilling <erik.schilling@linaro.org>
+To: Virtio-Fs <virtio-fs@redhat.com>
 
-On Wed, May 17, 2023 at 12:26:18PM -0400, Stefan Hajnoczi wrote:
-> On Wed, 17 May 2023 at 11:54, Alex Benn=E9e <alex.bennee@linaro.org> wrot=
-e:
-> Hi Alex,
-> There were two unresolved issues:
->=20
-> 1. How to inject SIGBUS when the guest accesses a page that's beyond
-> the end-of-file.
-> 2. Implementing the vhost-user messages for mapping ranges of files to
-> the vhost-user frontend.
->=20
-> The harder problem is SIGBUS. An mmap area may be larger than the
-> length of the file. Or another process could truncate the file while
-> it's mmapped, causing a previously correctly sized mmap to become
-> longer than the actual file. When a page beyond the end of file is
-> accessed, the kernel raises SIGBUS.
->=20
-> When this scenario occurs in the DAX Window, kvm.ko gets some type of
-> vmexit (fault) and the code currently enters an infinite loop because
-> it expects KVM memory regions to resolve faults. Since there is no
-> page backing that part of the vma, the fault handling fails and the
-> code loops trying to do this forever.
->=20
-> There needs to be a way to inject this fault back into the guest.
-> However, we did not found a way to do that. We considered Machine
-> Check Exceptions (MCEs), x86 interrupts, and paravirtualized
-> approaches. None of them looked like a clean and sane way to do this.
-> The Linux maintainers for MCEs and kvm.ko were not excited about
-> supporting this.
->=20
-> So in the end, SIGBUS was never solved. It leads to a DoS because the
-> host kernel will enter an infinite loop. We decided that until there
-> is progress on SIGBUS, we can't go ahead with DAX Windows in
-> production.
->=20
-> The easier problem is adding new vhost-user messages. It does lead to
-> a fundamental change in the vhost-user protocol: the presence of the
-> DAX Window means there are memory ranges that cannot be accessed via
-> shared memory. Imagine Device A has a DAX Window and Device B needs to
-> DMA to/from it. That doesn't work because the mmaps happen inside the
-> frontend (QEMU), so Device B doesn't have access to the current
-> mappings. The fundamental change to vhost-user is that virtqueue
-> descriptor mapping code must now deal with the situation where guest
-> addresses are absent from the shared memory regions and instead send
-> vhost-user protocol messages to read/write to/from bounce buffers
-> instead. The rest of the device backend does not require modification.
-> This is a slow path, but at least it works whereas currently the I/O
-> would fail because the memory is absent. Other solutions to the
-> vhost-user DMA problem exist, but this is the one that Dave and I last
-> discussed.
->=20
-> In the end, there is still work to do to make the DAX Window
-> supportable. There is experimental code out there that kind of works,
-> but we felt it was incomplete.
+--00000000000043037305fc08b17d
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-I feel that it will be good if someone can solve the vhost-user problem
-first and get patches upstream. Now virtiofsd support from qemu has
-been removed, so someone will have to add DAX support to rust virtiofsd.
-(And make correspoding vhost-user changes in qemu).
+Hi *virtio-fs.gitlab.io <http://virtio-fs.gitlab.io>* Owner,
 
-Once that is done, someone can look into MCE issue.
+My name is  *Gary Bechtel,* and I was just browsing your *virtio-fs.gitlab.=
+io
+<http://virtio-fs.gitlab.io>,* and I came up with a great design and a plan
+to develop your *virtio-fs.gitlab.io <http://virtio-fs.gitlab.io>,* using
+the latest technologies to generate additional revenue and beat your
+competitors. By the way, we=E2=80=99ve a pretty good experience in developi=
+ng apps
+too.
 
-With vhost-user problem solved, DAX will be usable in non-shared mode.
-That is just pass through host filesystem into the guest and even host
-can't make modifications. And that should steer clear us of the truncation
-issue.
 
-virtiofs DAX is a good piece of technology and provides speed up in many
-cases. Will be sad to see the patches lost.
 
-Now people are posting fixes to kernel side of DAX and there is no good
-way to test these. I will try to make it work with old DAX branch david
-had to test kernel changes but I am sure at some point of time it will
-stop working and I don't want virtiofs kernel DAX code to become unstable.
+Want to check out my portfolio, send a reply to talk more.
 
-Will be good if somebody takes up this project and makes it happen.
 
-Thanks
-Vivek
 
->=20
-> To your specific questions:
->=20
-> >  * What VMM/daemon combinations has DAX been tested on?
->=20
-> Only the experimental virtio-fs Kata Containers kernels and QEMU
-> builds that were available a few years ago. I don't think the code has
-> been rebased.
->=20
-> >  * Isn't it time the vhost-user spec is updated?
->=20
-> I don't know if Dave ever wrote the spec for or implemented the final
-> version of the vhost-user protocol messages we discussed.
->=20
-> >  * Is anyone picking up Dave's patches for the QEMU side of support?
->=20
-> Not at the moment. It would be nice to support, but someone needs the
-> energy/time/focus to deal with the outstanding issues I mentioned.
->=20
-> If you want to work on it, feel free to include me. I can help dig up
-> old discussions and give input.
->=20
-> Stefan
->=20
+Best Regards,
+
+*Gary Bechtel,  *
+
+Business Development Manager
+--------------------------------------------------------------------
+*Note:-* If you want to receive a *detailed plan of action,* please feel
+free to reply. *Yes*, we will get back to you with details.
+
+Note: If you are not interested, please
+
+Click here to unsubscribe
+<https://globalgns-dot-yamm-track.appspot.com/2CHy-cd8faJnbhtEFUtrtu-BUDCTr=
+mHUkk1c2__8usTd5kGAziAF3h9bqFUL_oMyHBSNS9SBPJpEF2rghfJELa4buq_URewW4_L2VNwt=
+Z-iteiQqvFp5hGIX_yOvd_vNpmyPbpBiM0R-EIFFm6WnqbU6ttm0YecmrjYxfmfM0bYmq4em8K_=
+ZqdzISZStMrI_waC8O>
+
+[image: beacon]
+
+--00000000000043037305fc08b17d
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;line-he=
+ight:107%"><font face=3D"comic sans ms, sans-serif" size=3D"4">Hi <b style=
+=3D""><a href=3D"http://virtio-fs.gitlab.io">virtio-fs.gitlab.io</a></b>
+Owner,<br></font></p><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;lin=
+e-height:107%"><span lang=3D"EN-IN"><font face=3D"comic sans ms, sans-serif=
+" size=3D"4">My name is=C2=A0
+
+<b><span style=3D"color:rgb(31,31,31);white-space:nowrap">Gary Bechtel</spa=
+n>,</b> and I was just
+browsing your <b><a href=3D"http://virtio-fs.gitlab.io">virtio-fs.gitlab.io=
+</a>,</b> and I came
+up with a great design and a plan to develop your <b><a href=3D"http://virt=
+io-fs.gitlab.io">virtio-fs.gitlab.io</a>,</b> using the latest technologies=
+ to generate additional
+revenue and beat your competitors. By the way, we=E2=80=99ve a pretty good =
+experience
+in developing apps too.</font></span></p><p class=3D"MsoNormal" style=3D"ma=
+rgin:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><font face=3D"comic=
+ sans ms, sans-serif" size=3D"4">=C2=A0</font></span></p><p class=3D"MsoNor=
+mal" style=3D"margin:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><fo=
+nt face=3D"comic sans ms, sans-serif" size=3D"4">Want to check out my portf=
+olio, send a
+reply to talk more.</font></span></p><p class=3D"MsoNormal" style=3D"margin=
+:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><font face=3D"comic san=
+s ms, sans-serif" size=3D"4">=C2=A0</font></span></p><p class=3D"MsoNormal"=
+ style=3D"margin:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><font f=
+ace=3D"comic sans ms, sans-serif" size=3D"4">Best Regards,</font></span></p=
+><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;line-height:107%"><span=
+ lang=3D"EN-IN"><b><font face=3D"comic sans ms, sans-serif" size=3D"4"><spa=
+n style=3D"color:rgb(31,31,31);white-space:nowrap">Gary Bechtel</span>,=C2=
+=A0
+</font></b></span></p><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;li=
+ne-height:107%"><font face=3D"comic sans ms, sans-serif" size=3D"4"><span l=
+ang=3D"EN-IN">Business Development Manager<br></span>----------------------=
+----------------------------------------------<br><b>Note:-</b> If you want=
+ to receive a <b><span style=3D"background:yellow">detailed plan of action,=
+</span></b> please feel free to reply. <b><span style=3D"background:yellow"=
+>Yes</span></b>, we will get back to you with details.</font></p><p class=
+=3D"MsoNormal" style=3D"margin:0cm 0cm 8pt;line-height:107%">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</p><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;line-height:107%">
+
+</p><font face=3D"comic sans ms, sans-serif" size=3D"4">Note: If you are no=
+t interested, please</font><div><font face=3D"comic sans ms, sans-serif" si=
+ze=3D"4"><br></font><div><div><font face=3D"comic sans ms, sans-serif" size=
+=3D"4">Click here to <a href=3D"https://globalgns-dot-yamm-track.appspot.co=
+m/2CHy-cd8faJnbhtEFUtrtu-BUDCTrmHUkk1c2__8usTd5kGAziAF3h9bqFUL_oMyHBSNS9SBP=
+JpEF2rghfJELa4buq_URewW4_L2VNwtZ-iteiQqvFp5hGIX_yOvd_vNpmyPbpBiM0R-EIFFm6Wn=
+qbU6ttm0YecmrjYxfmfM0bYmq4em8K_ZqdzISZStMrI_waC8O" rel=3D"nofollow">unsubsc=
+ribe</a>=C2=A0</font><table border=3D"0" cellpadding=3D"0" cellspacing=3D"0=
+" width=3D"64" style=3D"border-collapse:collapse;width:48pt"><colgroup><col=
+ width=3D"64" style=3D"width:48pt"></colgroup><tbody>
+
+</tbody></table></div></div></div></div>
+<img src=3D"https://globalgns-dot-yamm-track.appspot.com/2P1D5aGZZQTn557TWK=
+IoDwxx9Zt0NxEv8rQqt2r5WQWR0kGAziAHHPuYkQq6_R8lztz6OG0cHpNac5A-QcimcNKR4nxgP=
+TUPpJkINIRogXyMx-7x_WEQLWBx_8iqadtfFt3tYsbr6MrzGr9eI7zSsvSlSgOZaMib8Lpdqoo4=
+" width=3D"1" height=3D"1" alt=3D"beacon" style=3D"display:none; display:no=
+ne!important;">
+
+--00000000000043037305fc08b17d--
+

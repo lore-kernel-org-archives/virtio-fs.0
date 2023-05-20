@@ -1,23 +1,20 @@
-Return-Path: <gary.bechtel@globalgns.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=globalgns.com; s=google; t=1684489147; x=1687081147;
- h=to:subject:message-id:date:from:sender:mime-version:from:to:cc
- :subject:date:message-id:reply-to;
- bh=OlwoOngHXwqJeOMzsHd8fStV29pvpOIPWlDDfP3R4vU=;
- b=mzpfI1XEHdE6klZFm7UCkbeW6nuwkQY9JcjkMCRfm8atIc2905pPNlSMpRFLkJ1mbn
- BaD60RsMM9gUVnV70+IYzkE2oGRRKm9a6dvQ8I12DXwsctY6P9RV8N/iBWLT2R5CAufS
- 06YNmlhQ9SiQwKUBtV0/s1xYG2cRN1mcksoQByCzvPP8kwJzEEDLHHOse6H5bbLo5HCS
- KMFZyLcaVQfVDqcSIfhuSlIfCgVwfVhdtshxYPrjZELs5RA9OBEBwq/GQj7dmza/qw9E
- K5apdk8NUoY2F+yuVsN5yUKWAJbMQ6R0uPUMuU0lgfncvCiB0fWBoFoTxabJGZFL5jXS
- Z8Lg==
+Return-Path: <daggs@gmx.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=gmx.com; s=s31663417;
+ t=1684577730; i=daggs@gmx.com;
+ bh=BPi351b3cEAO/9mABW7kY33YkxUeYeae9znHW1FHnT8=;
+ h=X-UI-Sender-Class:From:To:Subject:Date;
+ b=mXfYks1XP6vMcvqhycfXUHCwiKCqF+rsVGlTgN87jxKsaya7l5QKZZszHqUMXb/Bg
+ 9sPUpGJRXstl+TjSdua7eojg31bkv/hSemE8gLLOabPG6j2zm7wRkxD5hmD/TYiP4E
+ J48GbPyj+jCaI7Nuj0EnLsG6hYiM8Xm7a9hPfCCtPE/ec73bg8MyAoRaFvP4QO9HHm
+ IgnGCr5d/AuAb+s4Lta6mf31X5WFpnk7jDMuHdQ1xkKkQIYWj5Y2LBm96kfKzcq8CE
+ xvyqyPa2Drp6sNntyDdbl8H/02WsGbmKUibSQsJ33PZVlp0qejoZBjD4z2atJTDeuG
+ WVbX/7nwvWemA==
 MIME-Version: 1.0
-Sender: Gary Bechtel <gary.bechtel@globalgns.com>
-From: Gary Bechtel <gary.bechtel@globalgns.com>
-Date: Fri, 19 May 2023 02:39:07 -0700
-Message-ID: <CAP1WZhOtCbwwWYTVOX+cBVBmGzuzrRszzADTybowRhFkdeaowA@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="00000000000043037305fc08b17d"
-Subject: Re: [Virtio-fs] virtio-fs.gitlab.io : Attract Local Customers with
- Local SEO Optimization.
+Message-ID: <trinity-69fb6e2a-760f-4a3b-9a40-c7472c34dab5-1684577428128@3c-app-mailcom-bs08>
+From: daggs <daggs@gmx.com>
+Date: Sat, 20 May 2023 12:10:28 +0200
+Content-Type: text/plain; charset=UTF-8
+Subject: [Virtio-fs] vm hangs when booting with virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,131 +23,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Virtio-Fs <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
---00000000000043037305fc08b17d
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+Greetings,
 
-Hi *virtio-fs.gitlab.io <http://virtio-fs.gitlab.io>* Owner,
+I'm trying to boot a win11 vm with a virtiofs fs and the system just hangs on boot, I'd like some incites on what is the issue.
+here is what I'm using:
+- kernel 6.3.3
+- libvirt 9.3.0
+- qemu 8.0.0
+- virtiofsd 1.5.1
 
-My name is  *Gary Bechtel,* and I was just browsing your *virtio-fs.gitlab.=
-io
-<http://virtio-fs.gitlab.io>,* and I came up with a great design and a plan
-to develop your *virtio-fs.gitlab.io <http://virtio-fs.gitlab.io>,* using
-the latest technologies to generate additional revenue and beat your
-competitors. By the way, we=E2=80=99ve a pretty good experience in developi=
-ng apps
-too.
+I'm using the following cmd to run virtiofsd using socket: virtiofsd --socket-path=/var/lib/libvirt/helpers_state/windows/linux_home.socket --shared-dir /home/daggs --cache auto
+where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 16K (tried with 1M too, same behavior)
+the virtiofsd invocation is issued inside the prepare and begin qemu hook on libvirt.
+I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO virtiofsd] Waiting for vhost-user socket connection...
+and I call it like this: nohup <virtiofsd cmd> &
 
+the vm's relevant config is this:
+<domain type='kvm'>
+...
+<memory unit='KiB'>24582144</memory>
+<currentMemory unit='KiB'>24582144</currentMemory>
+<memoryBacking>
+<source type='memfd'/>
+<access mode='shared'/>
+</memoryBacking>
+<vcpu placement='static'>12</vcpu>
+<cputune>
+<vcpupin vcpu='0' cpuset='4'/>
+<vcpupin vcpu='1' cpuset='5'/>
+<vcpupin vcpu='2' cpuset='6'/>
+<vcpupin vcpu='3' cpuset='7'/>
+<vcpupin vcpu='4' cpuset='8'/>
+<vcpupin vcpu='5' cpuset='9'/>
+<vcpupin vcpu='6' cpuset='10'/>
+<vcpupin vcpu='7' cpuset='11'/>
+<vcpupin vcpu='8' cpuset='12'/>
+<vcpupin vcpu='9' cpuset='13'/>
+<vcpupin vcpu='10' cpuset='14'/>
+<vcpupin vcpu='11' cpuset='15'/>
+<emulatorpin cpuset='0-1'/>
+</cputune>
 
+...
+<cpu mode='host-passthrough' check='none' migratable='on'>
+<topology sockets='1' dies='1' cores='6' threads='2'/>
+<cache mode='passthrough'/>
+<feature policy='require' name='topoext'/>
+</cpu>
+...
+<filesystem type='mount' accessmode='passthrough'>
+<driver type='virtiofs' queue='1024'/>
+<binary path='/usr/bin/virtiofsd'/>
+<source socket='/var/lib/libvirt/helpers_state/windows/linux_home.socket'/>
+<target dir='linux_home'/>
+<address type='pci' domain='0x0000' bus='0x07' slot='0x00' function='0x0'/>
+</filesystem>
+...
+</domain>
 
-Want to check out my portfolio, send a reply to talk more.
+I'm running it via virsh, added -d 4, no errors in the log
+when it is stuck, I get a black screen (using gpu pt to guest which work without it), ps shows both virsh start cmd running and stuck, two virtiofsd instances are up.
+any ideas how to solve this?
 
+Thanks,
 
-
-Best Regards,
-
-*Gary Bechtel,  *
-
-Business Development Manager
---------------------------------------------------------------------
-*Note:-* If you want to receive a *detailed plan of action,* please feel
-free to reply. *Yes*, we will get back to you with details.
-
-Note: If you are not interested, please
-
-Click here to unsubscribe
-<https://globalgns-dot-yamm-track.appspot.com/2CHy-cd8faJnbhtEFUtrtu-BUDCTr=
-mHUkk1c2__8usTd5kGAziAF3h9bqFUL_oMyHBSNS9SBPJpEF2rghfJELa4buq_URewW4_L2VNwt=
-Z-iteiQqvFp5hGIX_yOvd_vNpmyPbpBiM0R-EIFFm6WnqbU6ttm0YecmrjYxfmfM0bYmq4em8K_=
-ZqdzISZStMrI_waC8O>
-
-[image: beacon]
-
---00000000000043037305fc08b17d
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;line-he=
-ight:107%"><font face=3D"comic sans ms, sans-serif" size=3D"4">Hi <b style=
-=3D""><a href=3D"http://virtio-fs.gitlab.io">virtio-fs.gitlab.io</a></b>
-Owner,<br></font></p><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;lin=
-e-height:107%"><span lang=3D"EN-IN"><font face=3D"comic sans ms, sans-serif=
-" size=3D"4">My name is=C2=A0
-
-<b><span style=3D"color:rgb(31,31,31);white-space:nowrap">Gary Bechtel</spa=
-n>,</b> and I was just
-browsing your <b><a href=3D"http://virtio-fs.gitlab.io">virtio-fs.gitlab.io=
-</a>,</b> and I came
-up with a great design and a plan to develop your <b><a href=3D"http://virt=
-io-fs.gitlab.io">virtio-fs.gitlab.io</a>,</b> using the latest technologies=
- to generate additional
-revenue and beat your competitors. By the way, we=E2=80=99ve a pretty good =
-experience
-in developing apps too.</font></span></p><p class=3D"MsoNormal" style=3D"ma=
-rgin:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><font face=3D"comic=
- sans ms, sans-serif" size=3D"4">=C2=A0</font></span></p><p class=3D"MsoNor=
-mal" style=3D"margin:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><fo=
-nt face=3D"comic sans ms, sans-serif" size=3D"4">Want to check out my portf=
-olio, send a
-reply to talk more.</font></span></p><p class=3D"MsoNormal" style=3D"margin=
-:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><font face=3D"comic san=
-s ms, sans-serif" size=3D"4">=C2=A0</font></span></p><p class=3D"MsoNormal"=
- style=3D"margin:0in 0in 8pt;line-height:107%"><span lang=3D"EN-IN"><font f=
-ace=3D"comic sans ms, sans-serif" size=3D"4">Best Regards,</font></span></p=
-><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;line-height:107%"><span=
- lang=3D"EN-IN"><b><font face=3D"comic sans ms, sans-serif" size=3D"4"><spa=
-n style=3D"color:rgb(31,31,31);white-space:nowrap">Gary Bechtel</span>,=C2=
-=A0
-</font></b></span></p><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;li=
-ne-height:107%"><font face=3D"comic sans ms, sans-serif" size=3D"4"><span l=
-ang=3D"EN-IN">Business Development Manager<br></span>----------------------=
-----------------------------------------------<br><b>Note:-</b> If you want=
- to receive a <b><span style=3D"background:yellow">detailed plan of action,=
-</span></b> please feel free to reply. <b><span style=3D"background:yellow"=
->Yes</span></b>, we will get back to you with details.</font></p><p class=
-=3D"MsoNormal" style=3D"margin:0cm 0cm 8pt;line-height:107%">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</p><p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;line-height:107%">
-
-</p><font face=3D"comic sans ms, sans-serif" size=3D"4">Note: If you are no=
-t interested, please</font><div><font face=3D"comic sans ms, sans-serif" si=
-ze=3D"4"><br></font><div><div><font face=3D"comic sans ms, sans-serif" size=
-=3D"4">Click here to <a href=3D"https://globalgns-dot-yamm-track.appspot.co=
-m/2CHy-cd8faJnbhtEFUtrtu-BUDCTrmHUkk1c2__8usTd5kGAziAF3h9bqFUL_oMyHBSNS9SBP=
-JpEF2rghfJELa4buq_URewW4_L2VNwtZ-iteiQqvFp5hGIX_yOvd_vNpmyPbpBiM0R-EIFFm6Wn=
-qbU6ttm0YecmrjYxfmfM0bYmq4em8K_ZqdzISZStMrI_waC8O" rel=3D"nofollow">unsubsc=
-ribe</a>=C2=A0</font><table border=3D"0" cellpadding=3D"0" cellspacing=3D"0=
-" width=3D"64" style=3D"border-collapse:collapse;width:48pt"><colgroup><col=
- width=3D"64" style=3D"width:48pt"></colgroup><tbody>
-
-</tbody></table></div></div></div></div>
-<img src=3D"https://globalgns-dot-yamm-track.appspot.com/2P1D5aGZZQTn557TWK=
-IoDwxx9Zt0NxEv8rQqt2r5WQWR0kGAziAHHPuYkQq6_R8lztz6OG0cHpNac5A-QcimcNKR4nxgP=
-TUPpJkINIRogXyMx-7x_WEQLWBx_8iqadtfFt3tYsbr6MrzGr9eI7zSsvSlSgOZaMib8Lpdqoo4=
-" width=3D"1" height=3D"1" alt=3D"beacon" style=3D"display:none; display:no=
-ne!important;">
-
---00000000000043037305fc08b17d--
+Dagg
 

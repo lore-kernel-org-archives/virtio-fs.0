@@ -4,23 +4,23 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  h=content-transfer-encoding:mime-version:references:in-reply-to
  :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=PmygjvZg8uFQsUpexNqFXIftg/uxTgYWjvmcSaLAlsA=;
- b=K+2L5/KZsyNq2tWxX1t3NkN+Tas0iUV8sqmJbF8Bc1mBDsis9QGrtaPM6uWbU0O6EJ
- 3bSL27/+49AgEl/1zUOzqznhTS7uptifshnsILnPb8Ysxny83UMqJv7qrX1EJSfNbaLE
- Y6hUgGF/ljtDn+1/g/obYmnkGelgzkpeSwAlR7o/l9tfJZXMmJbqw40/Ik1pt8LL+oxC
- ubbYAkTFnF+GkjSTpMQRpy9dJnk2lai7+GH5xVRt7EgWpiQV0uEUefvA0EbkXHwLurp7
- /uobhuxqpzB4FGOZ9bLsboHb9Ig+4QMo4/9GYqxDGdUgazYs4cRI6JoT7A14GzQYDILz
- 8d7g==
+ bh=AJso+7/SyOzlPSfGsjFdKvvog0Z+6+yUR2hdcAwaBfc=;
+ b=MutJX7emGU8QPyPA59RtM1I5kKlSSAidzSGGfKrRgsv11216aNl7PXId0QQU0m6W9J
+ kHL4Eb2rXMOQqQTZgcLmLeTksnZRcvY1ErYZBDeBOySKM/ww0rU2Rr3smYl1FhJN0Ty7
+ QJrFU9oocvL+vmc/Bx7Z/KJ3CTzdoDFaCBgcwvTnFEegXYES6XbkJEQLXgiUnNMq1Ysc
+ 1AZF9EOnlU1Uvz/M5uFTWDDzYjRveuU/vJzNhFy/huSrObmQQQepk3UYUs9f63mxO86E
+ MJovmWlhQQ8kwXuW9WuhWTxkIH+8r9xN8D+8Ug2UJy7MexKFU8FutQUpxEEreiFj7qNs
+ AeZg==
 From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Mon, 10 Jul 2023 16:35:16 +0100
-Message-Id: <20230710153522.3469097-15-alex.bennee@linaro.org>
+Date: Mon, 10 Jul 2023 16:35:15 +0100
+Message-Id: <20230710153522.3469097-14-alex.bennee@linaro.org>
 In-Reply-To: <20230710153522.3469097-1-alex.bennee@linaro.org>
 References: <20230710153522.3469097-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC PATCH v3 14/20] docs/interop: define STANDALONE
- protocol feature for vhost-user
+Subject: [Virtio-fs] [RFC PATCH v3 13/20] docs/system: add a basic
+ enumeration of vhost-user devices
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,129 +32,80 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
-Currently QEMU has to know some details about the back-end to be able
-to setup the guest. While various parts of the setup can be delegated
-to the backend (for example config handling) this is a very piecemeal
-approach.
-
-This patch suggests a new feature flag (VHOST_USER_PROTOCOL_F_STANDALONE)
-which the back-end can advertise which allows a probe message to be
-sent to get all the details QEMU needs to know in one message.
+Make it clear the vhost-user-device is intended for expert use only.
 
 Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 
 ---
-Initial RFC for discussion. I intend to prototype this work with QEMU
-and one of the rust-vmm vhost-user daemons.
+v2
+  - make clear vhost-user-device for expert use
 ---
- docs/interop/vhost-user.rst | 39 +++++++++++++++++++++++++++++++++++++
- hw/virtio/vhost-user.c      |  8 ++++++++
- 2 files changed, 47 insertions(+)
+ docs/system/devices/vhost-user-rng.rst |  2 ++
+ docs/system/devices/vhost-user.rst     | 41 ++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+)
 
-diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-index 5a070adbc1..a2080f56f3 100644
---- a/docs/interop/vhost-user.rst
-+++ b/docs/interop/vhost-user.rst
-@@ -275,6 +275,21 @@ Inflight description
+diff --git a/docs/system/devices/vhost-user-rng.rst b/docs/system/devices/vhost-user-rng.rst
+index a145d4105c..ead1405326 100644
+--- a/docs/system/devices/vhost-user-rng.rst
++++ b/docs/system/devices/vhost-user-rng.rst
+@@ -1,3 +1,5 @@
++.. _vhost_user_rng:
++
+ QEMU vhost-user-rng - RNG emulation
+ ===================================
  
- :queue size: a 16-bit size of virtqueues
+diff --git a/docs/system/devices/vhost-user.rst b/docs/system/devices/vhost-user.rst
+index a80e95a48a..0f9eec3f00 100644
+--- a/docs/system/devices/vhost-user.rst
++++ b/docs/system/devices/vhost-user.rst
+@@ -15,6 +15,47 @@ to the guest. The code is mostly boilerplate although each device has
+ a ``chardev`` option which specifies the ID of the ``--chardev``
+ device that connects via a socket to the vhost-user *daemon*.
  
-+Backend specifications
-+^^^^^^^^^^^^^^^^^^^^^^
++Each device will have an virtio-mmio and virtio-pci variant. See your
++platform details for what sort of virtio bus to use.
 +
-++-----------+-------------+------------+------------+
-+| device id | config size |   min_vqs  |   max_vqs  |
-++-----------+-------------+------------+------------+
++.. list-table:: vhost-user devices
++  :widths: 20 20 60
++  :header-rows: 1
 +
-+:device id: a 32-bit value holding the VirtIO device ID
++  * - Device
++    - Type
++    - Notes
++  * - vhost-user-device
++    - Generic Development Device
++    - You must manually specify ``virtio-id`` and the correct ``num_vqs``. Intended for expert use.
++  * - vhost-user-blk
++    - Block storage
++    -
++  * - vhost-user-fs
++    - File based storage driver
++    - See https://gitlab.com/virtio-fs/virtiofsd
++  * - vhost-user-scsi
++    - SCSI based storage
++    - See contrib/vhost-user/scsi
++  * - vhost-user-gpio
++    - Proxy gpio pins to host
++    - See https://github.com/rust-vmm/vhost-device
++  * - vhost-user-i2c
++    - Proxy i2c devices to host
++    - See https://github.com/rust-vmm/vhost-device
++  * - vhost-user-input
++    - Generic input driver
++    - See contrib/vhost-user-input
++  * - vhost-user-rng
++    - Entropy driver
++    - :ref:`vhost_user_rng`
++  * - vhost-user-gpu
++    - GPU driver
++    -
++  * - vhost-user-vsock
++    - Socket based communication
++    - See https://github.com/rust-vmm/vhost-device
 +
-+:config size: a 32-bit value holding the config size (see ``VHOST_USER_GET_CONFIG``)
-+
-+:min_vqs: a 32-bit value holding the minimum number of vqs supported
-+
-+:max_vqs: a 32-bit value holding the maximum number of vqs supported, must be >= min_vqs
-+
- C structure
- -----------
+ vhost-user daemon
+ =================
  
-@@ -296,6 +311,7 @@ In QEMU the vhost-user message is implemented with the following struct:
-           VhostUserConfig config;
-           VhostUserVringArea area;
-           VhostUserInflight inflight;
-+          VhostUserBackendSpecs specs;
-       };
-   } QEMU_PACKED VhostUserMsg;
- 
-@@ -316,6 +332,7 @@ replies. Here is a list of the ones that do:
- * ``VHOST_USER_GET_VRING_BASE``
- * ``VHOST_USER_SET_LOG_BASE`` (if ``VHOST_USER_PROTOCOL_F_LOG_SHMFD``)
- * ``VHOST_USER_GET_INFLIGHT_FD`` (if ``VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD``)
-+* ``VHOST_USER_GET_BACKEND_SPECS`` (if ``VHOST_USER_PROTOCOL_F_STANDALONE``)
- 
- .. seealso::
- 
-@@ -885,6 +902,15 @@ Protocol features
-   #define VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS  15
-   #define VHOST_USER_PROTOCOL_F_STATUS               16
-   #define VHOST_USER_PROTOCOL_F_XEN_MMAP             17
-+  #define VHOST_USER_PROTOCOL_F_STANDALONE           18
-+
-+Some features depend on others to be supported:
-+
-+* ``VHOST_USER_PROTOCOL_F_STANDALONE`` depends on:
-+
-+  * ``VHOST_USER_PROTOCOL_F_STATUS``
-+  * ``VHOST_USER_PROTOCOL_F_CONFIG`` (if there is a config space)
-+
- 
- Front-end message types
- -----------------------
-@@ -1440,6 +1466,19 @@ Front-end message types
-   query the back-end for its device status as defined in the Virtio
-   specification.
- 
-+``VHOST_USER_GET_BACKEND_SPECS``
-+  :id: 41
-+  :request payload: N/A
-+  :reply payload: ``Backend specifications``
-+
-+  When the ``VHOST_USER_PROTOCOL_F_STANDALONE`` protocol feature has been
-+  successfully negotiated, this message is submitted by the front-end to
-+  query the back-end for its capabilities. This is intended to remove
-+  the need for the front-end to know ahead of time what the VirtIO
-+  device the backend emulates is.
-+
-+  The reply contains the device id, size of the config space and the
-+  range of VirtQueues the backend supports.
- 
- Back-end message types
- ----------------------
-diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-index c4e0cbd702..28b021d5d3 100644
---- a/hw/virtio/vhost-user.c
-+++ b/hw/virtio/vhost-user.c
-@@ -202,6 +202,13 @@ typedef struct VhostUserInflight {
-     uint16_t queue_size;
- } VhostUserInflight;
- 
-+typedef struct VhostUserBackendSpecs {
-+    uint32_t device_id;
-+    uint32_t config_size;
-+    uint32_t min_vqs;
-+    uint32_t max_vqs;
-+} VhostUserBackendSpecs;
-+
- typedef struct {
-     VhostUserRequest request;
- 
-@@ -226,6 +233,7 @@ typedef union {
-         VhostUserCryptoSession session;
-         VhostUserVringArea area;
-         VhostUserInflight inflight;
-+        VhostUserBackendSpecs specs;
- } VhostUserPayload;
- 
- typedef struct VhostUserMsg {
 -- 
 2.39.2
 

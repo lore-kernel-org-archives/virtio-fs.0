@@ -1,16 +1,15 @@
 Return-Path: <mst@redhat.com>
-Date: Mon, 10 Jul 2023 15:58:07 -0400
+Date: Mon, 10 Jul 2023 16:15:36 -0400
 From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20230710155653-mutt-send-email-mst@kernel.org>
+Message-ID: <20230710161447-mutt-send-email-mst@kernel.org>
 References: <20230710153522.3469097-1-alex.bennee@linaro.org>
- <20230710153522.3469097-11-alex.bennee@linaro.org>
+ <20230710153522.3469097-8-alex.bennee@linaro.org>
 MIME-Version: 1.0
-In-Reply-To: <20230710153522.3469097-11-alex.bennee@linaro.org>
-Content-Type: text/plain; charset="iso-8859-1"
+In-Reply-To: <20230710153522.3469097-8-alex.bennee@linaro.org>
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v3 10/20] hw/virtio: add config support to
- vhost-user-device
+Subject: Re: [Virtio-fs] [PATCH v3 07/20] virtio: add vhost-user-base and a
+ generic vhost-user-device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,156 +21,39 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
 Cc: qemu-devel@nongnu.org, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
-On Mon, Jul 10, 2023 at 04:35:12PM +0100, Alex Benn=E9e wrote:
-> To use the generic device the user will need to provide the config
-> region size via the command line. We also add a notifier so the guest
-> can be pinged if the remote daemon updates the config.
->=20
-> With these changes:
->=20
->   -device vhost-user-device-pci,virtio-id=3D41,num_vqs=3D2,config_size=3D8
->=20
-> is equivalent to:
->=20
->   -device vhost-user-gpio-pci
->=20
-> Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
+> +static const TypeInfo vud_info = {
+> +    .name = TYPE_VHOST_USER_DEVICE,
+> +    .parent = TYPE_VHOST_USER_BASE,
+> +    .instance_size = sizeof(VHostUserBase),
+> +    .class_init = vud_class_init,
+> +    .class_size = sizeof(VHostUserBaseClass),
 
+I wish you didn't tie the refactoring in with new functionality.
+I applied but blocked creating these for now with:
 
-This one I think it's best to defer until we get a better
-handle on how we want the configuration to look.
+Subject: [PATCH] vhost-user-device: block creating instances
+Message-Id: <b10d1e585adf8a5348bd886333a8c55dcdef6048.1689020067.git.mst@redhat.com>
 
+block this until we are ready to commit to this command line.
 
-> ---
->  include/hw/virtio/vhost-user-device.h |  1 +
->  hw/virtio/vhost-user-device.c         | 58 ++++++++++++++++++++++++++-
->  2 files changed, 58 insertions(+), 1 deletion(-)
->=20
-> diff --git a/include/hw/virtio/vhost-user-device.h b/include/hw/virtio/vh=
-ost-user-device.h
-> index 9105011e25..3ddf88a146 100644
-> --- a/include/hw/virtio/vhost-user-device.h
-> +++ b/include/hw/virtio/vhost-user-device.h
-> @@ -22,6 +22,7 @@ struct VHostUserBase {
->      CharBackend chardev;
->      uint16_t virtio_id;
->      uint32_t num_vqs;
-> +    uint32_t config_size;
->      /* State tracking */
->      VhostUserState vhost_user;
->      struct vhost_virtqueue *vhost_vq;
-> diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
-> index b0239fa033..2b028cae08 100644
-> --- a/hw/virtio/vhost-user-device.c
-> +++ b/hw/virtio/vhost-user-device.c
-> @@ -117,6 +117,42 @@ static uint64_t vub_get_features(VirtIODevice *vdev,
->      return vub->vhost_dev.features & ~(1ULL << VHOST_USER_F_PROTOCOL_FEA=
-TURES);
->  }
-> =20
-> +/*
-> + * To handle VirtIO config we need to know the size of the config
-> + * space. We don't cache the config but re-fetch it from the guest
-> + * every time in case something has changed.
-> + */
-> +static void vub_get_config(VirtIODevice *vdev, uint8_t *config)
-> +{
-> +    VHostUserBase *vub =3D VHOST_USER_BASE(vdev);
-> +    Error *local_err =3D NULL;
-> +
-> +    /*
-> +     * There will have been a warning during vhost_dev_init, but lets
-> +     * assert here as nothing will go right now.
-> +     */
-> +    g_assert(vub->config_size && vub->vhost_user.supports_config =3D=3D =
-true);
-> +
-> +    if (vhost_dev_get_config(&vub->vhost_dev, config,
-> +                             vub->config_size, &local_err)) {
-> +        error_report_err(local_err);
-> +    }
-> +}
-> +
-> +/*
-> + * When the daemon signals an update to the config we just need to
-> + * signal the guest as we re-read the config on demand above.
-> + */
-> +static int vub_config_notifier(struct vhost_dev *dev)
-> +{
-> +    virtio_notify_config(dev->vdev);
-> +    return 0;
-> +}
-> +
-> +const VhostDevConfigOps vub_config_ops =3D {
-> +    .vhost_dev_config_notifier =3D vub_config_notifier,
-> +};
-> +
->  static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)
->  {
->      /*
-> @@ -141,12 +177,21 @@ static int vub_connect(DeviceState *dev)
->  {
->      VirtIODevice *vdev =3D VIRTIO_DEVICE(dev);
->      VHostUserBase *vub =3D VHOST_USER_BASE(vdev);
-> +    struct vhost_dev *vhost_dev =3D &vub->vhost_dev;
-> =20
->      if (vub->connected) {
->          return 0;
->      }
->      vub->connected =3D true;
-> =20
-> +    /*
-> +     * If we support VHOST_USER_GET_CONFIG we must enable the notifier
-> +     * so we can ping the guest when it updates.
-> +     */
-> +    if (vub->vhost_user.supports_config) {
-> +        vhost_dev_set_config_notifier(vhost_dev, &vub_config_ops);
-> +    }
-> +
->      /* restore vhost state */
->      if (virtio_device_started(vdev, vdev->status)) {
->          vub_start(vdev);
-> @@ -214,11 +259,20 @@ static void vub_device_realize(DeviceState *dev, Er=
-ror **errp)
->          vub->num_vqs =3D 1; /* reasonable default? */
->      }
-> =20
-> +    /*
-> +     * We can't handle config requests unless we know the size of the
-> +     * config region, specialisations of the vhost-user-device will be
-> +     * able to set this.
-> +     */
-> +    if (vub->config_size) {
-> +        vub->vhost_user.supports_config =3D true;
-> +    }
-> +
->      if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
->          return;
->      }
-> =20
-> -    virtio_init(vdev, vub->virtio_id, 0);
-> +    virtio_init(vdev, vub->virtio_id, vub->config_size);
-> =20
->      /*
->       * Disable guest notifiers, by default all notifications will be via=
- the
-> @@ -268,6 +322,7 @@ static void vub_class_init(ObjectClass *klass, void *=
-data)
->      vdc->realize =3D vub_device_realize;
->      vdc->unrealize =3D vub_device_unrealize;
->      vdc->get_features =3D vub_get_features;
-> +    vdc->get_config =3D vub_get_config;
->      vdc->set_status =3D vub_set_status;
->  }
-> =20
-> @@ -295,6 +350,7 @@ static Property vud_properties[] =3D {
->      DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
->      DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
->      DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
-> +    DEFINE_PROP_UINT32("config_size", VHostUserBase, config_size, 0),
->      DEFINE_PROP_END_OF_LIST(),
->  };
-> =20
-> --=20
-> 2.39.2
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+---
+ hw/virtio/vhost-user-device.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
+index 2b028cae08..ded97b6d70 100644
+--- a/hw/virtio/vhost-user-device.c
++++ b/hw/virtio/vhost-user-device.c
+@@ -369,6 +369,7 @@ static const TypeInfo vud_info = {
+     .instance_size = sizeof(VHostUserBase),
+     .class_init = vud_class_init,
+     .class_size = sizeof(VHostUserBaseClass),
++    .abstract = true
+ };
+
+ static void vu_register_types(void)
+
+-- 
+MST
 

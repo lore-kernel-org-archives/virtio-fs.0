@@ -1,12 +1,26 @@
-Return-Path: <gmaglion@redhat.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1689003333; x=1691595333;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=uTkEU0oqDGeWEiEFn49DE5kPkeQF20sGslhQri+i2Js=;
+ b=Gb60r5ghyLsbjsw/emm/XNOO5XDsv73JGPkCO6Jg/NLliM9W8ko2COzk5S4LrX+Ks7
+ uRjWlcAAdWqpuUU6s1HF939iHae0Bsz3OBGc1L0EKpfhoBUNGe7kWsBb+KirTKMG+KqB
+ Yr7OYYc9dp6hwzvGDNaNC7QRrpLxF2ER6fY/Svzx2iGoGdwlg7jXy/qxLmevPi8FXmCo
+ igvyoe3d2e3HXe1wH6VYcU+GS3SPvR3VF2nccn/o7xKBeF87Xe16sD2JGtexBbAB1DNp
+ ooYiJxLqf/abGLFpdQfS+Al20i/IFZwaDuNlATC8CGIgB4CpLsSu6y/qjrQNbd/G9pEV
+ XGFg==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Mon, 10 Jul 2023 16:35:12 +0100
+Message-Id: <20230710153522.3469097-11-alex.bennee@linaro.org>
+In-Reply-To: <20230710153522.3469097-1-alex.bennee@linaro.org>
+References: <20230710153522.3469097-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-References: <trinity-69fb6e2a-760f-4a3b-9a40-c7472c34dab5-1684577428128@3c-app-mailcom-bs08>
-In-Reply-To: <trinity-69fb6e2a-760f-4a3b-9a40-c7472c34dab5-1684577428128@3c-app-mailcom-bs08>
-From: German Maglione <gmaglione@redhat.com>
-Date: Wed, 24 May 2023 16:51:57 +0200
-Message-ID: <CAJh=p+42T8VRkdE5citVFbgUCXF10vf-c3589c-JBbWQ0Yq2Nw@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="0000000000006a3fb405fc71a7b3"
-Subject: Re: [Virtio-fs] vm hangs when booting with virtiofs
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 10/20] hw/virtio: add config support to
+ vhost-user-device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,219 +29,146 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: daggs <daggs@gmx.com>
-Cc: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
---0000000000006a3fb405fc71a7b3
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+To use the generic device the user will need to provide the config
+region size via the command line. We also add a notifier so the guest
+can be pinged if the remote daemon updates the config.
 
-On Sat, May 20, 2023 at 12:15=E2=80=AFPM daggs <daggs@gmx.com> wrote:
+With these changes:
 
-> Greetings,
->
-> I'm trying to boot a win11 vm with a virtiofs fs and the system just hang=
-s
-> on boot, I'd like some incites on what is the issue.
-> here is what I'm using:
-> - kernel 6.3.3
-> - libvirt 9.3.0
-> - qemu 8.0.0
-> - virtiofsd 1.5.1
->
-> I'm using the following cmd to run virtiofsd using socket: virtiofsd
-> --socket-path=3D/var/lib/libvirt/helpers_state/windows/linux_home.socket
-> --shared-dir /home/daggs --cache auto
-> where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 16K
-> (tried with 1M too, same behavior)
-> the virtiofsd invocation is issued inside the prepare and begin qemu hook
-> on libvirt.
-> I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO
-> virtiofsd] Waiting for vhost-user socket connection...
-> and I call it like this: nohup <virtiofsd cmd> &
->
-> the vm's relevant config is this:
-> <domain type=3D'kvm'>
-> ...
-> <memory unit=3D'KiB'>24582144</memory>
-> <currentMemory unit=3D'KiB'>24582144</currentMemory>
-> <memoryBacking>
-> <source type=3D'memfd'/>
-> <access mode=3D'shared'/>
-> </memoryBacking>
-> <vcpu placement=3D'static'>12</vcpu>
-> <cputune>
-> <vcpupin vcpu=3D'0' cpuset=3D'4'/>
-> <vcpupin vcpu=3D'1' cpuset=3D'5'/>
-> <vcpupin vcpu=3D'2' cpuset=3D'6'/>
-> <vcpupin vcpu=3D'3' cpuset=3D'7'/>
-> <vcpupin vcpu=3D'4' cpuset=3D'8'/>
-> <vcpupin vcpu=3D'5' cpuset=3D'9'/>
-> <vcpupin vcpu=3D'6' cpuset=3D'10'/>
-> <vcpupin vcpu=3D'7' cpuset=3D'11'/>
-> <vcpupin vcpu=3D'8' cpuset=3D'12'/>
-> <vcpupin vcpu=3D'9' cpuset=3D'13'/>
-> <vcpupin vcpu=3D'10' cpuset=3D'14'/>
-> <vcpupin vcpu=3D'11' cpuset=3D'15'/>
-> <emulatorpin cpuset=3D'0-1'/>
-> </cputune>
->
-> ...
-> <cpu mode=3D'host-passthrough' check=3D'none' migratable=3D'on'>
-> <topology sockets=3D'1' dies=3D'1' cores=3D'6' threads=3D'2'/>
-> <cache mode=3D'passthrough'/>
-> <feature policy=3D'require' name=3D'topoext'/>
-> </cpu>
-> ...
-> <filesystem type=3D'mount' accessmode=3D'passthrough'>
-> <driver type=3D'virtiofs' queue=3D'1024'/>
-> <binary path=3D'/usr/bin/virtiofsd'/>
-> <source socket=3D'/var/lib/libvirt/helpers_state/windows/linux_home.socke=
-t'/>
-> <target dir=3D'linux_home'/>
-> <address type=3D'pci' domain=3D'0x0000' bus=3D'0x07' slot=3D'0x00' functi=
-on=3D'0x0'/>
-> </filesystem>
-> ...
-> </domain>
->
-> I'm running it via virsh, added -d 4, no errors in the log
-> when it is stuck, I get a black screen (using gpu pt to guest which work
-> without it), ps shows both virsh start cmd running and stuck, two virtiof=
-sd
-> instances are up.
-> any ideas how to solve this?
->
->
-I forgot, could you replace your '/usr/bin/virtiofsd' with a shell script
-that runs `virtiofsd --log-level=3Ddebug ...` and post the log output
+  -device vhost-user-device-pci,virtio-id=41,num_vqs=2,config_size=8
 
-If you want, you can open an issue here:
-https://gitlab.com/virtio-fs/virtiofsd/-/issues
+is equivalent to:
 
-Thanks,
+  -device vhost-user-gpio-pci
 
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+---
+ include/hw/virtio/vhost-user-device.h |  1 +
+ hw/virtio/vhost-user-device.c         | 58 ++++++++++++++++++++++++++-
+ 2 files changed, 58 insertions(+), 1 deletion(-)
 
-> Thanks,
->
-> Dagg
->
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
->
->
-
---=20
-German
-
---0000000000006a3fb405fc71a7b3
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div dir=3D"ltr"><br></div><br><div class=3D"gmail_quote">=
-<div dir=3D"ltr" class=3D"gmail_attr">On Sat, May 20, 2023 at 12:15=E2=80=
-=AFPM daggs &lt;<a href=3D"mailto:daggs@gmx.com" target=3D"_blank">daggs@gm=
-x.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"ma=
-rgin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:=
-1ex">Greetings,<br>
-<br>
-I&#39;m trying to boot a win11 vm with a virtiofs fs and the system just ha=
-ngs on boot, I&#39;d like some incites on what is the issue.<br>
-here is what I&#39;m using:<br>
-- kernel 6.3.3<br>
-- libvirt 9.3.0<br>
-- qemu 8.0.0<br>
-- virtiofsd 1.5.1<br>
-<br>
-I&#39;m using the following cmd to run virtiofsd using socket: virtiofsd --=
-socket-path=3D/var/lib/libvirt/helpers_state/windows/linux_home.socket --sh=
-ared-dir /home/daggs --cache auto<br>
-where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 16K (trie=
-d with 1M too, same behavior)<br>
-the virtiofsd invocation is issued inside the prepare and begin qemu hook o=
-n libvirt.<br>
-I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO virtiofsd=
-] Waiting for vhost-user socket connection...<br>
-and I call it like this: nohup &lt;virtiofsd cmd&gt; &amp;<br>
-<br>
-the vm&#39;s relevant config is this:<br>
-&lt;domain type=3D&#39;kvm&#39;&gt;<br>
-...<br>
-&lt;memory unit=3D&#39;KiB&#39;&gt;24582144&lt;/memory&gt;<br>
-&lt;currentMemory unit=3D&#39;KiB&#39;&gt;24582144&lt;/currentMemory&gt;<br=
->
-&lt;memoryBacking&gt;<br>
-&lt;source type=3D&#39;memfd&#39;/&gt;<br>
-&lt;access mode=3D&#39;shared&#39;/&gt;<br>
-&lt;/memoryBacking&gt;<br>
-&lt;vcpu placement=3D&#39;static&#39;&gt;12&lt;/vcpu&gt;<br>
-&lt;cputune&gt;<br>
-&lt;vcpupin vcpu=3D&#39;0&#39; cpuset=3D&#39;4&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;1&#39; cpuset=3D&#39;5&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;2&#39; cpuset=3D&#39;6&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;3&#39; cpuset=3D&#39;7&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;4&#39; cpuset=3D&#39;8&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;5&#39; cpuset=3D&#39;9&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;6&#39; cpuset=3D&#39;10&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;7&#39; cpuset=3D&#39;11&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;8&#39; cpuset=3D&#39;12&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;9&#39; cpuset=3D&#39;13&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;10&#39; cpuset=3D&#39;14&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;11&#39; cpuset=3D&#39;15&#39;/&gt;<br>
-&lt;emulatorpin cpuset=3D&#39;0-1&#39;/&gt;<br>
-&lt;/cputune&gt;<br>
-<br>
-...<br>
-&lt;cpu mode=3D&#39;host-passthrough&#39; check=3D&#39;none&#39; migratable=
-=3D&#39;on&#39;&gt;<br>
-&lt;topology sockets=3D&#39;1&#39; dies=3D&#39;1&#39; cores=3D&#39;6&#39; t=
-hreads=3D&#39;2&#39;/&gt;<br>
-&lt;cache mode=3D&#39;passthrough&#39;/&gt;<br>
-&lt;feature policy=3D&#39;require&#39; name=3D&#39;topoext&#39;/&gt;<br>
-&lt;/cpu&gt;<br>
-...<br>
-&lt;filesystem type=3D&#39;mount&#39; accessmode=3D&#39;passthrough&#39;&gt=
-;<br>
-&lt;driver type=3D&#39;virtiofs&#39; queue=3D&#39;1024&#39;/&gt;<br>
-&lt;binary path=3D&#39;/usr/bin/virtiofsd&#39;/&gt;<br>
-&lt;source socket=3D&#39;/var/lib/libvirt/helpers_state/windows/linux_home.=
-socket&#39;/&gt;<br>
-&lt;target dir=3D&#39;linux_home&#39;/&gt;<br>
-&lt;address type=3D&#39;pci&#39; domain=3D&#39;0x0000&#39; bus=3D&#39;0x07&=
-#39; slot=3D&#39;0x00&#39; function=3D&#39;0x0&#39;/&gt;<br>
-&lt;/filesystem&gt;<br>
-...<br>
-&lt;/domain&gt;<br>
-<br>
-I&#39;m running it via virsh, added -d 4, no errors in the log<br>
-when it is stuck, I get a black screen (using gpu pt to guest which work wi=
-thout it), ps shows both virsh start cmd running and stuck, two virtiofsd i=
-nstances are up.<br>
-any ideas how to solve this?<br>
-<br></blockquote><div><br></div><div>I forgot, could you replace your &#39;=
-/usr/bin/virtiofsd&#39; with a shell script that runs `virtiofsd --log-leve=
-l=3Ddebug ...` and post the log output<br></div><div><br></div><div>If you =
-want, you can open an issue here:</div><div><a href=3D"https://gitlab.com/v=
-irtio-fs/virtiofsd/-/issues" target=3D"_blank">https://gitlab.com/virtio-fs=
-/virtiofsd/-/issues</a></div><div><br></div><div>Thanks,<br></div><div>=C2=
-=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8e=
-x;border-left:1px solid rgb(204,204,204);padding-left:1ex">
-Thanks,<br>
-<br>
-Dagg<br>
-<br>
-_______________________________________________<br>
-Virtio-fs mailing list<br>
-<a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_blank">Virtio-fs@redhat.=
-com</a><br>
-<a href=3D"https://listman.redhat.com/mailman/listinfo/virtio-fs" rel=3D"no=
-referrer" target=3D"_blank">https://listman.redhat.com/mailman/listinfo/vir=
-tio-fs</a><br>
-<br>
-</blockquote></div><br clear=3D"all"><br><span>-- </span><br><div dir=3D"lt=
-r"><div dir=3D"ltr">German<br></div></div></div>
-
---0000000000006a3fb405fc71a7b3--
+diff --git a/include/hw/virtio/vhost-user-device.h b/include/hw/virtio/vhost-user-device.h
+index 9105011e25..3ddf88a146 100644
+--- a/include/hw/virtio/vhost-user-device.h
++++ b/include/hw/virtio/vhost-user-device.h
+@@ -22,6 +22,7 @@ struct VHostUserBase {
+     CharBackend chardev;
+     uint16_t virtio_id;
+     uint32_t num_vqs;
++    uint32_t config_size;
+     /* State tracking */
+     VhostUserState vhost_user;
+     struct vhost_virtqueue *vhost_vq;
+diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
+index b0239fa033..2b028cae08 100644
+--- a/hw/virtio/vhost-user-device.c
++++ b/hw/virtio/vhost-user-device.c
+@@ -117,6 +117,42 @@ static uint64_t vub_get_features(VirtIODevice *vdev,
+     return vub->vhost_dev.features & ~(1ULL << VHOST_USER_F_PROTOCOL_FEATURES);
+ }
+ 
++/*
++ * To handle VirtIO config we need to know the size of the config
++ * space. We don't cache the config but re-fetch it from the guest
++ * every time in case something has changed.
++ */
++static void vub_get_config(VirtIODevice *vdev, uint8_t *config)
++{
++    VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    Error *local_err = NULL;
++
++    /*
++     * There will have been a warning during vhost_dev_init, but lets
++     * assert here as nothing will go right now.
++     */
++    g_assert(vub->config_size && vub->vhost_user.supports_config == true);
++
++    if (vhost_dev_get_config(&vub->vhost_dev, config,
++                             vub->config_size, &local_err)) {
++        error_report_err(local_err);
++    }
++}
++
++/*
++ * When the daemon signals an update to the config we just need to
++ * signal the guest as we re-read the config on demand above.
++ */
++static int vub_config_notifier(struct vhost_dev *dev)
++{
++    virtio_notify_config(dev->vdev);
++    return 0;
++}
++
++const VhostDevConfigOps vub_config_ops = {
++    .vhost_dev_config_notifier = vub_config_notifier,
++};
++
+ static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+ {
+     /*
+@@ -141,12 +177,21 @@ static int vub_connect(DeviceState *dev)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+     VHostUserBase *vub = VHOST_USER_BASE(vdev);
++    struct vhost_dev *vhost_dev = &vub->vhost_dev;
+ 
+     if (vub->connected) {
+         return 0;
+     }
+     vub->connected = true;
+ 
++    /*
++     * If we support VHOST_USER_GET_CONFIG we must enable the notifier
++     * so we can ping the guest when it updates.
++     */
++    if (vub->vhost_user.supports_config) {
++        vhost_dev_set_config_notifier(vhost_dev, &vub_config_ops);
++    }
++
+     /* restore vhost state */
+     if (virtio_device_started(vdev, vdev->status)) {
+         vub_start(vdev);
+@@ -214,11 +259,20 @@ static void vub_device_realize(DeviceState *dev, Error **errp)
+         vub->num_vqs = 1; /* reasonable default? */
+     }
+ 
++    /*
++     * We can't handle config requests unless we know the size of the
++     * config region, specialisations of the vhost-user-device will be
++     * able to set this.
++     */
++    if (vub->config_size) {
++        vub->vhost_user.supports_config = true;
++    }
++
+     if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
+         return;
+     }
+ 
+-    virtio_init(vdev, vub->virtio_id, 0);
++    virtio_init(vdev, vub->virtio_id, vub->config_size);
+ 
+     /*
+      * Disable guest notifiers, by default all notifications will be via the
+@@ -268,6 +322,7 @@ static void vub_class_init(ObjectClass *klass, void *data)
+     vdc->realize = vub_device_realize;
+     vdc->unrealize = vub_device_unrealize;
+     vdc->get_features = vub_get_features;
++    vdc->get_config = vub_get_config;
+     vdc->set_status = vub_set_status;
+ }
+ 
+@@ -295,6 +350,7 @@ static Property vud_properties[] = {
+     DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+     DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
+     DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
++    DEFINE_PROP_UINT32("config_size", VHostUserBase, config_size, 0),
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
+-- 
+2.39.2
 

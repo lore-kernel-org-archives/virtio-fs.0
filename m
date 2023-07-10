@@ -1,28 +1,15 @@
-Return-Path: <philmd@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1689026299; x=1691618299;
- h=content-transfer-encoding:in-reply-to:from:references:cc:to
- :content-language:subject:user-agent:mime-version:date:message-id
- :from:to:cc:subject:date:message-id:reply-to;
- bh=JywJx1X809DQXGPFBk5XjtiL5MoqVVxEQC0YC0L3FdQ=;
- b=US4lrRlEgva5RCkuXL93gNr45wRKX9Mla+3sYapxxI39ag4ZQc3S2ZadFLhhDo2aJF
- GOL7WWY8za+JJvcSs1OC/6yKZ5pNIEXHXoHEOWqZDCg4u42mw9mG5jOn9Z2S/m6thTgv
- 8Q+soprEu0j7SqnD5zDt7nmWGUjx56FsxtpT64hdzkNkpCDRaXIfUg4Abhof7+KwGnt1
- +INyrnlsY58PVgt1z5JPGwk1Pznquf2UN9WtPdgbImKMdMZTx4ux13zMRE40dI5zmQEB
- JkKcpoSgpnug2ACb6N801KzBli5kiH+IwkWRVZIhKLTyArPBnPmV2XMAJgEErgLixizM
- LpVg==
-Message-ID: <d8555049-c6b9-fb81-0473-71ee87f632d8@linaro.org>
-Date: Mon, 10 Jul 2023 23:58:14 +0200
+Return-Path: <mst@redhat.com>
+Date: Mon, 10 Jul 2023 19:04:54 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <7e8094f0dfd04d4772b65dc92dd087dc86783dc4.1689030052.git.mst@redhat.com>
+References: <cover.1689030052.git.mst@redhat.com>
 MIME-Version: 1.0
-References: <20230710153522.3469097-1-alex.bennee@linaro.org>
- <20230710153522.3469097-6-alex.bennee@linaro.org>
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@linaro.org>
-In-Reply-To: <20230710153522.3469097-6-alex.bennee@linaro.org>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
+In-Reply-To: <cover.1689030052.git.mst@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v3 05/20] include/hw/virtio: add kerneldoc
- for virtio_init
+Subject: [Virtio-fs] [PULL 52/66] hw/virtio: fix typo in
+ VIRTIO_CONFIG_IRQ_IDX comments
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,14 +18,148 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, qemu-devel@nongnu.org
-Cc: =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: Peter Maydell <peter.maydell@linaro.org>, Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Jason Wang <jasowang@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, virtio-fs@redhat.com
 
-On 10/7/23 17:35, Alex Bennée wrote:
-> Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
-> ---
->   include/hw/virtio/virtio.h | 6 ++++++
->   1 file changed, 6 insertions(+)
+From: Alex Bennée <alex.bennee@linaro.org>
 
-Reviewed-by: Philippe Mathieu-Daudé <philmd@linaro.org>
+Fixes: 544f0278af (virtio: introduce macro VIRTIO_CONFIG_IRQ_IDX)
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+Message-Id: <20230710153522.3469097-4-alex.bennee@linaro.org>
+Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+---
+ hw/display/vhost-user-gpu.c    | 4 ++--
+ hw/net/virtio-net.c            | 4 ++--
+ hw/virtio/vhost-user-fs.c      | 4 ++--
+ hw/virtio/vhost-user-gpio.c    | 2 +-
+ hw/virtio/vhost-vsock-common.c | 4 ++--
+ hw/virtio/virtio-crypto.c      | 4 ++--
+ 6 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
+index 543ea92721..e8ee03094e 100644
+--- a/hw/display/vhost-user-gpu.c
++++ b/hw/display/vhost-user-gpu.c
+@@ -521,7 +521,7 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+@@ -538,7 +538,7 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
+index d51067123b..7102ec4817 100644
+--- a/hw/net/virtio-net.c
++++ b/hw/net/virtio-net.c
+@@ -3362,7 +3362,7 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
+     }
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return false
+      */
+ 
+@@ -3394,7 +3394,7 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
+     }
+     /*
+      *Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index 83fc20e49e..49d699ffc2 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -161,7 +161,7 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+@@ -177,7 +177,7 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
+index d6927b610a..3b013f2d0f 100644
+--- a/hw/virtio/vhost-user-gpio.c
++++ b/hw/virtio/vhost-user-gpio.c
+@@ -194,7 +194,7 @@ static void vu_gpio_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
+index 321262f6b3..12ea87d7a7 100644
+--- a/hw/virtio/vhost-vsock-common.c
++++ b/hw/virtio/vhost-vsock-common.c
+@@ -129,7 +129,7 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+@@ -146,7 +146,7 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
+index a6d7e1e8ec..44faf5a522 100644
+--- a/hw/virtio/virtio-crypto.c
++++ b/hw/virtio/virtio-crypto.c
+@@ -1210,7 +1210,7 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+@@ -1229,7 +1229,7 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ 
+     /*
+      * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+-     * as the Marco of configure interrupt's IDX, If this driver does not
++     * as the macro of configure interrupt's IDX, If this driver does not
+      * support, the function will return
+      */
+ 
+-- 
+MST
 

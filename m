@@ -1,15 +1,28 @@
-Return-Path: <mst@redhat.com>
-Date: Mon, 10 Jul 2023 16:15:36 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20230710161447-mutt-send-email-mst@kernel.org>
-References: <20230710153522.3469097-1-alex.bennee@linaro.org>
- <20230710153522.3469097-8-alex.bennee@linaro.org>
+Return-Path: <philmd@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1689026203; x=1691618203;
+ h=content-transfer-encoding:in-reply-to:from:references:cc:to
+ :content-language:subject:user-agent:mime-version:date:message-id
+ :from:to:cc:subject:date:message-id:reply-to;
+ bh=L4q7wMSsasZwArnf0grnmtRUbjmGYHOlhFhUwDDujEY=;
+ b=JEa2pY6WTaAQHamte52sBL/ZJboNAHmIUMYb+VKIQrvD5AQtu0vx+m3N1blQrTeD+j
+ NF5EzSEMDVSnTW/FNHNWSEvD79mbYqI9HqTmUamrrALyEa3Kw690zLhDVLH0vuJQff+h
+ WcxLTgc6vNsqLORZ/TR5neVG1LO+U9JNU+mTxAoDyYFi+PaRdvUGFbcCJRhWLCV7U1Hq
+ Vy8iiD4hRFkiEGv04UU2toWJfgG1x46Rrd5vHHaaEurxayo9hogFXafd6ACEgpPzdvBO
+ 0Ajma5MY5NgXpIGrTjSU1xLvLSwzrD1qknjHKyvcI88yQ2+zyLGmfc5kCi8vKZSh7P/+
+ 3/Bg==
+Message-ID: <f1b0e780-b3b3-0592-b3da-f7295a0ef800@linaro.org>
+Date: Mon, 10 Jul 2023 23:56:38 +0200
 MIME-Version: 1.0
-In-Reply-To: <20230710153522.3469097-8-alex.bennee@linaro.org>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v3 07/20] virtio: add vhost-user-base and a
- generic vhost-user-device
+References: <20230710153522.3469097-1-alex.bennee@linaro.org>
+ <20230710153522.3469097-4-alex.bennee@linaro.org>
+From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@linaro.org>
+In-Reply-To: <20230710153522.3469097-4-alex.bennee@linaro.org>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH v3 03/20] hw/virtio: fix typo in
+ VIRTIO_CONFIG_IRQ_IDX comments
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,42 +31,20 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
-Cc: qemu-devel@nongnu.org, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
+To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, qemu-devel@nongnu.org
+Cc: =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
-> +static const TypeInfo vud_info = {
-> +    .name = TYPE_VHOST_USER_DEVICE,
-> +    .parent = TYPE_VHOST_USER_BASE,
-> +    .instance_size = sizeof(VHostUserBase),
-> +    .class_init = vud_class_init,
-> +    .class_size = sizeof(VHostUserBaseClass),
+On 10/7/23 17:35, Alex Bennée wrote:
+> Fixes: 544f0278af (virtio: introduce macro VIRTIO_CONFIG_IRQ_IDX)
+> Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+> ---
+>   hw/display/vhost-user-gpu.c    | 4 ++--
+>   hw/net/virtio-net.c            | 4 ++--
+>   hw/virtio/vhost-user-fs.c      | 4 ++--
+>   hw/virtio/vhost-user-gpio.c    | 2 +-
+>   hw/virtio/vhost-vsock-common.c | 4 ++--
+>   hw/virtio/virtio-crypto.c      | 4 ++--
+>   6 files changed, 11 insertions(+), 11 deletions(-)
 
-I wish you didn't tie the refactoring in with new functionality.
-I applied but blocked creating these for now with:
-
-Subject: [PATCH] vhost-user-device: block creating instances
-Message-Id: <b10d1e585adf8a5348bd886333a8c55dcdef6048.1689020067.git.mst@redhat.com>
-
-block this until we are ready to commit to this command line.
-
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
----
- hw/virtio/vhost-user-device.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
-index 2b028cae08..ded97b6d70 100644
---- a/hw/virtio/vhost-user-device.c
-+++ b/hw/virtio/vhost-user-device.c
-@@ -369,6 +369,7 @@ static const TypeInfo vud_info = {
-     .instance_size = sizeof(VHostUserBase),
-     .class_init = vud_class_init,
-     .class_size = sizeof(VHostUserBaseClass),
-+    .abstract = true
- };
-
- static void vu_register_types(void)
-
--- 
-MST
+Reviewed-by: Philippe Mathieu-Daudé <philmd@linaro.org>
 

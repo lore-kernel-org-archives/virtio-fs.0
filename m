@@ -1,16 +1,26 @@
-Return-Path: <stefanha@redhat.com>
-Date: Thu, 5 Oct 2023 13:46:57 -0400
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20231005174657.GI1342722@fedora>
-References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-9-hreitz@redhat.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1689003324; x=1691595324;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=2VTCVQrd6KCn5j7u4ggdRsXsalHDUZEasAWYhlhI0Zk=;
+ b=j+WDoZ1iK16umdVplpNjyby+C0HXEitODI37kGwJGXP8HLOVKe7rt/a/fw7jXjba2v
+ zs1wAHlxk/Q0gaA1/EiJk1gIej/DaDqErNIuRsyn+V1aYx2zPQYHF82wztebpRwOgDdR
+ wDqaRu8ZbrT7AmcnqHRt5hh/t3t9ctn/KE0KuSYJ1MRNrZYGPsAaBSC6EWxhxA/ELSah
+ ssLutXIIMBRxXlihjutw4bgwVOv+fE2at4V0BKhYv7N3unwblarbHdJ1Zs11Q/JzVm2K
+ nGkk3S7WpCKhBVvOhtq0iL4/XKlTn9C4IYBO7y1oNaY9ibZp27R/VNPsJVXR0gDmkWip
+ wm2A==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Mon, 10 Jul 2023 16:35:03 +0100
+Message-Id: <20230710153522.3469097-2-alex.bennee@linaro.org>
+In-Reply-To: <20230710153522.3469097-1-alex.bennee@linaro.org>
+References: <20230710153522.3469097-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="E3HnexntZWZGy08/"
-Content-Disposition: inline
-In-Reply-To: <20231004125904.110781-9-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v4 8/8] vhost-user-fs: Implement internal
- migration
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 01/20] include: attempt to document
+ device_class_set_props
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,45 +29,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, German Maglione <gmaglione@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
+I'm still not sure how I achieve by use case of the parent class
+defining the following properties:
 
---E3HnexntZWZGy08/
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+  static Property vud_properties[] = {
+      DEFINE_PROP_CHR("chardev", VHostUserDevice, chardev),
+      DEFINE_PROP_UINT16("id", VHostUserDevice, id, 0),
+      DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
+      DEFINE_PROP_END_OF_LIST(),
+  };
 
-On Wed, Oct 04, 2023 at 02:59:04PM +0200, Hanna Czenczek wrote:
-> A virtio-fs device's VM state consists of:
-> - the virtio device (vring) state (VMSTATE_VIRTIO_DEVICE)
-> - the back-end's (virtiofsd's) internal state
->=20
-> We get/set the latter via the new vhost operations to transfer migratory
-> state.  It is its own dedicated subsection, so that for external
-> migration, it can be disabled.
->=20
-> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
-> ---
->  hw/virtio/vhost-user-fs.c | 101 +++++++++++++++++++++++++++++++++++++-
->  1 file changed, 100 insertions(+), 1 deletion(-)
+But for the specialisation of the class I want the id to default to
+the actual device id, e.g.:
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+  static Property vu_rng_properties[] = {
+      DEFINE_PROP_UINT16("id", VHostUserDevice, id, VIRTIO_ID_RNG),
+      DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
+      DEFINE_PROP_END_OF_LIST(),
+  };
 
---E3HnexntZWZGy08/
-Content-Type: application/pgp-signature; name="signature.asc"
+And so far the API for doing that isn't super clear.
 
------BEGIN PGP SIGNATURE-----
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+---
+ include/hw/qdev-core.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUe9pEACgkQnKSrs4Gr
-c8gYjwgAxU2ww9s9PeIb8tYpVQ9//4vdONyEacrcqL+yQmGDV8hb4dXJe1K3g5y8
-wOpaGhZ9z2dYOD3LD/5jNg45rK91k4rhZP/jcpNyEjCK0yjdf4jJEYvpVW1ENxc6
-A+yTDdnzpzTxru+nxRAj7oBir+waOO/N2cLZ5aEMYCTJs/qMCQ04Na+ETsXKHbUB
-AFStYKH+SQXQsHycVEg+uaimGyiZjghBWDuEz4PaDd2FhdfFrMCfHwkvr/C3avtJ
-EPNLsbXlPraX4GScYonWU8VVKrXTo71nBMVTP+lLsDu1fNXDexqRo6xjgj9COe8w
-BjvQ3Wfz/dUneQZzV7w2R6Xi7qONsQ==
-=nlmV
------END PGP SIGNATURE-----
+diff --git a/include/hw/qdev-core.h b/include/hw/qdev-core.h
+index 06cadfc492..196ebf6d91 100644
+--- a/include/hw/qdev-core.h
++++ b/include/hw/qdev-core.h
+@@ -926,6 +926,15 @@ BusState *sysbus_get_default(void);
+ char *qdev_get_fw_dev_path(DeviceState *dev);
+ char *qdev_get_own_fw_dev_path_from_handler(BusState *bus, DeviceState *dev);
+ 
++/**
++ * device_class_set_props(): add a set of properties to an device
++ * @dc: the parent DeviceClass all devices inherit
++ * @props: an array of properties, terminate by DEFINE_PROP_END_OF_LIST()
++ *
++ * This will add a set of properties to the object. It will fault if
++ * you attempt to add an existing property defined by a parent class.
++ * To modify an inherited property you need to use????
++ */
+ void device_class_set_props(DeviceClass *dc, Property *props);
+ 
+ /**
+-- 
+2.39.2
 
---E3HnexntZWZGy08/--

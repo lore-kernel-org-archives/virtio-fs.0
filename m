@@ -1,26 +1,16 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1689003803; x=1691595803;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=IVoZ+61FKCrNdklMoUuKRwdzJcWCiwu+9oFevqFhgNQ=;
- b=Vr0iX5PBlhO1Adj/4b7VlrHQkVn7GTOo5wyPKAYyOoIZEHmtrmf2CnnHEjUWaj3r5E
- gN1/wrYb3QfFv9cJ7Q+onYHROjTQ7g4Zk2+NvhwEx5lQUiRVDTA3Vspem0wuleZKlBTw
- HxZ5kfqcc4mZ5OGvHc4DKl1bxmJcccfgaf1hFufn/FOtw3wsH314q4Bjfx9ltnd83Dbg
- RvbJfwf39Lt2h6ddlusjcgwbBsceZCUeizDw6Aj5TX5ZaGT/rwtKPWaPWC5SFUqnexVj
- cNOLUD3riwHeX40BdeiIYBWMhiTu09Cv6qL4s4sfSUpe+/RCFyr7dZl0XKiMfrbRFWG9
- 2mtg==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Mon, 10 Jul 2023 16:35:22 +0100
-Message-Id: <20230710153522.3469097-21-alex.bennee@linaro.org>
-In-Reply-To: <20230710153522.3469097-1-alex.bennee@linaro.org>
+Return-Path: <mst@redhat.com>
+Date: Mon, 10 Jul 2023 15:58:07 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20230710155653-mutt-send-email-mst@kernel.org>
 References: <20230710153522.3469097-1-alex.bennee@linaro.org>
+ <20230710153522.3469097-11-alex.bennee@linaro.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC PATCH v3 20/20] hw/virtio: allow vhost-user-device
- to be driven by backend
+In-Reply-To: <20230710153522.3469097-11-alex.bennee@linaro.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v3 10/20] hw/virtio: add config support to
+ vhost-user-device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,95 +19,159 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
+To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
+Cc: qemu-devel@nongnu.org, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
-Instead of requiring all the information up front allow the
-vhost_dev_init to complete and then see what information we have from
-the backend.
+On Mon, Jul 10, 2023 at 04:35:12PM +0100, Alex Benn=E9e wrote:
+> To use the generic device the user will need to provide the config
+> region size via the command line. We also add a notifier so the guest
+> can be pinged if the remote daemon updates the config.
+>=20
+> With these changes:
+>=20
+>   -device vhost-user-device-pci,virtio-id=3D41,num_vqs=3D2,config_size=3D8
+>=20
+> is equivalent to:
+>=20
+>   -device vhost-user-gpio-pci
+>=20
+> Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
 
-This does change the order around somewhat.
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
----
- hw/virtio/vhost-user-device.c | 45 +++++++++++++++++++++++++----------
- 1 file changed, 32 insertions(+), 13 deletions(-)
+This one I think it's best to defer until we get a better
+handle on how we want the configuration to look.
 
-diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
-index 0109d4829d..b30b6265fb 100644
---- a/hw/virtio/vhost-user-device.c
-+++ b/hw/virtio/vhost-user-device.c
-@@ -243,7 +243,6 @@ static void vub_device_realize(DeviceState *dev, Error **errp)
- {
-     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-     VHostUserBase *vub = VHOST_USER_BASE(dev);
--    int ret;
- 
-     if (!vub->chardev.chr) {
-         error_setg(errp, "vhost-user-device: missing chardev");
-@@ -254,13 +253,43 @@ static void vub_device_realize(DeviceState *dev, Error **errp)
-         return;
-     }
- 
-+    if (vhost_dev_init(&vub->vhost_dev, &vub->vhost_user,
-+                       VHOST_BACKEND_TYPE_USER, 0, errp)!=0) {
-+        error_setg(errp, "vhost-user-device: unable to start connection");
-+        return;
-+    }
-+
-+    if (vub->vhost_dev.specs.device_id) {
-+        if (vub->virtio_id && vub->virtio_id != vub->vhost_dev.specs.device_id) {
-+            error_setg(errp, "vhost-user-device: backend id %d doesn't match cli %d",
-+                       vub->vhost_dev.specs.device_id, vub->virtio_id);
-+            return;
-+        }
-+        vub->virtio_id = vub->vhost_dev.specs.device_id;
-+    }
-+
-     if (!vub->virtio_id) {
--        error_setg(errp, "vhost-user-device: need to define device id");
-+        error_setg(errp, "vhost-user-device: need to define or be told device id");
-         return;
-     }
- 
-+    if (vub->vhost_dev.specs.min_vqs) {
-+        if (vub->num_vqs) {
-+            if (vub->num_vqs < vub->vhost_dev.specs.min_vqs ||
-+                vub->num_vqs > vub->vhost_dev.specs.max_vqs) {
-+                error_setg(errp,
-+                           "vhost-user-device: selected nvqs (%d) out of bounds (%d->%d)",
-+                           vub->num_vqs,
-+                           vub->vhost_dev.specs.min_vqs, vub->vhost_dev.specs.max_vqs);
-+                return;
-+            }
-+        } else {
-+            vub->num_vqs = vub->vhost_dev.specs.min_vqs;
-+        }
-+    }
-+
-     if (!vub->num_vqs) {
--        vub->num_vqs = 1; /* reasonable default? */
-+        error_setg(errp, "vhost-user-device: need to define number of vqs");
-     }
- 
-     /*
-@@ -287,16 +316,6 @@ static void vub_device_realize(DeviceState *dev, Error **errp)
-                         virtio_add_queue(vdev, 4, vub_handle_output));
-     }
- 
--    vub->vhost_dev.nvqs = vub->num_vqs;
--
--    /* connect to backend */
--    ret = vhost_dev_init(&vub->vhost_dev, &vub->vhost_user,
--                         VHOST_BACKEND_TYPE_USER, 0, errp);
--
--    if (ret < 0) {
--        do_vhost_user_cleanup(vdev, vub);
--    }
--
-     qemu_chr_fe_set_handlers(&vub->chardev, NULL, NULL, vub_event, NULL,
-                              dev, NULL, true);
- }
--- 
-2.39.2
+
+> ---
+>  include/hw/virtio/vhost-user-device.h |  1 +
+>  hw/virtio/vhost-user-device.c         | 58 ++++++++++++++++++++++++++-
+>  2 files changed, 58 insertions(+), 1 deletion(-)
+>=20
+> diff --git a/include/hw/virtio/vhost-user-device.h b/include/hw/virtio/vh=
+ost-user-device.h
+> index 9105011e25..3ddf88a146 100644
+> --- a/include/hw/virtio/vhost-user-device.h
+> +++ b/include/hw/virtio/vhost-user-device.h
+> @@ -22,6 +22,7 @@ struct VHostUserBase {
+>      CharBackend chardev;
+>      uint16_t virtio_id;
+>      uint32_t num_vqs;
+> +    uint32_t config_size;
+>      /* State tracking */
+>      VhostUserState vhost_user;
+>      struct vhost_virtqueue *vhost_vq;
+> diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-device.c
+> index b0239fa033..2b028cae08 100644
+> --- a/hw/virtio/vhost-user-device.c
+> +++ b/hw/virtio/vhost-user-device.c
+> @@ -117,6 +117,42 @@ static uint64_t vub_get_features(VirtIODevice *vdev,
+>      return vub->vhost_dev.features & ~(1ULL << VHOST_USER_F_PROTOCOL_FEA=
+TURES);
+>  }
+> =20
+> +/*
+> + * To handle VirtIO config we need to know the size of the config
+> + * space. We don't cache the config but re-fetch it from the guest
+> + * every time in case something has changed.
+> + */
+> +static void vub_get_config(VirtIODevice *vdev, uint8_t *config)
+> +{
+> +    VHostUserBase *vub =3D VHOST_USER_BASE(vdev);
+> +    Error *local_err =3D NULL;
+> +
+> +    /*
+> +     * There will have been a warning during vhost_dev_init, but lets
+> +     * assert here as nothing will go right now.
+> +     */
+> +    g_assert(vub->config_size && vub->vhost_user.supports_config =3D=3D =
+true);
+> +
+> +    if (vhost_dev_get_config(&vub->vhost_dev, config,
+> +                             vub->config_size, &local_err)) {
+> +        error_report_err(local_err);
+> +    }
+> +}
+> +
+> +/*
+> + * When the daemon signals an update to the config we just need to
+> + * signal the guest as we re-read the config on demand above.
+> + */
+> +static int vub_config_notifier(struct vhost_dev *dev)
+> +{
+> +    virtio_notify_config(dev->vdev);
+> +    return 0;
+> +}
+> +
+> +const VhostDevConfigOps vub_config_ops =3D {
+> +    .vhost_dev_config_notifier =3D vub_config_notifier,
+> +};
+> +
+>  static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+>  {
+>      /*
+> @@ -141,12 +177,21 @@ static int vub_connect(DeviceState *dev)
+>  {
+>      VirtIODevice *vdev =3D VIRTIO_DEVICE(dev);
+>      VHostUserBase *vub =3D VHOST_USER_BASE(vdev);
+> +    struct vhost_dev *vhost_dev =3D &vub->vhost_dev;
+> =20
+>      if (vub->connected) {
+>          return 0;
+>      }
+>      vub->connected =3D true;
+> =20
+> +    /*
+> +     * If we support VHOST_USER_GET_CONFIG we must enable the notifier
+> +     * so we can ping the guest when it updates.
+> +     */
+> +    if (vub->vhost_user.supports_config) {
+> +        vhost_dev_set_config_notifier(vhost_dev, &vub_config_ops);
+> +    }
+> +
+>      /* restore vhost state */
+>      if (virtio_device_started(vdev, vdev->status)) {
+>          vub_start(vdev);
+> @@ -214,11 +259,20 @@ static void vub_device_realize(DeviceState *dev, Er=
+ror **errp)
+>          vub->num_vqs =3D 1; /* reasonable default? */
+>      }
+> =20
+> +    /*
+> +     * We can't handle config requests unless we know the size of the
+> +     * config region, specialisations of the vhost-user-device will be
+> +     * able to set this.
+> +     */
+> +    if (vub->config_size) {
+> +        vub->vhost_user.supports_config =3D true;
+> +    }
+> +
+>      if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
+>          return;
+>      }
+> =20
+> -    virtio_init(vdev, vub->virtio_id, 0);
+> +    virtio_init(vdev, vub->virtio_id, vub->config_size);
+> =20
+>      /*
+>       * Disable guest notifiers, by default all notifications will be via=
+ the
+> @@ -268,6 +322,7 @@ static void vub_class_init(ObjectClass *klass, void *=
+data)
+>      vdc->realize =3D vub_device_realize;
+>      vdc->unrealize =3D vub_device_unrealize;
+>      vdc->get_features =3D vub_get_features;
+> +    vdc->get_config =3D vub_get_config;
+>      vdc->set_status =3D vub_set_status;
+>  }
+> =20
+> @@ -295,6 +350,7 @@ static Property vud_properties[] =3D {
+>      DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+>      DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
+>      DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
+> +    DEFINE_PROP_UINT32("config_size", VHostUserBase, config_size, 0),
+>      DEFINE_PROP_END_OF_LIST(),
+>  };
+> =20
+> --=20
+> 2.39.2
 

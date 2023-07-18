@@ -1,24 +1,16 @@
-Return-Path: <daggs@gmx.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=gmx.com; s=s31663417;
- t=1684996695; i=daggs@gmx.com;
- bh=f12WxO8FUOhhBoldN449LIxQ0QnIcEZ6ltGSraCx46w=;
- h=X-UI-Sender-Class:From:To:Cc:Subject:Date:In-Reply-To:References;
- b=Bey5I82ChLwoGMdueGgXzsNT2aYgXuDu+evPA0V+svVaNOI1/Quycch1B6SAR4YqA
- H1q9paD4aR6pKoYXRNfEVE8+VPs1wRDKYvoW1ytTvA5te+6C6VB53GUDpBILYd19Rd
- UHYm2OkL58yYZm10bLTGT+k/f/9S2NzXhaG1MqE91Wl33uvQPJyGSpit92qgah3mLc
- 4+5IxfpLMi2sRDp7SOAWa7KnXSTs9ENQeV8D3nmtN96ydJNMtz4IvcFve2YBD+Bxbx
- x7dXU5OL1BjWZRLBLFEjXLdr4oY5kir2HTj9JngVkCb8X6fDhVUv2vixmXorVlrxKG
- ktVxPsFThUODQ==
+Return-Path: <stefanha@redhat.com>
+Date: Tue, 18 Jul 2023 14:42:12 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20230718184212.GM44841@fedora>
+References: <20230712111703.28031-1-hreitz@redhat.com>
+ <20230712111703.28031-4-hreitz@redhat.com>
 MIME-Version: 1.0
-Message-ID: <trinity-bd64299a-0573-4343-afa2-b6071eb7d7b0-1684996695218@3c-app-mailcom-bs11>
-From: daggs <daggs@gmx.com>
-Date: Thu, 25 May 2023 08:38:15 +0200
-In-Reply-To: <CAJh=p+42T8VRkdE5citVFbgUCXF10vf-c3589c-JBbWQ0Yq2Nw@mail.gmail.com>
-References: <trinity-69fb6e2a-760f-4a3b-9a40-c7472c34dab5-1684577428128@3c-app-mailcom-bs08>
- <CAJh=p+42T8VRkdE5citVFbgUCXF10vf-c3589c-JBbWQ0Yq2Nw@mail.gmail.com>
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] vm hangs when booting with virtiofs
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="qc9UE6ORFiaWeN5N"
+Content-Disposition: inline
+In-Reply-To: <20230712111703.28031-4-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 3/4] vhost: Add high-level state
+ save/load functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,121 +19,328 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: German Maglione <gmaglione@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, German Maglione <gmaglione@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>
 
-Greetings German,
->
->Sent:=C2=A0Wednesday, May 24, 2023 at 5:51 PM
->From:=C2=A0"German Maglione" <gmaglione@redhat.com>
->To:=C2=A0"daggs" <daggs@gmx.com>
->Cc:=C2=A0virtio-fs@redhat.com
->Subject:=C2=A0Re: [Virtio-fs] vm hangs when booting with virtiofs
->
->=C2=A0=C2=A0
->
->>On Sat, May 20, 2023 at 12:15=E2=80=AFPM daggs <daggs@gmx.com[mailto:dagg=
-s@gmx.com]> wrote:Greetings,
->>
->>I'm trying to boot a win11 vm with a virtiofs fs and the system just hang=
-s on boot, I'd like some incites on what is the issue.
->>here is what I'm using:
->>- kernel 6.3.3
->>- libvirt 9.3.0
->>- qemu 8.0.0
->>- virtiofsd 1.5.1
->>
->>I'm using the following cmd to run virtiofsd using socket: virtiofsd --so=
-cket-path=3D/var/lib/libvirt/helpers_state/windows/linux_home.socket --shar=
-ed-dir /home/daggs --cache auto
->>where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 16K (tr=
-ied with 1M too, same behavior)
->>the virtiofsd invocation is issued inside the prepare and begin qemu hook=
- on libvirt.
->>I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO virtiof=
-sd] Waiting for vhost-user socket connection...
->>and I call it like this: nohup <virtiofsd cmd> &
->>
->>the vm's relevant config is this:
->><domain type=3D'kvm'>
->>...
->><memory unit=3D'KiB'>24582144</memory>
->><currentMemory unit=3D'KiB'>24582144</currentMemory>
->><memoryBacking>
->><source type=3D'memfd'/>
->><access mode=3D'shared'/>
->></memoryBacking>
->><vcpu placement=3D'static'>12</vcpu>
->><cputune>
->><vcpupin vcpu=3D'0' cpuset=3D'4'/>
->><vcpupin vcpu=3D'1' cpuset=3D'5'/>
->><vcpupin vcpu=3D'2' cpuset=3D'6'/>
->><vcpupin vcpu=3D'3' cpuset=3D'7'/>
->><vcpupin vcpu=3D'4' cpuset=3D'8'/>
->><vcpupin vcpu=3D'5' cpuset=3D'9'/>
->><vcpupin vcpu=3D'6' cpuset=3D'10'/>
->><vcpupin vcpu=3D'7' cpuset=3D'11'/>
->><vcpupin vcpu=3D'8' cpuset=3D'12'/>
->><vcpupin vcpu=3D'9' cpuset=3D'13'/>
->><vcpupin vcpu=3D'10' cpuset=3D'14'/>
->><vcpupin vcpu=3D'11' cpuset=3D'15'/>
->><emulatorpin cpuset=3D'0-1'/>
->></cputune>
->>
->>...
->><cpu mode=3D'host-passthrough' check=3D'none' migratable=3D'on'>
->><topology sockets=3D'1' dies=3D'1' cores=3D'6' threads=3D'2'/>
->><cache mode=3D'passthrough'/>
->><feature policy=3D'require' name=3D'topoext'/>
->></cpu>
->>...
->><filesystem type=3D'mount' accessmode=3D'passthrough'>
->><driver type=3D'virtiofs' queue=3D'1024'/>
->><binary path=3D'/usr/bin/virtiofsd'/>
->><source socket=3D'/var/lib/libvirt/helpers_state/windows/linux_home.socke=
-t'/>
->><target dir=3D'linux_home'/>
->><address type=3D'pci' domain=3D'0x0000' bus=3D'0x07' slot=3D'0x00' functi=
-on=3D'0x0'/>
->></filesystem>
->>...
->></domain>
->>
->>I'm running it via virsh, added -d 4, no errors in the log
->>when it is stuck, I get a black screen (using gpu pt to guest which work =
-without it), ps shows both virsh start cmd running and stuck, two virtiofsd=
- instances are up.
->>any ideas how to solve this?
->>=C2=A0
->>=C2=A0
->I forgot, could you replace your '/usr/bin/virtiofsd' with a shell script =
-that runs `virtiofsd --log-level=3Ddebug ...` and post the log output
->=C2=A0
->If you want, you can open an issue here:
->https://gitlab.com/virtio-fs/virtiofsd/-/issues[https://gitlab.com/virtio-=
-fs/virtiofsd/-/issues]
-do you mean run it from inside libvirt?
-I tried that, seems like virtiofsd fails because libvirt uses deprecated cl=
-i params
-that is why I'm using sockets and running it from outside libvirt
 
->>=C2=A0
->>Thanks,
->>=C2=A0Thanks,
->>
->>Dagg
->>
->>_______________________________________________
->>Virtio-fs mailing list
->>Virtio-fs@redhat.com[mailto:Virtio-fs@redhat.com]
->>https://listman.redhat.com/mailman/listinfo/virtio-fs
->=C2=A0
->
->--
->
->German
+--qc9UE6ORFiaWeN5N
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Thanks,
+On Wed, Jul 12, 2023 at 01:17:01PM +0200, Hanna Czenczek wrote:
+> vhost_save_backend_state() and vhost_load_backend_state() can be used by
+> vhost front-ends to easily save and load the back-end's state to/from
+> the migration stream.
+>=20
+> Because we do not know the full state size ahead of time,
+> vhost_save_backend_state() simply reads the data in 1 MB chunks, and
+> writes each chunk consecutively into the migration stream, prefixed by
+> its length.  EOF is indicated by a 0-length chunk.
+>=20
+> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> ---
+>  include/hw/virtio/vhost.h |  35 +++++++
+>  hw/virtio/vhost.c         | 204 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 239 insertions(+)
+>=20
+> diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
+> index d8877496e5..0c282abd4e 100644
+> --- a/include/hw/virtio/vhost.h
+> +++ b/include/hw/virtio/vhost.h
+> @@ -425,4 +425,39 @@ int vhost_set_device_state_fd(struct vhost_dev *dev,
+>   */
+>  int vhost_check_device_state(struct vhost_dev *dev, Error **errp);
+> =20
+> +/**
+> + * vhost_save_backend_state(): High-level function to receive a vhost
+> + * back-end's state, and save it in `f`.  Uses
 
-Dagg
+I think the GtkDoc syntax is @f instead of `f`.
 
+> + * `vhost_set_device_state_fd()` to get the data from the back-end, and
+> + * stores it in consecutive chunks that are each prefixed by their
+> + * respective length (be32).  The end is marked by a 0-length chunk.
+> + *
+> + * Must only be called while the device and all its vrings are stopped
+> + * (`VHOST_TRANSFER_STATE_PHASE_STOPPED`).
+> + *
+> + * @dev: The vhost device from which to save the state
+> + * @f: Migration stream in which to save the state
+> + * @errp: Potential error message
+> + *
+> + * Returns 0 on success, and -errno otherwise.
+> + */
+> +int vhost_save_backend_state(struct vhost_dev *dev, QEMUFile *f, Error *=
+*errp);
+> +
+> +/**
+> + * vhost_load_backend_state(): High-level function to load a vhost
+> + * back-end's state from `f`, and send it over to the back-end.  Reads
+> + * the data from `f` in the format used by `vhost_save_state()`, and
+> + * uses `vhost_set_device_state_fd()` to transfer it to the back-end.
+> + *
+> + * Must only be called while the device and all its vrings are stopped
+> + * (`VHOST_TRANSFER_STATE_PHASE_STOPPED`).
+> + *
+> + * @dev: The vhost device to which to send the sate
+> + * @f: Migration stream from which to load the state
+> + * @errp: Potential error message
+> + *
+> + * Returns 0 on success, and -errno otherwise.
+> + */
+> +int vhost_load_backend_state(struct vhost_dev *dev, QEMUFile *f, Error *=
+*errp);
+> +
+>  #endif
+> diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
+> index 756b6d55a8..332d49a310 100644
+> --- a/hw/virtio/vhost.c
+> +++ b/hw/virtio/vhost.c
+> @@ -2128,3 +2128,207 @@ int vhost_check_device_state(struct vhost_dev *de=
+v, Error **errp)
+>                 "vhost transport does not support migration state transfe=
+r");
+>      return -ENOSYS;
+>  }
+> +
+> +int vhost_save_backend_state(struct vhost_dev *dev, QEMUFile *f, Error *=
+*errp)
+> +{
+> +    /* Maximum chunk size in which to transfer the state */
+> +    const size_t chunk_size =3D 1 * 1024 * 1024;
+> +    void *transfer_buf =3D NULL;
+> +    g_autoptr(GError) g_err =3D NULL;
+> +    int pipe_fds[2], read_fd =3D -1, write_fd =3D -1, reply_fd =3D -1;
+> +    int ret;
+> +
+> +    /* [0] for reading (our end), [1] for writing (back-end's end) */
+> +    if (!g_unix_open_pipe(pipe_fds, FD_CLOEXEC, &g_err)) {
+> +        error_setg(errp, "Failed to set up state transfer pipe: %s",
+> +                   g_err->message);
+> +        ret =3D -EINVAL;
+> +        goto fail;
+> +    }
+> +
+> +    read_fd =3D pipe_fds[0];
+> +    write_fd =3D pipe_fds[1];
+> +
+> +    /*
+> +     * VHOST_TRANSFER_STATE_PHASE_STOPPED means the device must be stopp=
+ed.
+> +     * We cannot check dev->suspended, because the back-end may not supp=
+ort
+> +     * suspending.
+> +     */
+> +    assert(!dev->started);
+> +
+> +    /* Transfer ownership of write_fd to the back-end */
+> +    ret =3D vhost_set_device_state_fd(dev,
+> +                                    VHOST_TRANSFER_STATE_DIRECTION_SAVE,
+> +                                    VHOST_TRANSFER_STATE_PHASE_STOPPED,
+> +                                    write_fd,
+> +                                    &reply_fd,
+> +                                    errp);
+> +    if (ret < 0) {
+> +        error_prepend(errp, "Failed to initiate state transfer: ");
+> +        goto fail;
+> +    }
+> +
+> +    /* If the back-end wishes to use a different pipe, switch over */
+> +    if (reply_fd >=3D 0) {
+> +        close(read_fd);
+> +        read_fd =3D reply_fd;
+> +    }
+> +
+> +    transfer_buf =3D g_malloc(chunk_size);
+> +
+> +    while (true) {
+> +        ssize_t read_ret;
+> +
+> +        read_ret =3D read(read_fd, transfer_buf, chunk_size);
+> +        if (read_ret < 0) {
+
+Is it necessary to handle -EINTR?
+
+> +            ret =3D -errno;
+> +            error_setg_errno(errp, -ret, "Failed to receive state");
+> +            goto fail;
+> +        }
+> +
+> +        assert(read_ret <=3D chunk_size);
+> +        qemu_put_be32(f, read_ret);
+> +
+> +        if (read_ret =3D=3D 0) {
+> +            /* EOF */
+> +            break;
+> +        }
+> +
+> +        qemu_put_buffer(f, transfer_buf, read_ret);
+> +    }
+> +
+> +    /*
+> +     * Back-end will not really care, but be clean and close our end of =
+the pipe
+> +     * before inquiring the back-end about whether transfer was successf=
+ul
+> +     */
+> +    close(read_fd);
+> +    read_fd =3D -1;
+> +
+> +    /* Also, verify that the device is still stopped */
+> +    assert(!dev->started);
+> +
+> +    ret =3D vhost_check_device_state(dev, errp);
+> +    if (ret < 0) {
+> +        goto fail;
+> +    }
+> +
+> +    ret =3D 0;
+> +fail:
+> +    g_free(transfer_buf);
+> +    if (read_fd >=3D 0) {
+> +        close(read_fd);
+> +    }
+> +
+> +    return ret;
+> +}
+> +
+> +int vhost_load_backend_state(struct vhost_dev *dev, QEMUFile *f, Error *=
+*errp)
+> +{
+> +    size_t transfer_buf_size =3D 0;
+> +    void *transfer_buf =3D NULL;
+> +    g_autoptr(GError) g_err =3D NULL;
+> +    int pipe_fds[2], read_fd =3D -1, write_fd =3D -1, reply_fd =3D -1;
+> +    int ret;
+> +
+> +    /* [0] for reading (back-end's end), [1] for writing (our end) */
+> +    if (!g_unix_open_pipe(pipe_fds, FD_CLOEXEC, &g_err)) {
+> +        error_setg(errp, "Failed to set up state transfer pipe: %s",
+> +                   g_err->message);
+> +        ret =3D -EINVAL;
+> +        goto fail;
+> +    }
+> +
+> +    read_fd =3D pipe_fds[0];
+> +    write_fd =3D pipe_fds[1];
+> +
+> +    /*
+> +     * VHOST_TRANSFER_STATE_PHASE_STOPPED means the device must be stopp=
+ed.
+> +     * We cannot check dev->suspended, because the back-end may not supp=
+ort
+> +     * suspending.
+> +     */
+> +    assert(!dev->started);
+> +
+> +    /* Transfer ownership of read_fd to the back-end */
+> +    ret =3D vhost_set_device_state_fd(dev,
+> +                                    VHOST_TRANSFER_STATE_DIRECTION_LOAD,
+> +                                    VHOST_TRANSFER_STATE_PHASE_STOPPED,
+> +                                    read_fd,
+> +                                    &reply_fd,
+> +                                    errp);
+> +    if (ret < 0) {
+> +        error_prepend(errp, "Failed to initiate state transfer: ");
+> +        goto fail;
+> +    }
+> +
+> +    /* If the back-end wishes to use a different pipe, switch over */
+> +    if (reply_fd >=3D 0) {
+> +        close(write_fd);
+> +        write_fd =3D reply_fd;
+> +    }
+> +
+> +    while (true) {
+> +        size_t this_chunk_size =3D qemu_get_be32(f);
+> +        ssize_t write_ret;
+> +        const uint8_t *transfer_pointer;
+> +
+> +        if (this_chunk_size =3D=3D 0) {
+> +            /* End of state */
+> +            break;
+> +        }
+> +
+> +        if (transfer_buf_size < this_chunk_size) {
+> +            transfer_buf =3D g_realloc(transfer_buf, this_chunk_size);
+> +            transfer_buf_size =3D this_chunk_size;
+> +        }
+> +
+> +        if (qemu_get_buffer(f, transfer_buf, this_chunk_size) <
+> +                this_chunk_size)
+> +        {
+> +            error_setg(errp, "Failed to read state");
+> +            ret =3D -EINVAL;
+> +            goto fail;
+> +        }
+> +
+> +        transfer_pointer =3D transfer_buf;
+> +        while (this_chunk_size > 0) {
+> +            write_ret =3D write(write_fd, transfer_pointer, this_chunk_s=
+ize);
+> +            if (write_ret < 0) {
+
+Is it necessary to handle -EINTR?
+
+> +                ret =3D -errno;
+> +                error_setg_errno(errp, -ret, "Failed to send state");
+> +                goto fail;
+> +            } else if (write_ret =3D=3D 0) {
+> +                error_setg(errp, "Failed to send state: Connection is cl=
+osed");
+> +                ret =3D -ECONNRESET;
+> +                goto fail;
+> +            }
+> +
+> +            assert(write_ret <=3D this_chunk_size);
+> +            this_chunk_size -=3D write_ret;
+> +            transfer_pointer +=3D write_ret;
+> +        }
+> +    }
+> +
+> +    /*
+> +     * Close our end, thus ending transfer, before inquiring the back-en=
+d about
+> +     * whether transfer was successful
+> +     */
+> +    close(write_fd);
+> +    write_fd =3D -1;
+> +
+> +    /* Also, verify that the device is still stopped */
+> +    assert(!dev->started);
+> +
+> +    ret =3D vhost_check_device_state(dev, errp);
+> +    if (ret < 0) {
+> +        goto fail;
+> +    }
+> +
+> +    ret =3D 0;
+> +fail:
+> +    g_free(transfer_buf);
+> +    if (write_fd >=3D 0) {
+> +        close(write_fd);
+> +    }
+> +
+> +    return ret;
+> +}
+> --=20
+> 2.41.0
+>=20
+
+--qc9UE6ORFiaWeN5N
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmS23QQACgkQnKSrs4Gr
+c8gK9gf/UH9/r8OAcHwelbVVwwlqkj4FCw/Y5S9Eg0OdQf3Tzfqsx8DZazdQTIqU
+2x45Ej8rzrLkQP82UGTkKISAWA0IatZYqhiRjmYnQt0Rdjc7vkq6InRwrGzfRXKc
+VI8NJIe2N9qnjdD7NyRkdtY5wLNOolpO4XjHKHTjxYToT4JkL1y4ohMInT2pgODG
+ELdukjFIuhUSRyzXwQ8ultsiwHLTG8OoprdzQsbGv3QfZ4kIGWnkt09pnQP6iWX9
+PNtaTOK7hZKXp4aPCpho0k3Ui5EGm+A2OO2tMVKNVp7TmEqGAoOoh2i5dZr0ElF1
+/mXpW7Jc0FLTnGCSEFX6GI/iL9Lwaw==
+=+z9I
+-----END PGP SIGNATURE-----
+
+--qc9UE6ORFiaWeN5N--

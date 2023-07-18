@@ -1,14 +1,16 @@
-Return-Path: <hreitz@redhat.com>
-From: Hanna Czenczek <hreitz@redhat.com>
-Date: Wed, 12 Jul 2023 13:17:02 +0200
-Message-ID: <20230712111703.28031-5-hreitz@redhat.com>
-In-Reply-To: <20230712111703.28031-1-hreitz@redhat.com>
+Return-Path: <stefanha@redhat.com>
+Date: Tue, 18 Jul 2023 11:57:00 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20230718155700.GJ44841@fedora>
 References: <20230712111703.28031-1-hreitz@redhat.com>
+ <20230712111703.28031-2-hreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 4/4] vhost-user-fs: Implement internal
- migration
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="AXsKZLXtib5CKy2E"
+Content-Disposition: inline
+In-Reply-To: <20230712111703.28031-2-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/4] vhost-user.rst: Migrating
+ back-end-internal state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,136 +19,217 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: Hanna Czenczek <hreitz@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, =?UTF-8?q?Eugenio=20P=C3=A9rez?= <eperezma@redhat.com>
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, German Maglione <gmaglione@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>
 
-A virtio-fs device's VM state consists of:
-- the virtio device (vring) state (VMSTATE_VIRTIO_DEVICE)
-- the back-end's (virtiofsd's) internal state
 
-We get/set the latter via the new vhost operations to transfer migratory
-state.  It is its own dedicated subsection, so that for external
-migration, it can be disabled.
+--AXsKZLXtib5CKy2E
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
----
- hw/virtio/vhost-user-fs.c | 101 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 100 insertions(+), 1 deletion(-)
+On Wed, Jul 12, 2023 at 01:16:59PM +0200, Hanna Czenczek wrote:
+> For vhost-user devices, qemu can migrate the virtio state, but not the
+> back-end's internal state.  To do so, we need to be able to transfer
+> this internal state between front-end (qemu) and back-end.
+>=20
+> At this point, this new feature is added for the purpose of virtio-fs
+> migration.  Because virtiofsd's internal state will not be too large, we
+> believe it is best to transfer it as a single binary blob after the
+> streaming phase.
+>=20
+> These are the additions to the protocol:
+> - New vhost-user protocol feature VHOST_USER_PROTOCOL_F_MIGRATORY_STATE
 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 49d699ffc2..2b30f3d442 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -298,9 +298,108 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
-     return &fs->vhost_dev;
- }
- 
-+/**
-+ * Fetch the internal state from virtiofsd and save it to `f`.
-+ */
-+static int vuf_save_state(QEMUFile *f, void *pv, size_t size,
-+                          const VMStateField *field, JSONWriter *vmdesc)
-+{
-+    VirtIODevice *vdev = pv;
-+    VHostUserFS *fs = VHOST_USER_FS(vdev);
-+    Error *local_error = NULL;
-+    int ret;
-+
-+    ret = vhost_save_backend_state(&fs->vhost_dev, f, &local_error);
-+    if (ret < 0) {
-+        error_reportf_err(local_error,
-+                          "Error saving back-end state of %s device %s "
-+                          "(tag: \"%s\"): ",
-+                          vdev->name, vdev->parent_obj.canonical_path,
-+                          fs->conf.tag ?: "<none>");
-+        return ret;
-+    }
-+
-+    return 0;
-+}
-+
-+/**
-+ * Load virtiofsd's internal state from `f` and send it over to virtiofsd.
-+ */
-+static int vuf_load_state(QEMUFile *f, void *pv, size_t size,
-+                          const VMStateField *field)
-+{
-+    VirtIODevice *vdev = pv;
-+    VHostUserFS *fs = VHOST_USER_FS(vdev);
-+    Error *local_error = NULL;
-+    int ret;
-+
-+    ret = vhost_load_backend_state(&fs->vhost_dev, f, &local_error);
-+    if (ret < 0) {
-+        error_reportf_err(local_error,
-+                          "Error loading back-end state of %s device %s "
-+                          "(tag: \"%s\"): ",
-+                          vdev->name, vdev->parent_obj.canonical_path,
-+                          fs->conf.tag ?: "<none>");
-+        return ret;
-+    }
-+
-+    return 0;
-+}
-+
-+static bool vuf_is_internal_migration(void *opaque)
-+{
-+    /* TODO: Return false when an external migration is requested */
-+    return true;
-+}
-+
-+static int vuf_check_migration_support(void *opaque)
-+{
-+    VirtIODevice *vdev = opaque;
-+    VHostUserFS *fs = VHOST_USER_FS(vdev);
-+
-+    if (!vhost_supports_migratory_state(&fs->vhost_dev)) {
-+        error_report("Back-end of %s device %s (tag: \"%s\") does not support "
-+                     "migration through qemu",
-+                     vdev->name, vdev->parent_obj.canonical_path,
-+                     fs->conf.tag ?: "<none>");
-+        return -ENOTSUP;
-+    }
-+
-+    return 0;
-+}
-+
-+static const VMStateDescription vuf_backend_vmstate;
-+
- static const VMStateDescription vuf_vmstate = {
-     .name = "vhost-user-fs",
--    .unmigratable = 1,
-+    .version_id = 0,
-+    .fields = (VMStateField[]) {
-+        VMSTATE_VIRTIO_DEVICE,
-+        VMSTATE_END_OF_LIST()
-+    },
-+    .subsections = (const VMStateDescription * []) {
-+        &vuf_backend_vmstate,
-+        NULL,
-+    }
-+};
-+
-+static const VMStateDescription vuf_backend_vmstate = {
-+    .name = "vhost-user-fs-backend",
-+    .version_id = 0,
-+    .needed = vuf_is_internal_migration,
-+    .pre_load = vuf_check_migration_support,
-+    .pre_save = vuf_check_migration_support,
-+    .fields = (VMStateField[]) {
-+        {
-+            .name = "back-end",
-+            .info = &(const VMStateInfo) {
-+                .name = "virtio-fs back-end state",
-+                .get = vuf_load_state,
-+                .put = vuf_save_state,
-+            },
-+        },
-+        VMSTATE_END_OF_LIST()
-+    },
- };
- 
- static Property vuf_properties[] = {
--- 
-2.41.0
+It's not 100% clear whether "migratory" is related to live migration or
+something else. I don't like the name :P.
 
+The name "VHOST_USER_PROTOCOL_F_DEVICE_STATE" would be more obviously
+associated with SET_DEVICE_STATE_FD and CHECK_DEVICE_STATE than
+"MIGRATORY_STATE".
+
+> - SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a pipe
+>   over which to transfer the state.
+
+Does it need to be a pipe or can it be another type of file (e.g. UNIX
+domain socket)?
+
+In the future the fd may become bi-directional. Pipes are
+uni-directional on Linux.
+
+I suggest calling it a "file descriptor" and not mentioning "pipes"
+explicitly.
+
+> - CHECK_DEVICE_STATE: After the state has been transferred through the
+>   pipe, the front-end invokes this function to verify success.  There is
+>   no in-band way (through the pipe) to indicate failure, so we need to
+>   check explicitly.
+>=20
+> Once the transfer pipe has been established via SET_DEVICE_STATE_FD
+> (which includes establishing the direction of transfer and migration
+> phase), the sending side writes its data into the pipe, and the reading
+> side reads it until it sees an EOF.  Then, the front-end will check for
+> success via CHECK_DEVICE_STATE, which on the destination side includes
+> checking for integrity (i.e. errors during deserialization).
+>=20
+> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> ---
+>  docs/interop/vhost-user.rst | 87 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 87 insertions(+)
+>=20
+> diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+> index ac6be34c4c..c98dfeca25 100644
+> --- a/docs/interop/vhost-user.rst
+> +++ b/docs/interop/vhost-user.rst
+> @@ -334,6 +334,7 @@ in the ancillary data:
+>  * ``VHOST_USER_SET_VRING_ERR``
+>  * ``VHOST_USER_SET_BACKEND_REQ_FD`` (previous name ``VHOST_USER_SET_SLAV=
+E_REQ_FD``)
+>  * ``VHOST_USER_SET_INFLIGHT_FD`` (if ``VHOST_USER_PROTOCOL_F_INFLIGHT_SH=
+MFD``)
+> +* ``VHOST_USER_SET_DEVICE_STATE_FD``
+> =20
+>  If *front-end* is unable to send the full message or receives a wrong
+>  reply it will close the connection. An optional reconnection mechanism
+> @@ -497,6 +498,44 @@ it performs WAKE ioctl's on the userfaultfd to wake =
+the stalled
+>  back-end.  The front-end indicates support for this via the
+>  ``VHOST_USER_PROTOCOL_F_PAGEFAULT`` feature.
+> =20
+> +.. _migrating_backend_state:
+> +
+> +Migrating back-end state
+> +^^^^^^^^^^^^^^^^^^^^^^^^
+> +
+> +If the back-end has internal state that is to be sent from source to
+> +destination,
+
+Migration and the terms "source" and "destination" have not been
+defined. Here is a suggestion for an introductory paragraph:
+
+  Migrating device state involves transferring the state from one
+  back-end, called the source, to another back-end, called the
+  destination. After migration, the destination transparently resumes
+  operation without requiring the driver to re-initialize the device at
+  the VIRTIO level. If the migration fails, then the source can
+  transparently resume operation until another migration attempt is
+  made.
+
+> the front-end may be able to store and transfer it via an
+> +internal migration stream.  Support for this is negotiated with the
+> +``VHOST_USER_PROTOCOL_F_MIGRATORY_STATE`` feature.
+> +
+> +First, a channel over which the state is transferred is established on
+> +the source side using the ``VHOST_USER_SET_DEVICE_STATE_FD`` message.
+> +This message has two parameters:
+> +
+> +* Direction of transfer: On the source, the data is saved, transferring
+> +  it from the back-end to the front-end.  On the destination, the data
+> +  is loaded, transferring it from the front-end to the back-end.
+> +
+> +* Migration phase: Currently, only the period after memory transfer
+
+"memory transfer" is vague. This sentence is referring to VM live
+migration and guest RAM but it may be better to focus on just the device
+perspective and not the VM:
+
+  Migration is currently only supported while the device is suspended
+  and all of its rings are stopped. In the future, additional phases
+  might be support to allow iterative migration while the device is
+  running.
+
+> +  before switch-over is supported, in which the device is suspended and
+> +  all of its rings are stopped.
+> +
+> +Then, the writing end will write all the data it has, signalling the end
+> +of data by closing its end of the pipe.  The reading end must read all
+> +of this data and process it:
+> +
+> +* If saving, the front-end will transfer this data to the destination,
+
+To be extra clear:
+
+  ...transfer this data to the destination through some
+  implementation-specific means.
+
+> +  where it is loaded into the destination back-end.
+> +
+> +* If loading, the back-end must deserialize its internal state from the
+> +  transferred data and be set up to resume operation.
+
+"and be set up to resume operation" is a little unclear to me. I guess
+it means "in preparation for VHOST_USER_RESUME".
+
+> +
+> +After the front-end has seen all data transferred (saving: seen an EOF
+> +on the pipe; loading: closed its end of the pipe), it sends the
+> +``VHOST_USER_CHECK_DEVICE_STATE`` message to verify that data transfer
+> +was successful in the back-end, too.  The back-end responds once it
+> +knows whether the tranfer and processing was successful or not.
+> +
+>  Memory access
+>  -------------
+> =20
+> @@ -891,6 +930,7 @@ Protocol features
+>    #define VHOST_USER_PROTOCOL_F_STATUS               16
+>    #define VHOST_USER_PROTOCOL_F_XEN_MMAP             17
+>    #define VHOST_USER_PROTOCOL_F_SUSPEND              18
+> +  #define VHOST_USER_PROTOCOL_F_MIGRATORY_STATE      19
+> =20
+>  Front-end message types
+>  -----------------------
+> @@ -1471,6 +1511,53 @@ Front-end message types
+>    before.  The back-end must again begin processing rings that are not
+>    stopped, and it may resume background operations.
+> =20
+> +``VHOST_USER_SET_DEVICE_STATE_FD``
+> +  :id: 43
+> +  :equivalent ioctl: N/A
+> +  :request payload: device state transfer parameters
+> +  :reply payload: ``u64``
+> +
+> +  The front-end negotiates a pipe over which to transfer the back-end=E2=
+=80=99s
+> +  internal state during migration.  For this purpose, this message is
+> +  accompanied by a file descriptor that is to be the back-end=E2=80=99s =
+end of
+> +  the pipe.  If the back-end can provide a more efficient pipe (i.e.
+> +  because it internally already has a pipe into/from which to
+> +  put/receive state), it can ignore this and reply with a different file
+> +  descriptor to serve as the front-end=E2=80=99s end.
+> +
+> +  The request payload contains parameters for the subsequent data
+> +  transfer, as described in the :ref:`Migrating back-end state
+> +  <migrating_backend_state>` section.  That section also explains the
+> +  data transfer itself.
+> +
+> +  The value returned is both an indication for success, and whether a
+> +  new pipe file descriptor is returned: Bits 0=E2=80=937 are 0 on succes=
+s, and
+> +  non-zero on error.  Bit 8 is the invalid FD flag; this flag is set
+> +  when there is no file descriptor returned.  When this flag is not set,
+> +  the front-end must use the returned file descriptor as its end of the
+> +  pipe.  The back-end must not both indicate an error and return a file
+> +  descriptor.
+
+Is the invalid FD flag necessary? The front-end can check whether or not
+an fd was passed along with the result, so I'm not sure why the result
+also needs to communicate this.
+
+--AXsKZLXtib5CKy2E
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmS2tkwACgkQnKSrs4Gr
+c8gEiAgAtaMTnqd8Y4gJuYTsWqFbvvqwnexPOt8r1UoRJasG9WmezMM0QN8Tk71O
+fFzDbn5w8ZdiecmWL4tNqHZvd3jBhtY1y9ryguG3tqZpRA4+50kzDr4z7vPTeZm3
+DtJg8wWM+0kW9AZrz6kG/8PLlPPBTTiVXILZVz5ON4TnUluBQiPw+R4oaMruqNxD
+BorHJfdPeyMKfp8lluIqGVoRFRJ9wSUFGonT/bQX/ZHs7/OTm104Hvn5WF1GOnLU
+FpP2bCuEYDYG4kvRlHvLad1WgNABgISWV6O69OOrEFMFBZ/Vt4RPISYybgeg7Cp3
+m3e8kGiSSahwTSWg4MlllvjoSPCHNQ==
+=5I1o
+-----END PGP SIGNATURE-----
+
+--AXsKZLXtib5CKy2E--

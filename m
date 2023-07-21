@@ -1,14 +1,30 @@
-Return-Path: <gmaglion@redhat.com>
+Return-Path: <hao.xu@linux.dev>
+Message-ID: <130f1169-7ff6-1f8d-c416-90a0bfa3a6dd@linux.dev>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linux.dev; s=key1;
+ t=1689927815;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=fUDUWK+so5TMLl2RSbEHrsL6g7/lD6FkvaTpUyXuIKU=;
+ b=lqG38qNnKP1yCSjwbNwwBXSlWIYYALKbaJgplO0ukeXBxWhfmxxcsAEf+AIQafNFVs593b
+ sqNrQzzNWd+wNwFTURQ5nzo/WeUZ/2mJ6gYr2c0ruuKcBAC/erQt51RVatD8zVsJHPckf0
+ LM8vnAhCFE7SBxjemNe4OeoGF+Omvng=
+Date: Fri, 21 Jul 2023 16:23:23 +0800
 MIME-Version: 1.0
-References: <trinity-69fb6e2a-760f-4a3b-9a40-c7472c34dab5-1684577428128@3c-app-mailcom-bs08>
- <CAJh=p+42T8VRkdE5citVFbgUCXF10vf-c3589c-JBbWQ0Yq2Nw@mail.gmail.com>
- <trinity-bd64299a-0573-4343-afa2-b6071eb7d7b0-1684996695218@3c-app-mailcom-bs11>
-In-Reply-To: <trinity-bd64299a-0573-4343-afa2-b6071eb7d7b0-1684996695218@3c-app-mailcom-bs11>
-From: German Maglione <gmaglione@redhat.com>
-Date: Thu, 25 May 2023 15:57:06 +0200
-Message-ID: <CAJh=p+71zuPObZNf0-kYo-hviw0jYODfVczOFZuaRr4gvFvQ-Q@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="0000000000001c014c05fc8501bb"
-Subject: Re: [Virtio-fs] vm hangs when booting with virtiofs
+References: <20230712111703.28031-1-hreitz@redhat.com>
+ <20230712111703.28031-3-hreitz@redhat.com>
+ <d5fc7e82-3bd5-deeb-b506-5a8d10bd7112@linux.dev>
+ <14677814-9707-6a08-7b07-4532fad5f7a1@redhat.com>
+ <d3d992ff-3d3d-1282-cdbc-f7ec1ad175cb@linux.dev>
+ <f07af821-a667-f2c5-3cec-a2f3e2b31ee2@redhat.com>
+From: Hao Xu <hao.xu@linux.dev>
+In-Reply-To: <f07af821-a667-f2c5-3cec-a2f3e2b31ee2@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v2 2/4] vhost-user: Interface for migration
+ state transfer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,317 +33,305 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: daggs <daggs@gmx.com>
-Cc: virtio-fs@redhat.com
-
---0000000000001c014c05fc8501bb
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-I'm copying your response to this email
-
-> >If you swap your win11 for a linux guest (using the same libvirt xml)
-are you able to reproduce the error?
-> do you think the guest type matters much?
-
-Yes, because the windows guest uses a different driver. So the problem
-could be virtiofsd daemon,
-the linux kernel or the windows drivers
+To: Hanna Czenczek <hreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>
 
 
-On Thu, May 25, 2023 at 8:38=E2=80=AFAM daggs <daggs@gmx.com> wrote:
-
-> Greetings German,
-> >
-> >Sent: Wednesday, May 24, 2023 at 5:51 PM
-> >From: "German Maglione" <gmaglione@redhat.com>
-> >To: "daggs" <daggs@gmx.com>
-> >Cc: virtio-fs@redhat.com
-> >Subject: Re: [Virtio-fs] vm hangs when booting with virtiofs
-> >
-> >
-> >
-> >>On Sat, May 20, 2023 at 12:15=E2=80=AFPM daggs <daggs@gmx.com[mailto:
-> daggs@gmx.com]> wrote:Greetings,
-> >>
-> >>I'm trying to boot a win11 vm with a virtiofs fs and the system just
-> hangs on boot, I'd like some incites on what is the issue.
-> >>here is what I'm using:
-> >>- kernel 6.3.3
-> >>- libvirt 9.3.0
-> >>- qemu 8.0.0
-> >>- virtiofsd 1.5.1
-> >>
-> >>I'm using the following cmd to run virtiofsd using socket: virtiofsd
-> --socket-path=3D/var/lib/libvirt/helpers_state/windows/linux_home.socket
-> --shared-dir /home/daggs --cache auto
-> >>where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 16K
-> (tried with 1M too, same behavior)
-> >>the virtiofsd invocation is issued inside the prepare and begin qemu
-> hook on libvirt.
-> >>I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO
-> virtiofsd] Waiting for vhost-user socket connection...
-> >>and I call it like this: nohup <virtiofsd cmd> &
-> >>
-> >>the vm's relevant config is this:
-> >><domain type=3D'kvm'>
-> >>...
-> >><memory unit=3D'KiB'>24582144</memory>
-> >><currentMemory unit=3D'KiB'>24582144</currentMemory>
-> >><memoryBacking>
-> >><source type=3D'memfd'/>
-> >><access mode=3D'shared'/>
-> >></memoryBacking>
-> >><vcpu placement=3D'static'>12</vcpu>
-> >><cputune>
-> >><vcpupin vcpu=3D'0' cpuset=3D'4'/>
-> >><vcpupin vcpu=3D'1' cpuset=3D'5'/>
-> >><vcpupin vcpu=3D'2' cpuset=3D'6'/>
-> >><vcpupin vcpu=3D'3' cpuset=3D'7'/>
-> >><vcpupin vcpu=3D'4' cpuset=3D'8'/>
-> >><vcpupin vcpu=3D'5' cpuset=3D'9'/>
-> >><vcpupin vcpu=3D'6' cpuset=3D'10'/>
-> >><vcpupin vcpu=3D'7' cpuset=3D'11'/>
-> >><vcpupin vcpu=3D'8' cpuset=3D'12'/>
-> >><vcpupin vcpu=3D'9' cpuset=3D'13'/>
-> >><vcpupin vcpu=3D'10' cpuset=3D'14'/>
-> >><vcpupin vcpu=3D'11' cpuset=3D'15'/>
-> >><emulatorpin cpuset=3D'0-1'/>
-> >></cputune>
-> >>
-> >>...
-> >><cpu mode=3D'host-passthrough' check=3D'none' migratable=3D'on'>
-> >><topology sockets=3D'1' dies=3D'1' cores=3D'6' threads=3D'2'/>
-> >><cache mode=3D'passthrough'/>
-> >><feature policy=3D'require' name=3D'topoext'/>
-> >></cpu>
-> >>...
-> >><filesystem type=3D'mount' accessmode=3D'passthrough'>
-> >><driver type=3D'virtiofs' queue=3D'1024'/>
-> >><binary path=3D'/usr/bin/virtiofsd'/>
-> >><source
-> socket=3D'/var/lib/libvirt/helpers_state/windows/linux_home.socket'/>
-> >><target dir=3D'linux_home'/>
-> >><address type=3D'pci' domain=3D'0x0000' bus=3D'0x07' slot=3D'0x00'
-> function=3D'0x0'/>
-> >></filesystem>
-> >>...
-> >></domain>
-> >>
-> >>I'm running it via virsh, added -d 4, no errors in the log
-> >>when it is stuck, I get a black screen (using gpu pt to guest which wor=
-k
-> without it), ps shows both virsh start cmd running and stuck, two virtiof=
-sd
-> instances are up.
-> >>any ideas how to solve this?
-> >>
-> >>
-> >I forgot, could you replace your '/usr/bin/virtiofsd' with a shell scrip=
-t
-> that runs `virtiofsd --log-level=3Ddebug ...` and post the log output
-> >
-> >If you want, you can open an issue here:
-> >
-> https://gitlab.com/virtio-fs/virtiofsd/-/issues[https://gitlab.com/virtio=
--fs/virtiofsd/-/issues]
-> do you mean run it from inside libvirt?
-> I tried that, seems like virtiofsd fails because libvirt uses deprecated
-> cli params
-> that is why I'm using sockets and running it from outside libvirt
+On 7/21/23 16:07, Hanna Czenczek wrote:
+> On 20.07.23 17:05, Hao Xu wrote:
+>>
+>> On 7/20/23 21:20, Hanna Czenczek wrote:
+>>> On 20.07.23 14:13, Hao Xu wrote:
+>>>>
+>>>> On 7/12/23 19:17, Hanna Czenczek wrote:
+>>>>> Add the interface for transferring the back-end's state during=20
+>>>>> migration
+>>>>> as defined previously in vhost-user.rst.
+>>>>>
+>>>>> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+>>>>> ---
+>>>>> =C2=A0 include/hw/virtio/vhost-backend.h |=C2=A0 24 +++++
+>>>>> =C2=A0 include/hw/virtio/vhost.h=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0 |=C2=A0 79 ++++++++++++++++
+>>>>> =C2=A0 hw/virtio/vhost-user.c=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0=C2=A0=C2=A0=C2=A0 | 147=20
+>>>>> ++++++++++++++++++++++++++++++
+>>>>> =C2=A0 hw/virtio/vhost.c=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 |=C2=A0 37 ++++++++
+>>>>> =C2=A0 4 files changed, 287 insertions(+)
+>>>>>
+>>>>> diff --git a/include/hw/virtio/vhost-backend.h=20
+>>>>> b/include/hw/virtio/vhost-backend.h
+>>>>> index 31a251a9f5..e59d0b53f8 100644
+>>>>> --- a/include/hw/virtio/vhost-backend.h
+>>>>> +++ b/include/hw/virtio/vhost-backend.h
+>>>>> @@ -26,6 +26,18 @@ typedef enum VhostSetConfigType {
+>>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 VHOST_SET_CONFIG_TYPE_MIGRATION =3D 1,
+>>>>> =C2=A0 } VhostSetConfigType;
+>>>>> =C2=A0 +typedef enum VhostDeviceStateDirection {
+>>>>> +=C2=A0=C2=A0=C2=A0 /* Transfer state from back-end (device) to front=
+-end */
+>>>>> +=C2=A0=C2=A0=C2=A0 VHOST_TRANSFER_STATE_DIRECTION_SAVE =3D 0,
+>>>>> +=C2=A0=C2=A0=C2=A0 /* Transfer state from front-end to back-end (dev=
+ice) */
+>>>>> +=C2=A0=C2=A0=C2=A0 VHOST_TRANSFER_STATE_DIRECTION_LOAD =3D 1,
+>>>>> +} VhostDeviceStateDirection;
+>>>>> +
+>>>>> +typedef enum VhostDeviceStatePhase {
+>>>>> +=C2=A0=C2=A0=C2=A0 /* The device (and all its vrings) is stopped */
+>>>>> +=C2=A0=C2=A0=C2=A0 VHOST_TRANSFER_STATE_PHASE_STOPPED =3D 0,
+>>>>> +} VhostDeviceStatePhase;
+>>>>> +
+>>>>> =C2=A0 struct vhost_inflight;
+>>>>> =C2=A0 struct vhost_dev;
+>>>>> =C2=A0 struct vhost_log;
+>>>>> @@ -133,6 +145,15 @@ typedef int=20
+>>>>> (*vhost_set_config_call_op)(struct vhost_dev *dev,
+>>>>> =C2=A0 =C2=A0 typedef void (*vhost_reset_status_op)(struct vhost_dev =
+*dev);
+>>>>> =C2=A0 +typedef bool (*vhost_supports_migratory_state_op)(struct=20
+>>>>> vhost_dev *dev);
+>>>>> +typedef int (*vhost_set_device_state_fd_op)(struct vhost_dev *dev,
+>>>>> + VhostDeviceStateDirection direction,
+>>>>> + VhostDeviceStatePhase phase,
+>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 int fd,
+>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 int *reply_fd,
+>>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 Error **errp);
+>>>>> +typedef int (*vhost_check_device_state_op)(struct vhost_dev *dev,=20
+>>>>> Error **errp);
+>>>>> +
+>>>>> =C2=A0 typedef struct VhostOps {
+>>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 VhostBackendType backend_type;
+>>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 vhost_backend_init vhost_backend_init;
+>>>>> @@ -181,6 +202,9 @@ typedef struct VhostOps {
+>>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 vhost_force_iommu_op vhost_force_iommu=
+;
+>>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 vhost_set_config_call_op vhost_set_con=
+fig_call;
+>>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 vhost_reset_status_op vhost_reset_stat=
+us;
+>>>>> +=C2=A0=C2=A0=C2=A0 vhost_supports_migratory_state_op=20
+>>>>> vhost_supports_migratory_state;
+>>>>> +=C2=A0=C2=A0=C2=A0 vhost_set_device_state_fd_op vhost_set_device_sta=
+te_fd;
+>>>>> +=C2=A0=C2=A0=C2=A0 vhost_check_device_state_op vhost_check_device_st=
+ate;
+>>>>> =C2=A0 } VhostOps;
+>>>>> =C2=A0 =C2=A0 int vhost_backend_update_device_iotlb(struct vhost_dev =
+*dev,
+>>>>> diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
+>>>>> index 69bf59d630..d8877496e5 100644
+>>>>> --- a/include/hw/virtio/vhost.h
+>>>>> +++ b/include/hw/virtio/vhost.h
+>>>>> @@ -346,4 +346,83 @@ int vhost_dev_set_inflight(struct vhost_dev=20
+>>>>> *dev,
+>>>>> =C2=A0 int vhost_dev_get_inflight(struct vhost_dev *dev, uint16_t=20
+>>>>> queue_size,
+>>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
+=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0=C2=A0=C2=A0=C2=A0 struct vhost_inflight *inflight);
+>>>>> =C2=A0 bool vhost_dev_has_iommu(struct vhost_dev *dev);
+>>>>> +
+>>>>> +/**
+>>>>> + * vhost_supports_migratory_state(): Checks whether the back-end
+>>>>> + * supports transferring internal state for the purpose of=20
+>>>>> migration.
+>>>>> + * Support for this feature is required for=20
+>>>>> vhost_set_device_state_fd()
+>>>>> + * and vhost_check_device_state().
+>>>>> + *
+>>>>> + * @dev: The vhost device
+>>>>> + *
+>>>>> + * Returns true if the device supports these commands, and false=20
+>>>>> if it
+>>>>> + * does not.
+>>>>> + */
+>>>>> +bool vhost_supports_migratory_state(struct vhost_dev *dev);
+>>>>> +
+>>>>> +/**
+>>>>> + * vhost_set_device_state_fd(): Begin transfer of internal state=20
+>>>>> from/to
+>>>>> + * the back-end for the purpose of migration.=C2=A0 Data is to be=20
+>>>>> transferred
+>>>>> + * over a pipe according to @direction and @phase.=C2=A0 The sending=
+=20
+>>>>> end must
+>>>>> + * only write to the pipe, and the receiving end must only read=20
+>>>>> from it.
+>>>>> + * Once the sending end is done, it closes its FD.=C2=A0 The receivi=
+ng=20
+>>>>> end
+>>>>> + * must take this as the end-of-transfer signal and close its FD,=20
+>>>>> too.
+>>>>> + *
+>>>>> + * @fd is the back-end's end of the pipe: The write FD for SAVE,=20
+>>>>> and the
+>>>>> + * read FD for LOAD.=C2=A0 This function transfers ownership of @fd =
+to=20
+>>>>> the
+>>>>> + * back-end, i.e. closes it in the front-end.
+>>>>> + *
+>>>>> + * The back-end may optionally reply with an FD of its own, if this
+>>>>> + * improves efficiency on its end.=C2=A0 In this case, the returned =
+FD is
+>>>>
+>>>>
+>>>> Hi Hanna,
+>>>>
+>>>> In what case/situation, the back-end will have a more efficient fd?
+>>>
+>>> Hi Hao,
+>>>
+>>> There is no example yet.
+>>>
+>>>> Here my understanding of this "FD of its own" is as same type as
+>>>>
+>>>> the given fd(e.g. both pipe files), why the fd from back-end makes
+>>>>
+>>>> difference? Do I miss anything here?
+>>>
+>>> Maybe it makes more sense in the context of how we came up with the=20
+>>> idea: Specifically, Stefan and me were asking which end should=20
+>>> provide the FD.=C2=A0 In the context of vhost-user, it makes sense to=
+=20
+>>> have it be the front-end, because it controls vhost-user=20
+>>> communication, but that=E2=80=99s just the natural protocol choice, not=
+=20
+>>> necessarily the most efficient one.
+>>>
+>>> It is imaginable that the front-end (e.g. qemu) could create a file=20
+>>> descriptor whose data is directly spliced (automatically) into the=20
+>>> migration stream, and then hand this FD to the back-end. In=20
+>>> practice, this doesn=E2=80=99t work for qemu (at this point), because i=
+t=20
+>>> doesn=E2=80=99t use simple read/write into the migration stream, but ha=
+s an=20
+>>> abstraction layer for that.=C2=A0 It might be possible to make this wor=
+k=20
+>>> in some cases, depending on what is used as a transport, but (1) not=20
+>>> generally, and (2) not now.=C2=A0 But this would be efficient.
+>>
+>>
+>> I'm thinking one thing, we now already have a channel(a unix domain=20
+>> socket) between front-end and back-end, why not delivering the state=20
+>> file (as an fd) to/from back-end directly rathen than negotiating
+>>
+>> a new pipe as data channel.(since we already assume they can share fd=20
+>> of pipe, why not fd of normal file?)
 >
+> I don=E2=80=99t quite understand.=C2=A0 We do deliver the FD to the back-=
+end=20
+> through this new command to the back-end, rather directly.=C2=A0 The=20
+> back-end can disagree and send another FD back, but it doesn=E2=80=99t ha=
+ve=20
+> to.=C2=A0 It can just simply always take the FD that it=E2=80=99s been gi=
+ven.
 >
-Oh great, I didn't realize you were calling virtiofsd directly, easier
-then, just call
-virtiofsd --log-level=3Ddebug
-
-and please also using strace, like:
-strace -f -o vfsd.strace.log  virtiofsd ...
-
-
-
-> >>
-> >>Thanks,
-> >> Thanks,
-> >>
-> >>Dagg
-> >>
-> >>_______________________________________________
-> >>Virtio-fs mailing list
-> >>Virtio-fs@redhat.com[mailto:Virtio-fs@redhat.com]
-> >>https://listman.redhat.com/mailman/listinfo/virtio-fs
-> >
-> >
-> >--
-> >
-> >German
+> The FD also doesn=E2=80=99t need to be a pipe, it can be any FD that the=
+=20
+> back-end can read the state from (see my discussion with Stefan on=20
+> patch 1).=C2=A0 In the practical implementation, it=E2=80=99s difficult f=
+or qemu to=20
+> provide anything that is not a pipe, because the migration state can=20
+> be sent over many channels, and the respective FD (if any) is not=20
+> exposed on the high level (for devices).
 >
-> Thanks,
+>>
+>>>
+>>> The model we=E2=80=99d implement in qemu with this series is comparativ=
+ely=20
+>>> not efficient, because it manually copies data from the FD (which by=20
+>>> default is a pipe) into the migration stream.
+>>>
+>>> But it is possible that the front-end can provide a zero-copy FD=20
+>>> into the migration stream, and for that reason we want to allow the=20
+>>> front-end to provide the transfer FD.
+>>>
+>>> In contrast, the back-end might have a more efficient implementation=20
+>>> on its side, too, though.=C2=A0 It is difficult to imagine, but it may =
+be=20
+>>> possible that it has an FD already where the data needs to written=20
+>>> to/read from, e.g. because it=E2=80=99s connected to a physical device =
+that=20
+>>> wants to get/send its state this way.=C2=A0 Admittedly, we have=20
+>>> absolutely no concrete example for such a back-end at this point,=20
+>>> but it=E2=80=99s hard to rule out that it is possible that there will b=
+e=20
+>>> back-ends that could make use of zero-copy if only they are allowed=20
+>>> to dictate the transfer FD.
+>>>
+>>> So because we in qemu can=E2=80=99t (at least not generally) provide an=
+=20
+>>> efficient (zero-copy) implementation, we don=E2=80=99t want to rule out=
+ that=20
+>>> the back-end might be able to, so we also want to allow it to=20
+>>> provide the transfer FD.
+>>>
+>>> In the end, we decided that we don=E2=80=99t want to preclude either si=
+de of=20
+>>> providing the FD.=C2=A0 If one side knows it can do better than a plain=
+=20
+>>> pipe with copying on both ends, it should provide the FD. That=20
+>>> doesn=E2=80=99t complicate the implementation much.
+>>>
+>>> (So, notably, we measure =E2=80=9Cimproves efficiency=E2=80=9D based on=
+ =E2=80=9Cis it=20
+>>> better than a plain pipe with copying on both ends=E2=80=9D.=C2=A0 A pi=
+pe with=20
+>>> copying is the default implementation, but as Stefan has pointed out=20
+>>> in his review, it doesn=E2=80=99t need to be a pipe.=C2=A0 More efficie=
+nt FDs,=20
+>>> like the back-end can provide in its reply, would actually likely=20
+>>> not be pipes.)
+>>
+>>
+>> Yea, but the vhost-user protocol in this patchset defines these FDs=20
+>> as data transfer channel not the data itself, how about the latter?
 >
-> Dagg
+> I don=E2=80=99t quite understand this either.=C2=A0 Perhaps you=E2=80=99r=
+e suggesting that=20
+> we should just transfer the data over the vhost-user socket. There are=20
+> two reasons why I don=E2=80=99t think we should do that: First, the vhost=
+-user=20
+> socket is currently only used for a small amount of data.=C2=A0 For=20
+> example, the Rust vhost crate will reject any message longer than 4096=20
+> bytes.=C2=A0 So if I were to use it for more data, I feel like I=E2=80=99=
+d be=20
+> abusing it.=C2=A0 Second, if/when we add other transfer phases (i.e. whil=
+e=20
+> the VM is still running, to transfer larger amounts of state), it will=20
+> be important that the vhost-user socket is open for messages from the=20
+> front-end at any time.=C2=A0 So then, at the latest, would we need a=20
+> separate data channel.=C2=A0 I don=E2=80=99t feel like there is harm in m=
+aking the=20
+> interface have this separate channel now already.
 >
+> Or maybe you suggest that the separate FD is OK, but it shouldn=E2=80=99t=
+ be=20
+> defined to be a data transfer channel, but just data, i.e. not=20
+> necessarily a pipe.=C2=A0 I think that=E2=80=99s basically the discussion=
+ I had=20
+> with Stefan on patch 1: That the important thing is just that the=20
+> receiving end can read data out of the FD until EOF, and the writing=20
+> end can write data and close the FD to signal the end of data. Whether=20
+> they actually do that is not important, only that anything they do=20
+> will let the other end do that.
+
+
+I re-read the discussion of patch1, I now see what I suggested is=20
+already included in the protocol design.
+
+
 >
-
---=20
-German
-
---0000000000001c014c05fc8501bb
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div dir=3D"ltr"><div>I&#39;m copying your response to thi=
-s email</div><div><br></div><div>&gt;<span class=3D"gmail-im">
-&gt;If you swap your win11 for a linux guest (using the same libvirt xml) a=
-re you able to reproduce the error?</span></div><div>&gt; do you think the =
-guest type matters much?<br></div><div><br></div><div>Yes, because the wind=
-ows guest uses a different driver. So the problem could be virtiofsd daemon=
-,</div><div>the linux kernel or the windows drivers<br></div><div><br></div=
-></div><br><div class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr"=
->On Thu, May 25, 2023 at 8:38=E2=80=AFAM daggs &lt;<a href=3D"mailto:daggs@=
-gmx.com">daggs@gmx.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_q=
-uote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,2=
-04);padding-left:1ex">Greetings German,<br>
-&gt;<br>
-&gt;Sent:=C2=A0Wednesday, May 24, 2023 at 5:51 PM<br>
-&gt;From:=C2=A0&quot;German Maglione&quot; &lt;<a href=3D"mailto:gmaglione@=
-redhat.com" target=3D"_blank">gmaglione@redhat.com</a>&gt;<br>
-&gt;To:=C2=A0&quot;daggs&quot; &lt;<a href=3D"mailto:daggs@gmx.com" target=
-=3D"_blank">daggs@gmx.com</a>&gt;<br>
-&gt;Cc:=C2=A0<a href=3D"mailto:virtio-fs@redhat.com" target=3D"_blank">virt=
-io-fs@redhat.com</a><br>
-&gt;Subject:=C2=A0Re: [Virtio-fs] vm hangs when booting with virtiofs<br>
-&gt;<br>
-&gt;=C2=A0=C2=A0<br>
-&gt;<br>
-&gt;&gt;On Sat, May 20, 2023 at 12:15=E2=80=AFPM daggs &lt;<a href=3D"mailt=
-o:daggs@gmx.com" target=3D"_blank">daggs@gmx.com</a>[mailto:<a href=3D"mail=
-to:daggs@gmx.com" target=3D"_blank">daggs@gmx.com</a>]&gt; wrote:Greetings,=
-<br>
-&gt;&gt;<br>
-&gt;&gt;I&#39;m trying to boot a win11 vm with a virtiofs fs and the system=
- just hangs on boot, I&#39;d like some incites on what is the issue.<br>
-&gt;&gt;here is what I&#39;m using:<br>
-&gt;&gt;- kernel 6.3.3<br>
-&gt;&gt;- libvirt 9.3.0<br>
-&gt;&gt;- qemu 8.0.0<br>
-&gt;&gt;- virtiofsd 1.5.1<br>
-&gt;&gt;<br>
-&gt;&gt;I&#39;m using the following cmd to run virtiofsd using socket: virt=
-iofsd --socket-path=3D/var/lib/libvirt/helpers_state/windows/linux_home.soc=
-ket --shared-dir /home/daggs --cache auto<br>
-&gt;&gt;where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 1=
-6K (tried with 1M too, same behavior)<br>
-&gt;&gt;the virtiofsd invocation is issued inside the prepare and begin qem=
-u hook on libvirt.<br>
-&gt;&gt;I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO v=
-irtiofsd] Waiting for vhost-user socket connection...<br>
-&gt;&gt;and I call it like this: nohup &lt;virtiofsd cmd&gt; &amp;<br>
-&gt;&gt;<br>
-&gt;&gt;the vm&#39;s relevant config is this:<br>
-&gt;&gt;&lt;domain type=3D&#39;kvm&#39;&gt;<br>
-&gt;&gt;...<br>
-&gt;&gt;&lt;memory unit=3D&#39;KiB&#39;&gt;24582144&lt;/memory&gt;<br>
-&gt;&gt;&lt;currentMemory unit=3D&#39;KiB&#39;&gt;24582144&lt;/currentMemor=
-y&gt;<br>
-&gt;&gt;&lt;memoryBacking&gt;<br>
-&gt;&gt;&lt;source type=3D&#39;memfd&#39;/&gt;<br>
-&gt;&gt;&lt;access mode=3D&#39;shared&#39;/&gt;<br>
-&gt;&gt;&lt;/memoryBacking&gt;<br>
-&gt;&gt;&lt;vcpu placement=3D&#39;static&#39;&gt;12&lt;/vcpu&gt;<br>
-&gt;&gt;&lt;cputune&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;0&#39; cpuset=3D&#39;4&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;1&#39; cpuset=3D&#39;5&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;2&#39; cpuset=3D&#39;6&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;3&#39; cpuset=3D&#39;7&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;4&#39; cpuset=3D&#39;8&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;5&#39; cpuset=3D&#39;9&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;6&#39; cpuset=3D&#39;10&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;7&#39; cpuset=3D&#39;11&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;8&#39; cpuset=3D&#39;12&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;9&#39; cpuset=3D&#39;13&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;10&#39; cpuset=3D&#39;14&#39;/&gt;<br>
-&gt;&gt;&lt;vcpupin vcpu=3D&#39;11&#39; cpuset=3D&#39;15&#39;/&gt;<br>
-&gt;&gt;&lt;emulatorpin cpuset=3D&#39;0-1&#39;/&gt;<br>
-&gt;&gt;&lt;/cputune&gt;<br>
-&gt;&gt;<br>
-&gt;&gt;...<br>
-&gt;&gt;&lt;cpu mode=3D&#39;host-passthrough&#39; check=3D&#39;none&#39; mi=
-gratable=3D&#39;on&#39;&gt;<br>
-&gt;&gt;&lt;topology sockets=3D&#39;1&#39; dies=3D&#39;1&#39; cores=3D&#39;=
-6&#39; threads=3D&#39;2&#39;/&gt;<br>
-&gt;&gt;&lt;cache mode=3D&#39;passthrough&#39;/&gt;<br>
-&gt;&gt;&lt;feature policy=3D&#39;require&#39; name=3D&#39;topoext&#39;/&gt=
-;<br>
-&gt;&gt;&lt;/cpu&gt;<br>
-&gt;&gt;...<br>
-&gt;&gt;&lt;filesystem type=3D&#39;mount&#39; accessmode=3D&#39;passthrough=
-&#39;&gt;<br>
-&gt;&gt;&lt;driver type=3D&#39;virtiofs&#39; queue=3D&#39;1024&#39;/&gt;<br=
+> Hanna
 >
-&gt;&gt;&lt;binary path=3D&#39;/usr/bin/virtiofsd&#39;/&gt;<br>
-&gt;&gt;&lt;source socket=3D&#39;/var/lib/libvirt/helpers_state/windows/lin=
-ux_home.socket&#39;/&gt;<br>
-&gt;&gt;&lt;target dir=3D&#39;linux_home&#39;/&gt;<br>
-&gt;&gt;&lt;address type=3D&#39;pci&#39; domain=3D&#39;0x0000&#39; bus=3D&#=
-39;0x07&#39; slot=3D&#39;0x00&#39; function=3D&#39;0x0&#39;/&gt;<br>
-&gt;&gt;&lt;/filesystem&gt;<br>
-&gt;&gt;...<br>
-&gt;&gt;&lt;/domain&gt;<br>
-&gt;&gt;<br>
-&gt;&gt;I&#39;m running it via virsh, added -d 4, no errors in the log<br>
-&gt;&gt;when it is stuck, I get a black screen (using gpu pt to guest which=
- work without it), ps shows both virsh start cmd running and stuck, two vir=
-tiofsd instances are up.<br>
-&gt;&gt;any ideas how to solve this?<br>
-&gt;&gt;=C2=A0<br>
-&gt;&gt;=C2=A0<br>
-&gt;I forgot, could you replace your &#39;/usr/bin/virtiofsd&#39; with a sh=
-ell script that runs `virtiofsd --log-level=3Ddebug ...` and post the log o=
-utput<br>
-&gt;=C2=A0<br>
-&gt;If you want, you can open an issue here:<br>
-&gt;<a href=3D"https://gitlab.com/virtio-fs/virtiofsd/-/issues%5Bhttps://gi=
-tlab.com/virtio-fs/virtiofsd/-/issues%5D" rel=3D"noreferrer" target=3D"_bla=
-nk">https://gitlab.com/virtio-fs/virtiofsd/-/issues[https://gitlab.com/virt=
-io-fs/virtiofsd/-/issues]</a><br>
-do you mean run it from inside libvirt?<br>
-I tried that, seems like virtiofsd fails because libvirt uses deprecated cl=
-i params<br>
-that is why I&#39;m using sockets and running it from outside libvirt<br>
-<br></blockquote><div><br></div><div>Oh great, I didn&#39;t realize you wer=
-e calling virtiofsd directly, easier then, just call</div><div>virtiofsd --=
-log-level=3Ddebug</div><div><br></div><div>and please also using strace, li=
-ke:</div><div>strace -f -o vfsd.strace.log=C2=A0 virtiofsd ...<br></div><di=
-v><br></div><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=3D"mar=
-gin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1=
-ex">
-&gt;&gt;=C2=A0<br>
-&gt;&gt;Thanks,<br>
-&gt;&gt;=C2=A0Thanks,<br>
-&gt;&gt;<br>
-&gt;&gt;Dagg<br>
-&gt;&gt;<br>
-&gt;&gt;_______________________________________________<br>
-&gt;&gt;Virtio-fs mailing list<br>
-&gt;&gt;<a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_blank">Virtio-fs=
-@redhat.com</a>[mailto:<a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_b=
-lank">Virtio-fs@redhat.com</a>]<br>
-&gt;&gt;<a href=3D"https://listman.redhat.com/mailman/listinfo/virtio-fs" r=
-el=3D"noreferrer" target=3D"_blank">https://listman.redhat.com/mailman/list=
-info/virtio-fs</a><br>
-&gt;=C2=A0<br>
-&gt;<br>
-&gt;--<br>
-&gt;<br>
-&gt;German<br>
-<br>
-Thanks,<br>
-<br>
-Dagg<br>
-<br>
-</blockquote></div><br clear=3D"all"><br><span class=3D"gmail_signature_pre=
-fix">-- </span><br><div dir=3D"ltr" class=3D"gmail_signature"><div dir=3D"l=
-tr">German<br></div></div></div>
-
---0000000000001c014c05fc8501bb--
 

@@ -1,11 +1,11 @@
-Return-Path: <nancy@attendees-leadspro1.services>
-From: Nancy Wilson <nancy@attendees-leadspro1.services>
-Date: Tue, 1 Aug 2023 05:57:15 +0000
-Message-ID: <PN2P287MB05478D86B496C482484616DFD20AA@PN2P287MB0547.INDP287.PROD.OUTLOOK.COM>
+Return-Path: <hailey@leadliste.info>
+From: Hailey Robinson <hailey@leadliste.info>
+Date: Wed, 2 Aug 2023 01:58:11 +0000
+Message-ID: <PN3P287MB07519E5EADAB229E46A9CC25A10BA@PN3P287MB0751.INDP287.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
 Content-Language: en-US
 Content-Type: multipart/alternative;
- boundary="_000_PN2P287MB05478D86B496C482484616DFD20AAPN2P287MB0547INDP_"
+ boundary="_000_PN3P287MB07519E5EADAB229E46A9CC25A10BAPN3P287MB0751INDP_"
 Subject: [Virtio-fs] Redhat
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -17,7 +17,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---_000_PN2P287MB05478D86B496C482484616DFD20AAPN2P287MB0547INDP_
+--_000_PN3P287MB07519E5EADAB229E46A9CC25A10BAPN3P287MB0751INDP_
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -26,34 +26,30 @@ Hi Redhat,
 I'm following up to confirm if you are interested in acquiring the Registra=
 nts/Attendees list.
 
-*           JavaZone 2023 ( Norway, USA , Sep. 2023 )
-*           1,000+  Contacts
+*           Northwest Arkansas Technology Summit 2023 (Rogers, USA, 29 Oct =
+- 01 Nov 2023)
+*           1,000+ Contacts
 
 Let me know your thoughts so that I can share the price & more information.
 
 Regards,
-Nancy - Business Executive
+Hailey - Business Executive
 
 
-
---_000_PN2P287MB05478D86B496C482484616DFD20AAPN2P287MB0547INDP_
+--_000_PN3P287MB07519E5EADAB229E46A9CC25A10BAPN3P287MB0751INDP_
 Content-Type: text/html; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
 <html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
 osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
-xmlns:x=3D"urn:schemas-microsoft-com:office:excel" xmlns:m=3D"http://schema=
-s.microsoft.com/office/2004/12/omml" xmlns=3D"http://www.w3.org/TR/REC-html=
-40">
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
+//www.w3.org/TR/REC-html40">
 <head>
 <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
 >
 <meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered medium)">
 <style><!--
 /* Font Definitions */
-@font-face
-=09{font-family:Helvetica;
-=09panose-1:2 11 6 4 2 2 2 2 2 4;}
 @font-face
 =09{font-family:"Cambria Math";
 =09panose-1:2 4 5 3 5 4 6 3 2 4;}
@@ -95,49 +91,53 @@ div.WordSection1
 </head>
 <body lang=3D"EN-US" link=3D"#0563C1" vlink=3D"#954F72">
 <div class=3D"WordSection1">
-<p class=3D"MsoNormal"><span style=3D"color:#002060">Hi Redhat,</span><o:p>=
-</o:p></p>
-<p class=3D"MsoNormal"><span style=3D"color:#002060">&nbsp;</span><o:p></o:=
-p></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060">Hi Redhat,<o:p></o:p><=
+/span></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060"><o:p>&nbsp;</o:p></spa=
+n></p>
 <p class=3D"MsoNormal"><span style=3D"color:#002060">I&#8217;m following up=
  to confirm if you are interested in acquiring the
-<b><span style=3D"background:yellow">Registrants/Attendees list</span></b>.=
-</span><o:p></o:p></p>
-<p class=3D"MsoNormal"><span style=3D"color:#002060">&nbsp;</span><o:p></o:=
-p></p>
+<b><span style=3D"background:yellow;mso-highlight:yellow">Registrants/Atten=
+dees list</span></b>.<o:p></o:p></span></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060"><o:p>&nbsp;</o:p></spa=
+n></p>
 <p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
 -height:18.75pt;background:white;vertical-align:baseline">
 <span style=3D"font-size:10.0pt;font-family:Symbol;color:black">&middot;</s=
 pan><span style=3D"font-size:7.0pt;font-family:&quot;Times New Roman&quot;,=
 serif;color:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span><span style=3D"color:#002060">&nbsp;&nbsp;</span><b><span style=3D"f=
-ont-size:12.0pt;font-family:&quot;Helvetica&quot;,sans-serif;color:#002060"=
->JavaZone 2023 ( Norway, USA , Sep. 2023 )</span></b><o:p></o:p></p>
+</span><span style=3D"color:#002060">&nbsp;&nbsp;</span><b><u><span style=
+=3D"font-size:12.0pt;color:#002060;border:none windowtext 1.0pt;padding:0in=
+">Northwest Arkansas Technology Summit 2023
+</span></u></b><b><span style=3D"font-size:12.0pt;color:#002060;border:none=
+ windowtext 1.0pt;padding:0in">(Rogers, USA, 29 Oct - 01 Nov 2023)
+</span></b><o:p></o:p></p>
 <p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
 -height:18.75pt;background:white;vertical-align:baseline">
 <span style=3D"font-size:10.0pt;font-family:Symbol;color:black">&middot;</s=
 pan><span style=3D"font-size:7.0pt;font-family:&quot;Times New Roman&quot;,=
 serif;color:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </span><b><span style=3D"font-size:12.0pt;color:#002060;border:none windowt=
-ext 1.0pt;padding:0in">&nbsp;&nbsp;1,000+&nbsp; Contacts</span></b><o:p></o=
-:p></p>
+ext 1.0pt;padding:0in">&nbsp;&nbsp;1,000+ Contacts<o:p></o:p></span></b></p=
+>
 <p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
 -height:18.75pt;background:white;vertical-align:baseline">
-<span lang=3D"DA">&nbsp;</span><o:p></o:p></p>
+<b><span style=3D"font-size:12.0pt;color:#002060;border:none windowtext 1.0=
+pt;padding:0in"><o:p>&nbsp;</o:p></span></b></p>
 <p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060">Let me kno=
 w your thoughts so that I can share the
-<span style=3D"background:yellow">price &amp; more information.<o:p></o:p><=
-/span></span></p>
+<span style=3D"background:yellow;mso-highlight:yellow">price &amp; more inf=
+ormation.<o:p></o:p></span></span></p>
 <p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060;background:=
-yellow"><o:p>&nbsp;</o:p></span></p>
+yellow;mso-highlight:yellow"><o:p>&nbsp;</o:p></span></p>
 <p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060">Regards,<b=
 r>
-<b>Nancy </b>&#8211; Business Executive</span><o:p></o:p></p>
-<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<b>Hailey </b>&#8211; Business Executive</span><span lang=3D"EN-AU"><o:p></=
+o:p></span></p>
 <p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
 </div>
 </body>
 </html>
 
---_000_PN2P287MB05478D86B496C482484616DFD20AAPN2P287MB0547INDP_--
+--_000_PN3P287MB07519E5EADAB229E46A9CC25A10BAPN3P287MB0751INDP_--
 

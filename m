@@ -1,11 +1,11 @@
-Return-Path: <ruth@list1-data.live>
-From: Ruth Wilson <ruth@list1-data.live>
-Date: Thu, 3 Aug 2023 15:23:56 +0000
-Message-ID: <PN0P287MB0711F312B5C95BAADDBC4EB1D708A@PN0P287MB0711.INDP287.PROD.OUTLOOK.COM>
+Return-Path: <noelle@leadlistesearches.info>
+From: Noelle Thomas <noelle@leadlistesearches.info>
+Date: Fri, 4 Aug 2023 02:49:22 +0000
+Message-ID: <MA0P287MB0661DB7618EB0F407DAD2A9BA809A@MA0P287MB0661.INDP287.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
 Content-Language: en-US
 Content-Type: multipart/alternative;
- boundary="_000_PN0P287MB0711F312B5C95BAADDBC4EB1D708APN0P287MB0711INDP_"
+ boundary="_000_MA0P287MB0661DB7618EB0F407DAD2A9BA809AMA0P287MB0661INDP_"
 Subject: [Virtio-fs] Redhat
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -17,7 +17,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---_000_PN0P287MB0711F312B5C95BAADDBC4EB1D708APN0P287MB0711INDP_
+--_000_MA0P287MB0661DB7618EB0F407DAD2A9BA809AMA0P287MB0661INDP_
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -26,16 +26,16 @@ Dear Redhat,
 I'm following up to confirm if you are interested in acquiring the Registra=
 nts/Attendees list.
 
-*                IT Day - the IT specialist forum 2023 ( Stuttgart, Germany=
- , 10 Nov 2023)
+*                KubeCon + CloudNativeCon North America 2023 (Chicago, USA,=
+ 08 - 10 Nov 2023)
 *                1,000 Contacts
 
-Let me know your thoughts so that I can share the cost & more information
+Let me know your thoughts so that I can share the cost & more information.
 Regards,
-Ruth - Event Coordinator
+Noelle - Event Coordinator
 
 
---_000_PN0P287MB0711F312B5C95BAADDBC4EB1D708APN0P287MB0711INDP_
+--_000_MA0P287MB0661DB7618EB0F407DAD2A9BA809AMA0P287MB0661INDP_
 Content-Type: text/html; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -69,21 +69,12 @@ a:visited, span.MsoHyperlinkFollowed
 =09{mso-style-priority:99;
 =09color:#954F72;
 =09text-decoration:underline;}
-p.msonormal0, li.msonormal0, div.msonormal0
-=09{mso-style-name:msonormal;
-=09mso-margin-top-alt:auto;
-=09margin-right:0in;
-=09mso-margin-bottom-alt:auto;
-=09margin-left:0in;
-=09font-size:11.0pt;
-=09font-family:"Calibri",sans-serif;}
-span.EmailStyle18
+span.EmailStyle17
 =09{mso-style-type:personal-compose;
 =09font-family:"Calibri",sans-serif;
 =09color:windowtext;}
 .MsoChpDefault
 =09{mso-style-type:export-only;
-=09font-size:10.0pt;
 =09font-family:"Calibri",sans-serif;}
 @page WordSection1
 =09{size:8.5in 11.0in;
@@ -115,10 +106,13 @@ n></p>
 an><span style=3D"font-size:6.0pt;font-family:&quot;Times New Roman&quot;,s=
 erif;color:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </span><span style=3D"font-size:10.0pt;color:#002060">&nbsp;&nbsp;&nbsp;&nb=
-sp;&nbsp;&nbsp; </span><b><span style=3D"font-size:12.0pt;color:#002060">IT=
- Day - the IT specialist forum 2023 (
-<span style=3D"border:none windowtext 1.0pt;padding:0in">Stuttgart, Germany=
- , 10 Nov 2023)</span></span></b><b><o:p></o:p></b></p>
+sp;&nbsp;&nbsp; </span><b><span style=3D"font-size:12.0pt;color:#002060">Ku=
+beCon + CloudNativeCon North America 2023
+<span style=3D"border:none windowtext 1.0pt;padding:0in">(</span></span></b=
+><b><span lang=3D"EN-IN" style=3D"font-size:12.0pt;color:#002060">Chicago, =
+USA, 08 - 10 Nov 2023</span></b><b><span style=3D"font-size:12.0pt;color:#0=
+02060;border:none windowtext 1.0pt;padding:0in">)</span></b><b><o:p></o:p><=
+/b></p>
 <p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
 -height:18.75pt;background:white;vertical-align:baseline">
 <b><span style=3D"font-size:10.0pt;font-family:Symbol;color:black">&middot;=
@@ -130,19 +124,19 @@ dowtext 1.0pt;padding:0in">1,000 Contacts<o:p></o:p></span></b></p>
 <p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
 -height:18.75pt;background:white;vertical-align:baseline">
 <span lang=3D"DA"><o:p>&nbsp;</o:p></span></p>
-<p class=3D"MsoNormal" style=3D"mso-margin-top-alt:auto;mso-margin-bottom-a=
-lt:auto"><span lang=3D"DA" style=3D"color:#002060">Let me know your thought=
-s so that I can share the
-<b><span style=3D"background:yellow;mso-highlight:yellow">cost &amp; more i=
-nformation</span></b></span><span lang=3D"DA" style=3D"color:#002060">
-</span><span lang=3D"EN-IN" style=3D"color:#002060"><o:p></o:p></span></p>
+<p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060">Let me kno=
+w your thoughts so that I can share the
+</span><b><span lang=3D"DA" style=3D"font-size:12.0pt;color:#002060;backgro=
+und:yellow;mso-highlight:yellow">cost &amp; more information.</span></b><sp=
+an lang=3D"DA" style=3D"color:#002060;background:yellow;mso-highlight:yello=
+w"><o:p></o:p></span></p>
 <p class=3D"MsoNormal" style=3D"mso-margin-top-alt:auto;mso-margin-bottom-a=
 lt:auto"><span lang=3D"EN-IN" style=3D"color:#002060">Regards,<br>
-<b>Ruth</b> &#8211; Event Coordinator<o:p></o:p></span></p>
+<b>Noelle</b> &#8211; Event Coordinator <o:p></o:p></span></p>
 <p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
 </div>
 </body>
 </html>
 
---_000_PN0P287MB0711F312B5C95BAADDBC4EB1D708APN0P287MB0711INDP_--
+--_000_MA0P287MB0661DB7618EB0F407DAD2A9BA809AMA0P287MB0661INDP_--
 

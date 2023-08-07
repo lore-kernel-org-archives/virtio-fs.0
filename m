@@ -1,11 +1,11 @@
-Return-Path: <alaiya@etrade-db.info>
-From: Alaiya Louise <alaiya@etrade-db.info>
-Date: Mon, 7 Aug 2023 21:03:59 +0000
-Message-ID: <PN0P287MB0229AE5A7836B68FCB8610AAEF0CA@PN0P287MB0229.INDP287.PROD.OUTLOOK.COM>
+Return-Path: <angie@leadproelist.live>
+From: Angie Smith <angie@leadproelist.live>
+Date: Mon, 7 Aug 2023 21:04:52 +0000
+Message-ID: <MA0P287MB06640F95E1EB73A83F5518E7A00CA@MA0P287MB0664.INDP287.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
 Content-Language: en-US
 Content-Type: multipart/alternative;
- boundary="_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_"
+ boundary="_000_MA0P287MB06640F95E1EB73A83F5518E7A00CAMA0P287MB0664INDP_"
 Subject: [Virtio-fs] Redhat
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -17,7 +17,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_
+--_000_MA0P287MB06640F95E1EB73A83F5518E7A00CAMA0P287MB0664INDP_
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -34,10 +34,10 @@ nts/Attendees list.
 Let me know your thoughts so that I can share the price & more information.
 
 Regards,
-Alaiya - Business Executive
+Angie - Business Executive
 
 
---_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_
+--_000_MA0P287MB06640F95E1EB73A83F5518E7A00CAMA0P287MB0664INDP_
 Content-Type: text/html; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -136,8 +136,8 @@ span></p>
 yellow;mso-highlight:yellow"><o:p>&nbsp;</o:p></span></p>
 <p class=3D"MsoNormal"><span style=3D"color:#002060">Regards,<o:p></o:p></s=
 pan></p>
-<p class=3D"MsoNormal"><b><span style=3D"color:#002060">Alaiya </span></b><=
-span style=3D"color:#002060">&#8211;
+<p class=3D"MsoNormal"><b><span style=3D"color:#002060">Angie </span></b><s=
+pan style=3D"color:#002060">&#8211;
 </span><span lang=3D"DA" style=3D"color:#002060">Business Executive</span><=
 o:p></o:p></p>
 <p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
@@ -145,5 +145,5 @@ o:p></o:p></p>
 </body>
 </html>
 
---_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_--
+--_000_MA0P287MB06640F95E1EB73A83F5518E7A00CAMA0P287MB0664INDP_--
 

@@ -1,11 +1,11 @@
-Return-Path: <lainey@leadstrades.info>
-From: Lainey James <lainey@leadstrades.info>
-Date: Sat, 5 Aug 2023 04:01:00 +0000
-Message-ID: <PN3P287MB03399595B9309165CBE288D3A60EA@PN3P287MB0339.INDP287.PROD.OUTLOOK.COM>
+Return-Path: <alaiya@etrade-db.info>
+From: Alaiya Louise <alaiya@etrade-db.info>
+Date: Mon, 7 Aug 2023 21:03:59 +0000
+Message-ID: <PN0P287MB0229AE5A7836B68FCB8610AAEF0CA@PN0P287MB0229.INDP287.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
 Content-Language: en-US
 Content-Type: multipart/alternative;
- boundary="_000_PN3P287MB03399595B9309165CBE288D3A60EAPN3P287MB0339INDP_"
+ boundary="_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_"
 Subject: [Virtio-fs] Redhat
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -17,25 +17,27 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---_000_PN3P287MB03399595B9309165CBE288D3A60EAPN3P287MB0339INDP_
+--_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
-Dear Redhat,
+Hi Redhat,
 
 I'm following up to confirm if you are interested in acquiring the Registra=
 nts/Attendees list.
 
-*                Black Hat USA 2023 ( Las Vegas , USA , 05 - 10 Aug 2023 )
-*                 5,000+ Contacts
+            *           All Things Open Conference 2023 (Raleigh, USA, 15 -=
+ 18 Oct 2023)
 
-Let me know your thoughts so that I can share the cost & more information.
+            *          1,200 Contacts
+
+Let me know your thoughts so that I can share the price & more information.
 
 Regards,
-Lainey- Event Coordinator
+Alaiya - Business Executive
 
 
---_000_PN3P287MB03399595B9309165CBE288D3A60EAPN3P287MB0339INDP_
+--_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_
 Content-Type: text/html; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -58,9 +60,17 @@ xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
 /* Style Definitions */
 p.MsoNormal, li.MsoNormal, div.MsoNormal
 =09{margin:0in;
+=09margin-bottom:.0001pt;
 =09font-size:11.0pt;
-=09font-family:"Calibri",sans-serif;
-=09mso-ligatures:standardcontextual;}
+=09font-family:"Calibri",sans-serif;}
+a:link, span.MsoHyperlink
+=09{mso-style-priority:99;
+=09color:#0563C1;
+=09text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+=09{mso-style-priority:99;
+=09color:#954F72;
+=09text-decoration:underline;}
 span.EmailStyle17
 =09{mso-style-type:personal-compose;
 =09font-family:"Calibri",sans-serif;
@@ -80,60 +90,60 @@ div.WordSection1
 <o:idmap v:ext=3D"edit" data=3D"1" />
 </o:shapelayout></xml><![endif]-->
 </head>
-<body lang=3D"EN-US" link=3D"#0563C1" vlink=3D"#954F72" style=3D"word-wrap:=
-break-word">
+<body lang=3D"EN-US" link=3D"#0563C1" vlink=3D"#954F72">
 <div class=3D"WordSection1">
-<p class=3D"MsoNormal"><span style=3D"color:#002060;mso-ligatures:none">Dea=
-r Redhat,<o:p></o:p></span></p>
-<p class=3D"MsoNormal"><span style=3D"color:#002060;mso-ligatures:none"><o:=
-p>&nbsp;</o:p></span></p>
-<p class=3D"MsoNormal"><span style=3D"color:#002060;mso-ligatures:none">I&#=
-8217;m following up to confirm if you are interested in acquiring the
-<b><span style=3D"background:yellow;mso-highlight:yellow">Registrants/Atten=
-dees list</span></b>.<o:p></o:p></span></p>
-<p class=3D"MsoNormal"><span style=3D"color:#002060;mso-ligatures:none"><o:=
-p>&nbsp;</o:p></span></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060">Hi Redhat,<o:p></o:p><=
+/span></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060"><o:p>&nbsp;</o:p></spa=
+n></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060">I&#8217;m following up=
+ to confirm if you are interested in acquiring the
+</span><b><span style=3D"color:#002060;background:yellow">Registrants/Atten=
+dees list</span></b><span style=3D"color:#002060">.</span><span style=3D"co=
+lor:#002060"><o:p></o:p></span></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060"><o:p>&nbsp;</o:p></spa=
+n></p>
+<p class=3D"MsoNormal"><span style=3D"font-size:10.0pt;font-family:Symbol;c=
+olor:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb=
+sp;&nbsp;&middot;</span><span style=3D"font-size:7.0pt;font-family:&quot;Ti=
+mes New Roman&quot;,serif;color:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+&nbsp;&nbsp;
+</span><span style=3D"color:#002060">&nbsp;&nbsp;</span><b><span style=3D"f=
+ont-size:12.0pt;color:#002060;border:none windowtext 1.0pt;padding:0in">All=
+ Things Open Conference 2023 (Raleigh, USA</span></b>,
+<b><span style=3D"font-size:12.0pt;color:#002060;border:none windowtext 1.0=
+pt;padding:0in">15 - 18 Oct 2023)</span></b><span style=3D"color:white"><o:=
+p></o:p></span></p>
+<p class=3D"MsoNormal"><span style=3D"color:white"><o:p>&nbsp;</o:p></span>=
+</p>
+<p class=3D"MsoNormal"><span style=3D"font-size:10.0pt;font-family:Symbol;c=
+olor:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb=
+sp;&nbsp;&middot;</span><span style=3D"font-size:7.0pt;font-family:&quot;Ti=
+mes New Roman&quot;,serif;color:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+&nbsp;
+</span><b><span style=3D"font-size:12.0pt;color:#002060;border:none windowt=
+ext 1.0pt;padding:0in">&nbsp; 1,200 Contacts<o:p></o:p></span></b></p>
 <p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
 -height:18.75pt;background:white;vertical-align:baseline">
-<span style=3D"font-size:9.0pt;font-family:Symbol;color:black;mso-ligatures=
-:none">&middot;</span><span style=3D"font-size:6.0pt;font-family:&quot;Time=
-s New Roman&quot;,serif;color:black;mso-ligatures:none">&nbsp;&nbsp;&nbsp;&=
-nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span><span style=3D"font-size:10.0pt;color:#002060;mso-ligatures:none">&n=
-bsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>
-<b><span style=3D"font-size:12.0pt;color:#002060;mso-ligatures:none">Black =
-Hat USA 2023 ( Las Vegas , USA , 05 - 10 Aug 2023 )<o:p></o:p></span></b></=
-p>
-<p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
--height:18.75pt;background:white;vertical-align:baseline">
-<b><span style=3D"font-size:10.0pt;font-family:Symbol;color:black;mso-ligat=
-ures:none">&middot;</span></b><b><span style=3D"font-size:7.0pt;font-family=
-:&quot;Times New Roman&quot;,serif;color:black;mso-ligatures:none">&nbsp;&n=
-bsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp=
-;&nbsp;&nbsp;
-</span></b><b><span style=3D"font-size:12.0pt;color:#002060;border:none win=
-dowtext 1.0pt;padding:0in;mso-ligatures:none">5,000+ Contacts</span></b><b>=
-<span style=3D"font-size:7.0pt;font-family:&quot;Times New Roman&quot;,seri=
-f;color:black;mso-ligatures:none"><o:p></o:p></span></b></p>
-<p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
--height:18.75pt;background:white;vertical-align:baseline">
-<span lang=3D"DA" style=3D"mso-ligatures:none"><o:p>&nbsp;</o:p></span></p>
-<p class=3D"MsoNormal" style=3D"mso-margin-top-alt:auto;mso-margin-bottom-a=
-lt:auto"><span lang=3D"DA" style=3D"color:#002060;mso-ligatures:none">Let m=
-e know your thoughts so that I can share the
-</span><b><span lang=3D"DA" style=3D"font-size:12.0pt;color:#002060;backgro=
-und:yellow;mso-highlight:yellow;mso-ligatures:none">cost &amp; more informa=
-tion.</span></b><b><span lang=3D"DA" style=3D"font-size:12.0pt;color:#00206=
-0;mso-ligatures:none"><o:p></o:p></span></b></p>
-<p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060"><o:p>&nbsp=
-;</o:p></span></p>
-<p class=3D"MsoNormal" style=3D"mso-margin-top-alt:auto;mso-margin-bottom-a=
-lt:auto"><span lang=3D"EN-IN" style=3D"color:#002060">Regards,<br>
-<b>Lainey</b>&#8211; Event Coordinator <o:p></o:p></span></p>
+<span lang=3D"DA"><o:p>&nbsp;</o:p></span></p>
+<p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060">Let me kno=
+w your thoughts so that I can share the
+<span style=3D"background:yellow;mso-highlight:yellow">price &amp; more inf=
+ormation.</span>
+<span style=3D"background:yellow;mso-highlight:yellow"><o:p></o:p></span></=
+span></p>
+<p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060;background:=
+yellow;mso-highlight:yellow"><o:p>&nbsp;</o:p></span></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060">Regards,<o:p></o:p></s=
+pan></p>
+<p class=3D"MsoNormal"><b><span style=3D"color:#002060">Alaiya </span></b><=
+span style=3D"color:#002060">&#8211;
+</span><span lang=3D"DA" style=3D"color:#002060">Business Executive</span><=
+o:p></o:p></p>
 <p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
 </div>
 </body>
 </html>
 
---_000_PN3P287MB03399595B9309165CBE288D3A60EAPN3P287MB0339INDP_--
+--_000_PN0P287MB0229AE5A7836B68FCB8610AAEF0CAPN0P287MB0229INDP_--
 

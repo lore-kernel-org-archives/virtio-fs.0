@@ -1,21 +1,12 @@
-Return-Path: <alpha754293@hotmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=hotmail.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=MzD9NogZugD7pC7Axwcnu/Iqpb5lbC6ZrcKFX9Q2QP4=;
- b=TumCOLFno/NS1wiUrSUofWU8qLTnbEUBYH3q0Os1FYfJ7bJXE+li4OdzQ1KZPvgc/bEMso3Ndc7/+xeXgIFvhVXYhUcjTlQ+4l7G9lf2CAZdf0QZxY7qdd/37OQdgmKAFBo+COSTD3tngZFKQQoH0w3UIVXwaTpfUnOfeJoIa5StbsGYvWJGMt/AZj9zEtd2acCknCOBXoqMWIp78guFd2HIXEe3a0qYV81ob9JCeDd+DRzfs9yztfMSlgBxA/V7wpKzsv8pYjp4X4V4okOo5j/m5MjcVxw5MGZqBOZcNtT7SWXI/aBtqXxlze7q6KnwJLpriYiuW/xnh5SZcdYrZQ==
-From: Ewen Chan <alpha754293@hotmail.com>
-Date: Sun, 28 May 2023 13:27:03 +0000
-Message-ID: <SA1P221MB1018D1F87D19E4F29CC7AD98B5459@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
-References: <SA1P221MB1018666909025F9520B3A960B57B9@SA1P221MB1018.NAMP221.PROD.OUTLOOK.COM>
- <CAJh=p+7EnxbniPKyQX26waewoAv3jH_v1=3cGvp9b3Jpx9x=fw@mail.gmail.com>
-In-Reply-To: <CAJh=p+7EnxbniPKyQX26waewoAv3jH_v1=3cGvp9b3Jpx9x=fw@mail.gmail.com>
+Return-Path: <sawyer@leadlistvisit.info>
+From: Sawyer Davis <sawyer@leadlistvisit.info>
+Date: Tue, 8 Aug 2023 00:14:42 +0000
+Message-ID: <MA0P287MB00926336D36DC0C4F5ED5268AE0DA@MA0P287MB0092.INDP287.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
-Content-Language: en-CA
+Content-Language: en-US
 Content-Type: multipart/alternative;
- boundary="_000_SA1P221MB1018D1F87D19E4F29CC7AD98B5459SA1P221MB1018NAMP_"
-Subject: Re: [Virtio-fs] Is there a way to get NFS and/or NFSoRDMA to play
- nice with Virtio-FS?
+ boundary="_000_MA0P287MB00926336D36DC0C4F5ED5268AE0DAMA0P287MB0092INDP_"
+Subject: [Virtio-fs] Redhat
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,186 +15,125 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: German Maglione <gmaglione@redhat.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---_000_SA1P221MB1018D1F87D19E4F29CC7AD98B5459SA1P221MB1018NAMP_
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+--_000_MA0P287MB00926336D36DC0C4F5ED5268AE0DAMA0P287MB0092INDP_
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
 
-R2VybWFuOg0KDQpJIGZpbmFsbHkgZ290IGFyb3VuZCB0byB0ZXN0aW5nIHRoaXMgYW5kIHVuZm9y
-dHVuYXRlbHksIEkgYW0gc3RpbGwgZ2V0dGluZyB0aGUgc3RhbGUgZmlsZSBoYW5kbGUgZXJyb3Iu
-DQoNCkhlcmUgaXMgdGhlIGNvbW1hbmQgdGhhdCBJIHVzZWQgZm9yIHZpcnRpb2ZzZCAod2hpY2gg
-aXMgZW1iZWRkZWQgaW5zaWRlIGEgc3RhcnR1cCBzY3JpcHQgZmlsZSBpbiBQcm94bW94KS4NCg0K
-bm9odXAgL3Vzci9saWIva3ZtL3ZpcnRpb2ZzZCAtLXN5c2xvZyAtLWRhZW1vbml6ZSAtLXNvY2tl
-dC1wYXRoPS92YXIvcnVuL3NoYXJlZC1mcy5zb2NrIC1vIHNvdXJjZT0vZXhwb3J0L215ZnMvIC1v
-IGNhY2hlPW5vbmUgJj4gL2Rldi9udWxsICAmDQoNCklmIHlvdSBoYXZlIGFueSBvdGhlciBzdWdn
-ZXN0aW9ucywgdGhhdCB3b3VsZCBiZSBncmVhdGx5IGFwcHJlY2lhdGVkLg0KDQpUaGFuayB5b3Uu
-DQoNClNpbmNlcmVseSwNCkV3ZW4NCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fDQpG
-cm9tOiBHZXJtYW4gTWFnbGlvbmUgPGdtYWdsaW9uZUByZWRoYXQuY29tPg0KU2VudDogTWF5IDE0
-LCAyMDIzIDE6MDYgUE0NClRvOiBFd2VuIENoYW4gPGFscGhhNzU0MjkzQGhvdG1haWwuY29tPg0K
-Q2M6IHZpcnRpby1mc0ByZWRoYXQuY29tIDx2aXJ0aW8tZnNAcmVkaGF0LmNvbT4NClN1YmplY3Q6
-IFJlOiBbVmlydGlvLWZzXSBJcyB0aGVyZSBhIHdheSB0byBnZXQgTkZTIGFuZC9vciBORlNvUkRN
-QSB0byBwbGF5IG5pY2Ugd2l0aCBWaXJ0aW8tRlM/DQoNCkhpIEV3ZW4sDQoNCk9uIFN1biwgTWF5
-IDE0LCAyMDIzIGF0IDk6NDnigK9BTSBFd2VuIENoYW4gPGFscGhhNzU0MjkzQGhvdG1haWwuY29t
-PG1haWx0bzphbHBoYTc1NDI5M0Bob3RtYWlsLmNvbT4+IHdyb3RlOg0KVG8gV2hvbSBJdCBNYXkg
-Q29uY2VybjoNCg0KSSdtIHVzaW5nIFByb3htb3ggNy4zLTQgYW5kIEkgaGF2ZSBhIENlbnRPUyA3
-LjcuMTkwOCBWTSB0aGF0J3MgYWJsZSB0byBzaGFyZSBkYXRhL2ZpbGVzIHZpYSBWaXJ0aW8tRlMu
-IFRoYXQgcGFydCBpcyB3b3JraW5nIGZpbmUuDQoNCkhvd2V2ZXIsIGlmIEkgdHJ5IHRvIGV4cG9y
-dCB0aGF0IFZpcnRJTy1GUyAidGFyZ2V0IiBhcyBhIE5GUyBleHBvcnQsIHdoZW5ldmVyIG15IG90
-aGVyIGNvbXB1dGVycyBjb25uZWN0IHRvIHRoYXQgTkZTIHNoYXJlLCBpdCB3aWxsIHNheSB0aGF0
-IHRoZSBmb2xkZXJzIGhhdmUgc3RhbGUgTkZTIGhhbmRsZXMuDQoNCklzIHRoZXJlIGEgd2F5IHRv
-IGZpeC9yZXNvbHZlIHRoaXM/DQoNCkhlcmUgaXMgdGhlIG91dHB1dCBmb3IgL2V0Yy9leHBvcnRz
-Og0KDQovZXhwb3J0ICoocncsYXN5bmMsbm9fcm9vdF9zcXVhc2gsbm9fYWxsX3NxdWFzaCxub19z
-dWJ0cmVlX2NoZWNrLGZzaWQ9NCkNCg0KSSBoYXZlIHRyaWVkIHJlYm9vdGluZyB0aGUgY2xpZW50
-cyBtdWx0aXBsZSB0aW1lcywgYWxvbmcgd2l0aCBtb3VudGluZy91bm1vdW50aW5nIHNhaWQgTkZT
-IHNoYXJlIGFuZCBpdCBkb2Vzbid0IGFwcGVhciB0byBtYWtlIGFueSBkaWZmZXJlbmNlLg0KDQoN
-Ckp1c3QgdG8gY29uZmlybSwgeW91IHdhbnQgdG8gc2hhcmUgYSBmb2xkZXIgdXNpbmcgdmlydGlv
-ZnMgd2l0aCBhIFZNLCBhbmQgdGhlbiB0aGF0IFZNIHJ1bm5pbmcgYXMgYW4gTkZTIHNlcnZlciBz
-aGFyaW5nIHRoYXQgc2FtZSBmb2xkZXIgb3ZlciBuZnMsIGFtIEkgcmlnaHQ/DQoNCklmIHRoYXQg
-aXMgdGhlIGNhc2UsIGl0J3Mgbm90IHBvc3NpYmxlICgqKSB0aGUgTkZTIHNlcnZlciByZXF1aXJl
-cyBwZXJzaXN0ZW50IGZpbGUgaGFuZGxlcyB0aGF0IEZVU0UgZG9lcyBub3Qgc3VwcG9ydC4NCg0K
-KCopIEknbSBub3Qgc3VyZSwgYnV0IElJUkMgTWlrbG9zIHNhaWQgaXQgY291bGQgd29yayBpZiB5
-b3UgZGlzYWJsZSB0aGUgY2FjaGUsIHNvIHlvdSBjYW4gdHJ5IHJ1bm5pbmcgdmlydGlvZnNkIHdp
-dGggYC0tY2FjaGU9bm9uZWAgKGxldCBtZSBrbm93IGlmIHRoYXQgd29yaykuDQoNCg0KDQpZb3Vy
-IGhlbHAgaXMgZ3JlYXRseSBhcHByZWNpYXRlZC4NCg0KVGhhbmsgeW91Lg0KDQpTaW5jZXJlbHks
-DQpFd2VuDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXw0K
-VmlydGlvLWZzIG1haWxpbmcgbGlzdA0KVmlydGlvLWZzQHJlZGhhdC5jb208bWFpbHRvOlZpcnRp
-by1mc0ByZWRoYXQuY29tPg0KaHR0cHM6Ly9saXN0bWFuLnJlZGhhdC5jb20vbWFpbG1hbi9saXN0
-aW5mby92aXJ0aW8tZnMNCg0KDQotLQ0KR2VybWFuDQo=
---_000_SA1P221MB1018D1F87D19E4F29CC7AD98B5459SA1P221MB1018NAMP_
-Content-Type: text/html; charset="utf-8"
-Content-Transfer-Encoding: base64
+Hi Redhat,
 
-PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
-dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyIgc3R5bGU9
-ImRpc3BsYXk6bm9uZTsiPiBQIHttYXJnaW4tdG9wOjA7bWFyZ2luLWJvdHRvbTowO30gPC9zdHls
-ZT4NCjwvaGVhZD4NCjxib2R5IGRpcj0ibHRyIj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBD
-YWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJn
-YigwLCAwLCAwKTsiIGNsYXNzPSJlbGVtZW50VG9Qcm9vZiI+DQpHZXJtYW46PC9kaXY+DQo8ZGl2
-IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250
-LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2Yi
-Pg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0
-aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBj
-bGFzcz0iZWxlbWVudFRvUHJvb2YiPg0KSSBmaW5hbGx5IGdvdCBhcm91bmQgdG8gdGVzdGluZyB0
-aGlzIGFuZCB1bmZvcnR1bmF0ZWx5LCBJIGFtIHN0aWxsIGdldHRpbmcgdGhlIHN0YWxlIGZpbGUg
-aGFuZGxlIGVycm9yLjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENhbGlicmksIEhl
-bHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMnB0OyBjb2xvcjogcmdiKDAsIDAsIDAp
-OyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIj4NCjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9u
-dC1mYW1pbHk6IENhbGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMnB0
-OyBjb2xvcjogcmdiKDAsIDAsIDApOyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIj4NCkhlcmUgaXMg
-dGhlIGNvbW1hbmQgdGhhdCBJIHVzZWQgZm9yIHZpcnRpb2ZzZCAod2hpY2ggaXMgZW1iZWRkZWQg
-aW5zaWRlIGEgc3RhcnR1cCBzY3JpcHQgZmlsZSBpbiBQcm94bW94KS48L2Rpdj4NCjxkaXYgc3R5
-bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBIZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6
-ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAwKTsiIGNsYXNzPSJlbGVtZW50VG9Qcm9vZiI+DQo8
-YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBIZWx2ZXRpY2Es
-IHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAwKTsiIGNsYXNz
-PSJlbGVtZW50VG9Qcm9vZiBDb250ZW50UGFzdGVkMCBDb250ZW50UGFzdGVkMSI+DQpub2h1cCAv
-dXNyL2xpYi9rdm0vdmlydGlvZnNkIC0tc3lzbG9nIC0tZGFlbW9uaXplIC0tc29ja2V0LXBhdGg9
-L3Zhci9ydW4vc2hhcmVkLWZzLnNvY2sgLW8gc291cmNlPS9leHBvcnQvbXlmcy8gLW8gY2FjaGU9
-bm9uZSAmYW1wOyZndDsgL2Rldi9udWxsICZuYnNwOyZhbXA7PC9kaXY+DQo8ZGl2IHN0eWxlPSJm
-b250LWZhbWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEy
-cHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YgQ29udGVudFBh
-c3RlZDAgQ29udGVudFBhc3RlZDEiPg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZh
-bWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNv
-bG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YgQ29udGVudFBhc3RlZDAg
-Q29udGVudFBhc3RlZDEiPg0KSWYgeW91IGhhdmUgYW55IG90aGVyIHN1Z2dlc3Rpb25zLCB0aGF0
-IHdvdWxkIGJlIGdyZWF0bHkgYXBwcmVjaWF0ZWQuPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZh
-bWlseTogQ2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNv
-bG9yOiByZ2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YgQ29udGVudFBhc3RlZDAg
-Q29udGVudFBhc3RlZDEiPg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTog
-Q2FsaWJyaSwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiBy
-Z2IoMCwgMCwgMCk7IiBjbGFzcz0iZWxlbWVudFRvUHJvb2YgQ29udGVudFBhc3RlZDAgQ29udGVu
-dFBhc3RlZDEiPg0KVGhhbmsgeW91LjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENh
-bGlicmksIEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMnB0OyBjb2xvcjogcmdi
-KDAsIDAsIDApOyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIENvbnRlbnRQYXN0ZWQwIENvbnRlbnRQ
-YXN0ZWQxIj4NCjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENhbGlicmks
-IEhlbHZldGljYSwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAxMnB0OyBjb2xvcjogcmdiKDAsIDAs
-IDApOyIgY2xhc3M9ImVsZW1lbnRUb1Byb29mIENvbnRlbnRQYXN0ZWQwIENvbnRlbnRQYXN0ZWQx
-Ij4NClNpbmNlcmVseSw8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBI
-ZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAw
-KTsiIGNsYXNzPSJlbGVtZW50VG9Qcm9vZiBDb250ZW50UGFzdGVkMCBDb250ZW50UGFzdGVkMSI+
-DQpFd2VuPGJyPg0KPC9kaXY+DQo8ZGl2IGlkPSJhcHBlbmRvbnNlbmQiPjwvZGl2Pg0KPGhyIHN0
-eWxlPSJkaXNwbGF5OmlubGluZS1ibG9jazt3aWR0aDo5OCUiIHRhYmluZGV4PSItMSI+DQo8ZGl2
-IGlkPSJkaXZScGx5RndkTXNnIiBkaXI9Imx0ciI+PGZvbnQgZmFjZT0iQ2FsaWJyaSwgc2Fucy1z
-ZXJpZiIgc3R5bGU9ImZvbnQtc2l6ZToxMXB0IiBjb2xvcj0iIzAwMDAwMCI+PGI+RnJvbTo8L2I+
-IEdlcm1hbiBNYWdsaW9uZSAmbHQ7Z21hZ2xpb25lQHJlZGhhdC5jb20mZ3Q7PGJyPg0KPGI+U2Vu
-dDo8L2I+IE1heSAxNCwgMjAyMyAxOjA2IFBNPGJyPg0KPGI+VG86PC9iPiBFd2VuIENoYW4gJmx0
-O2FscGhhNzU0MjkzQGhvdG1haWwuY29tJmd0Ozxicj4NCjxiPkNjOjwvYj4gdmlydGlvLWZzQHJl
-ZGhhdC5jb20gJmx0O3ZpcnRpby1mc0ByZWRoYXQuY29tJmd0Ozxicj4NCjxiPlN1YmplY3Q6PC9i
-PiBSZTogW1ZpcnRpby1mc10gSXMgdGhlcmUgYSB3YXkgdG8gZ2V0IE5GUyBhbmQvb3IgTkZTb1JE
-TUEgdG8gcGxheSBuaWNlIHdpdGggVmlydGlvLUZTPzwvZm9udD4NCjxkaXY+Jm5ic3A7PC9kaXY+
-DQo8L2Rpdj4NCjxkaXY+DQo8ZGl2IGRpcj0ibHRyIj4NCjxkaXYgZGlyPSJsdHIiPkhpIEV3ZW4s
-PGJyPg0KPC9kaXY+DQo8YnI+DQo8ZGl2IGNsYXNzPSJ4X2dtYWlsX3F1b3RlIj4NCjxkaXYgZGly
-PSJsdHIiIGNsYXNzPSJ4X2dtYWlsX2F0dHIiPk9uIFN1biwgTWF5IDE0LCAyMDIzIGF0IDk6NDni
-gK9BTSBFd2VuIENoYW4gJmx0OzxhIGhyZWY9Im1haWx0bzphbHBoYTc1NDI5M0Bob3RtYWlsLmNv
-bSI+YWxwaGE3NTQyOTNAaG90bWFpbC5jb208L2E+Jmd0OyB3cm90ZTo8YnI+DQo8L2Rpdj4NCjxi
-bG9ja3F1b3RlIGNsYXNzPSJ4X2dtYWlsX3F1b3RlIiBzdHlsZT0ibWFyZ2luOjBweCAwcHggMHB4
-IDAuOGV4OyBib3JkZXItbGVmdDoxcHggc29saWQgcmdiKDIwNCwyMDQsMjA0KTsgcGFkZGluZy1s
-ZWZ0OjFleCI+DQo8ZGl2IGNsYXNzPSJ4X21zZy0xNzQ2NDg5MTcyNzIxODk0MDM4Ij4NCjxkaXYg
-ZGlyPSJsdHIiPg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fu
-cy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KVG8gV2hvbSBJdCBN
-YXkgQ29uY2Vybjo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmks
-SGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApIj4N
-Cjxicj4NCkknbSB1c2luZyBQcm94bW94IDcuMy00IGFuZCBJIGhhdmUgYSBDZW50T1MgNy43LjE5
-MDggVk0gdGhhdCdzIGFibGUgdG8gc2hhcmUgZGF0YS9maWxlcyB2aWEgVmlydGlvLUZTLiBUaGF0
-IHBhcnQgaXMgd29ya2luZyBmaW5lLjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2Fs
-aWJyaSxIZWx2ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAs
-MCkiPg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZl
-dGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQpIb3dl
-dmVyLCBpZiBJIHRyeSB0byBleHBvcnQgdGhhdCBWaXJ0SU8tRlMgJnF1b3Q7dGFyZ2V0JnF1b3Q7
-IGFzIGEgTkZTIGV4cG9ydCwgd2hlbmV2ZXIgbXkgb3RoZXIgY29tcHV0ZXJzIGNvbm5lY3QgdG8g
-dGhhdCBORlMgc2hhcmUsIGl0IHdpbGwgc2F5IHRoYXQgdGhlIGZvbGRlcnMgaGF2ZSBzdGFsZSBO
-RlMgaGFuZGxlcy48L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmksSGVsdmV0
-aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApIj4NCjxicj4N
-CjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1z
-ZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KSXMgdGhlcmUgYSB3YXkg
-dG8gZml4L3Jlc29sdmUgdGhpcz88L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGli
-cmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDAp
-Ij4NCjxicj4NCjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRp
-Y2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KSGVyZSBp
-cyB0aGUgb3V0cHV0IGZvciAvZXRjL2V4cG9ydHM6PC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZh
-bWlseTpDYWxpYnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6
-cmdiKDAsMCwwKSI+DQo8YnI+DQo8L2Rpdj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGli
-cmksSGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDAp
-Ij4NCi9leHBvcnQgKihydyxhc3luYyxub19yb290X3NxdWFzaCxub19hbGxfc3F1YXNoLG5vX3N1
-YnRyZWVfY2hlY2ssZnNpZD00KTwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJy
-aSxIZWx2ZXRpY2Esc2Fucy1zZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCki
-Pg0KPGJyPg0KPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxpYnJpLEhlbHZldGlj
-YSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCwwKSI+DQpJIGhhdmUg
-dHJpZWQgcmVib290aW5nIHRoZSBjbGllbnRzIG11bHRpcGxlIHRpbWVzLCBhbG9uZyB3aXRoIG1v
-dW50aW5nL3VubW91bnRpbmcgc2FpZCBORlMgc2hhcmUgYW5kIGl0IGRvZXNuJ3QgYXBwZWFyIHRv
-IG1ha2UgYW55IGRpZmZlcmVuY2UuPC9kaXY+DQo8ZGl2IHN0eWxlPSJmb250LWZhbWlseTpDYWxp
-YnJpLEhlbHZldGljYSxzYW5zLXNlcmlmOyBmb250LXNpemU6MTJwdDsgY29sb3I6cmdiKDAsMCww
-KSI+DQo8YnI+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2Jsb2NrcXVvdGU+DQo8ZGl2Pjxi
-cj4NCjwvZGl2Pg0KPGRpdj5KdXN0IHRvIGNvbmZpcm0sIHlvdSB3YW50IHRvIHNoYXJlIGEgZm9s
-ZGVyIHVzaW5nIHZpcnRpb2ZzIHdpdGggYSBWTSwgYW5kIHRoZW4gdGhhdCBWTSBydW5uaW5nIGFz
-IGFuIE5GUyBzZXJ2ZXIgc2hhcmluZyB0aGF0IHNhbWUgZm9sZGVyIG92ZXIgbmZzLCBhbSBJIHJp
-Z2h0PzwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+SWYgdGhhdCBpcyB0aGUgY2FzZSwg
-aXQncyBub3QgcG9zc2libGUgKCopIHRoZSBORlMgc2VydmVyIHJlcXVpcmVzIHBlcnNpc3RlbnQg
-ZmlsZSBoYW5kbGVzIHRoYXQgRlVTRSBkb2VzIG5vdCBzdXBwb3J0LjwvZGl2Pg0KPGRpdj48YnI+
-DQo8L2Rpdj4NCjxkaXY+KCopIEknbSBub3Qgc3VyZSwgYnV0IElJUkMgTWlrbG9zIHNhaWQgaXQg
-Y291bGQgd29yayBpZiB5b3UgZGlzYWJsZSB0aGUgY2FjaGUsIHNvIHlvdSBjYW4gdHJ5IHJ1bm5p
-bmcgdmlydGlvZnNkIHdpdGggYC0tY2FjaGU9bm9uZWAgKGxldCBtZSBrbm93IGlmIHRoYXQgd29y
-aykuPC9kaXY+DQo8ZGl2Pjxicj4NCjwvZGl2Pg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+Jm5i
-c3A7PC9kaXY+DQo8YmxvY2txdW90ZSBjbGFzcz0ieF9nbWFpbF9xdW90ZSIgc3R5bGU9Im1hcmdp
-bjowcHggMHB4IDBweCAwLjhleDsgYm9yZGVyLWxlZnQ6MXB4IHNvbGlkIHJnYigyMDQsMjA0LDIw
-NCk7IHBhZGRpbmctbGVmdDoxZXgiPg0KPGRpdiBjbGFzcz0ieF9tc2ctMTc0NjQ4OTE3MjcyMTg5
-NDAzOCI+DQo8ZGl2IGRpcj0ibHRyIj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OkNhbGlicmks
-SGVsdmV0aWNhLHNhbnMtc2VyaWY7IGZvbnQtc2l6ZToxMnB0OyBjb2xvcjpyZ2IoMCwwLDApIj4N
-CjwvZGl2Pg0KPGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6Q2FsaWJyaSxIZWx2ZXRpY2Esc2Fucy1z
-ZXJpZjsgZm9udC1zaXplOjEycHQ7IGNvbG9yOnJnYigwLDAsMCkiPg0KWW91ciBoZWxwIGlzIGdy
-ZWF0bHkgYXBwcmVjaWF0ZWQuPGJyPg0KPGJyPg0KVGhhbmsgeW91Ljxicj4NCjxicj4NClNpbmNl
-cmVseSw8YnI+DQpFd2VuPGJyPg0KPC9kaXY+DQo8L2Rpdj4NCl9fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fPGJyPg0KVmlydGlvLWZzIG1haWxpbmcgbGlzdDxi
-cj4NCjxhIGhyZWY9Im1haWx0bzpWaXJ0aW8tZnNAcmVkaGF0LmNvbSIgdGFyZ2V0PSJfYmxhbmsi
-PlZpcnRpby1mc0ByZWRoYXQuY29tPC9hPjxicj4NCjxhIGhyZWY9Imh0dHBzOi8vbGlzdG1hbi5y
-ZWRoYXQuY29tL21haWxtYW4vbGlzdGluZm8vdmlydGlvLWZzIiByZWw9Im5vcmVmZXJyZXIiIHRh
-cmdldD0iX2JsYW5rIj5odHRwczovL2xpc3RtYW4ucmVkaGF0LmNvbS9tYWlsbWFuL2xpc3RpbmZv
-L3ZpcnRpby1mczwvYT48YnI+DQo8L2Rpdj4NCjwvYmxvY2txdW90ZT4NCjwvZGl2Pg0KPGJyIGNs
-ZWFyPSJhbGwiPg0KPGJyPg0KPHNwYW4gY2xhc3M9InhfZ21haWxfc2lnbmF0dXJlX3ByZWZpeCI+
-LS0gPC9zcGFuPjxicj4NCjxkaXYgZGlyPSJsdHIiIGNsYXNzPSJ4X2dtYWlsX3NpZ25hdHVyZSI+
-DQo8ZGl2IGRpcj0ibHRyIj5HZXJtYW48YnI+DQo8L2Rpdj4NCjwvZGl2Pg0KPC9kaXY+DQo8L2Rp
-dj4NCjwvYm9keT4NCjwvaHRtbD4NCg==
---_000_SA1P221MB1018D1F87D19E4F29CC7AD98B5459SA1P221MB1018NAMP_--
+I'm following up to confirm if you are interested in acquiring the Mailing =
+List/Distribution List.
+
+*           Florida IT Leadership Forum 2023 (  Tallahassee, USA , 02 Nov 2=
+023 )
+*           1,500+ Contacts
+
+Let me know your thoughts so that I can share the price & more information.
+
+Regards,
+Sawyer- Business Executive
+
+
+--_000_MA0P287MB00926336D36DC0C4F5ED5268AE0DAMA0P287MB0092INDP_
+Content-Type: text/html; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+<html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
+osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
+//www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
+>
+<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered medium)">
+<style><!--
+/* Font Definitions */
+@font-face
+=09{font-family:"Cambria Math";
+=09panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+=09{font-family:Calibri;
+=09panose-1:2 15 5 2 2 2 4 3 2 4;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+=09{margin:0in;
+=09margin-bottom:.0001pt;
+=09font-size:11.0pt;
+=09font-family:"Calibri",sans-serif;}
+a:link, span.MsoHyperlink
+=09{mso-style-priority:99;
+=09color:#0563C1;
+=09text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+=09{mso-style-priority:99;
+=09color:#954F72;
+=09text-decoration:underline;}
+span.EmailStyle17
+=09{mso-style-type:personal-compose;
+=09font-family:"Calibri",sans-serif;
+=09color:windowtext;}
+.MsoChpDefault
+=09{mso-style-type:export-only;
+=09font-family:"Calibri",sans-serif;}
+@page WordSection1
+=09{size:8.5in 11.0in;
+=09margin:1.0in 1.0in 1.0in 1.0in;}
+div.WordSection1
+=09{page:WordSection1;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext=3D"edit">
+<o:idmap v:ext=3D"edit" data=3D"1" />
+</o:shapelayout></xml><![endif]-->
+</head>
+<body lang=3D"EN-US" link=3D"#0563C1" vlink=3D"#954F72">
+<div class=3D"WordSection1">
+<p class=3D"MsoNormal"><span style=3D"color:#002060">Hi Redhat,</span><o:p>=
+</o:p></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060">&nbsp;</span><o:p></o:=
+p></p>
+<p class=3D"MsoNormal"><span style=3D"color:#002060">I&#8217;m following up=
+ to confirm if you are interested in acquiring the
+<span style=3D"background:yellow;mso-highlight:yellow">Mailing List/Distrib=
+ution List.</span></span><o:p></o:p></p>
+<p class=3D"MsoNormal" style=3D"line-height:18.75pt;background:white;vertic=
+al-align:baseline">
+<span style=3D"color:#002060">&nbsp;</span><o:p></o:p></p>
+<p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
+-height:18.75pt;background:white;vertical-align:baseline">
+<span style=3D"font-size:10.0pt;font-family:Symbol;color:black">&middot;</s=
+pan><span style=3D"font-size:7.0pt;font-family:&quot;Times New Roman&quot;,=
+serif;color:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span><span style=3D"color:#002060">&nbsp;&nbsp;<b>Florida IT Leadership F=
+orum 2023 (&nbsp; Tallahassee, USA , 02 Nov 2023
+</b></span><b><span style=3D"font-size:12.0pt;color:#002060;border:none win=
+dowtext 1.0pt;padding:0in">)</span></b><o:p></o:p></p>
+<p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
+-height:18.75pt;background:white;vertical-align:baseline">
+<span style=3D"font-size:10.0pt;font-family:Symbol;color:black">&middot;</s=
+pan><span style=3D"font-size:7.0pt;font-family:&quot;Times New Roman&quot;,=
+serif;color:black">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span><b><span style=3D"font-size:12.0pt;color:#002060;border:none windowt=
+ext 1.0pt;padding:0in">&nbsp;&nbsp;1,500+ Contacts</span></b><o:p></o:p></p=
+>
+<p class=3D"MsoNormal" style=3D"margin-left:50.25pt;text-indent:-.25in;line=
+-height:18.75pt;background:white;vertical-align:baseline">
+<span lang=3D"DA" style=3D"color:black">&nbsp;</span><o:p></o:p></p>
+<p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060">Let me kno=
+w your thoughts so that I can share the
+<span style=3D"background:yellow;mso-highlight:yellow">price &amp; more inf=
+ormation.</span></span><o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class=3D"MsoNormal"><span lang=3D"DA" style=3D"color:#002060">Regards,<b=
+r>
+<b>Sawyer</b>&#8211; Business Executive</span><o:p></o:p></p>
+<p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
+</div>
+</body>
+</html>
+
+--_000_MA0P287MB00926336D36DC0C4F5ED5268AE0DAMA0P287MB0092INDP_--
 

@@ -1,11 +1,11 @@
-Return-Path: <ashlynn@eleadsexpert.live>
-From: Ashlynn Craig <ashlynn@eleadsexpert.live>
-Date: Tue, 8 Aug 2023 23:28:39 +0000
-Message-ID: <PN2P287MB1372EED820CECF6A499A2389B90DA@PN2P287MB1372.INDP287.PROD.OUTLOOK.COM>
+Return-Path: <joelle@eattendleadslist.live>
+From: Joelle Curtis <joelle@eattendleadslist.live>
+Date: Wed, 9 Aug 2023 00:03:34 +0000
+Message-ID: <MA0PR01MB9653660AF10A608D244C167DD112A@MA0PR01MB9653.INDPRD01.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
 Content-Language: en-US
 Content-Type: multipart/alternative;
- boundary="_000_PN2P287MB1372EED820CECF6A499A2389B90DAPN2P287MB1372INDP_"
+ boundary="_000_MA0PR01MB9653660AF10A608D244C167DD112AMA0PR01MB9653INDP_"
 Subject: [Virtio-fs] Redhat
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -17,7 +17,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---_000_PN2P287MB1372EED820CECF6A499A2389B90DAPN2P287MB1372INDP_
+--_000_MA0PR01MB9653660AF10A608D244C167DD112AMA0PR01MB9653INDP_
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -27,16 +27,16 @@ I'm following up to confirm if you are interested in acquiring the Registra=
 nts/Attendees list.
 
 
-  *   Nashville Analytics Summit 2023 (Nashville, USA ,  02 - 03 Oct 2023)
+  *   Michigan Digital Government Summit 2023 (Lansing, USA ,  28 Sep 2023)
   *   Attendees Counts: 1,000+
 
 Awaiting your response, so that I can share the cost & additional details.
 
 Regards,
-Ashlynn- Event Coordinator
+Joelle- Event Coordinator
 
 
---_000_PN2P287MB1372EED820CECF6A499A2389B90DAPN2P287MB1372INDP_
+--_000_MA0PR01MB9653660AF10A608D244C167DD112AMA0PR01MB9653INDP_
 Content-Type: text/html; charset="us-ascii"
 Content-Transfer-Encoding: quoted-printable
 
@@ -188,12 +188,12 @@ n></p>
 <li class=3D"MsoNormal" style=3D"color:#002060;line-height:18.75pt;mso-list=
 :l0 level1 lfo1;background:white;vertical-align:baseline">
 <b><span style=3D"font-size:9.0pt;font-family:&quot;Verdana&quot;,sans-seri=
-f;color:#1F3864">Nashville Analytics Summit 2023 (</span></b><span style=3D=
-"color:windowtext">Nashville, USA
+f;color:#1F3864">Michigan Digital Government Summit 2023 (</span></b><span =
+style=3D"color:windowtext">Lansing, USA
 </span><b><span style=3D"font-size:9.0pt;font-family:&quot;Verdana&quot;,sa=
-ns-serif;color:#1F3864">,&nbsp; 02 - 03 Oct 2023)</span></b><o:p></o:p></li=
-><li class=3D"MsoNormal" style=3D"color:#002060;line-height:18.75pt;mso-lis=
-t:l0 level1 lfo1;background:white;vertical-align:baseline">
+ns-serif;color:#1F3864">,&nbsp; 28 Sep 2023)</span></b><o:p></o:p></li><li =
+class=3D"MsoNormal" style=3D"color:#002060;line-height:18.75pt;mso-list:l0 =
+level1 lfo1;background:white;vertical-align:baseline">
 <b><span style=3D"border:none windowtext 1.0pt;padding:0in">Attendees Count=
 s: 1,000+</span></b><o:p></o:p></li></ul>
 <p class=3D"MsoNormal" style=3D"margin-left:.25in;line-height:18.75pt;backg=
@@ -207,13 +207,12 @@ l details.</span><o:p></o:p></span></p>
 n></p>
 <p class=3D"MsoNormal"><span style=3D"color:#002060">Regards,<o:p></o:p></s=
 pan></p>
-<p class=3D"MsoNormal"><b><span style=3D"color:#002060">Ashlynn</span></b><=
-span style=3D"color:#002060">&#8211; Event Coordinator</span><o:p></o:p></p=
->
+<p class=3D"MsoNormal"><b><span style=3D"color:#002060">Joelle</span></b><s=
+pan style=3D"color:#002060">&#8211; Event Coordinator</span><o:p></o:p></p>
 <p class=3D"MsoNormal"><o:p>&nbsp;</o:p></p>
 </div>
 </body>
 </html>
 
---_000_PN2P287MB1372EED820CECF6A499A2389B90DAPN2P287MB1372INDP_--
+--_000_MA0PR01MB9653660AF10A608D244C167DD112AMA0PR01MB9653INDP_--
 

@@ -1,23 +1,15 @@
-Return-Path: <erik.schilling@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1693383604; x=1693988404; darn=redhat.com;
- h=message-id:from:to:cc:subject:date:content-transfer-encoding
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=z6VGj+d59SoWScxEJA9LEHL+NP9IQEEXMEE3Jz1KTmE=;
- b=UnE4jp1uY8OoQ9JrPZOJSiyq7xJsvUG/sjE768Jx5oDG+SsYZDl9ElQXpFn8NA/O12
- iBfDEVum8b1TQZJlvZthey7cBzktb0jvIs1cQZ3MW4Pc6ObjXIjODqzhECYz/lQvpgrM
- j8ztVmhOO7IB4C2Rzo46lYu7h6GANyL3jMgbgz6jhmb7jELsd4fD/5CHcaobbU/XHgq3
- CN1cf8ivzrvNySV4/R1UFrAW/ctGZ78PXHY+w/eZEMw6Z/8lXT8eiTwOvg0soomFgkJ/
- Uk3NzTM/Habxg5V8MLliSAc/Jx1eIj7MiP6lvXIfZ2iIbtu7yIDiGCOtGFRUDGkqRupg
- etKw==
-Mime-Version: 1.0
-Date: Wed, 30 Aug 2023 10:20:02 +0200
-From: "Erik Schilling" <erik.schilling@linaro.org>
-Message-Id: <CV5Q388ZKSI3.2N5DT3BRV3RIM@fedora>
-Content-Transfer-Encoding: quoted-printable
-Content-Type: text/plain; charset=UTF-8
-Subject: [Virtio-fs] [BUG] virtio-fs: Corruption when running binaries from
- virtiofsd-backed fs
+Return-Path: <aesteve@redhat.com>
+MIME-Version: 1.0
+References: <20230710153522.3469097-1-alex.bennee@linaro.org>
+ <20230710153522.3469097-11-alex.bennee@linaro.org>
+ <20230710155653-mutt-send-email-mst@kernel.org>
+In-Reply-To: <20230710155653-mutt-send-email-mst@kernel.org>
+From: Albert Esteve <aesteve@redhat.com>
+Date: Thu, 31 Aug 2023 16:23:29 +0200
+Message-ID: <CADSE00KvkezAHR_BGGwV5MT-KstLaZzMGM+gxpfm+91aqdRwmg@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="0000000000006c62e5060438ca4c"
+Subject: Re: [Virtio-fs] [PATCH v3 10/20] hw/virtio: add config support to
+ vhost-user-device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,215 +18,396 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtualization@lists.linux-foundation.org, linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
-Cc: Vivek Goyal <vgoyal@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, =?utf-8?q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>, Manos
- Pitsidianakis <manos.pitsidianakis@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, linux-kernel@vger.kernel.org
+To: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, qemu-devel@nongnu.org, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
-Hi all!
+--0000000000006c62e5060438ca4c
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Some days ago I posted to #virtiofs:matrix.org, describing that I am
-observing what looks like a corruption when executing programs from a
-virtiofs-based filesystem.
+Sorry to bring up this post, it's been a while since you posted.
+But I have been testing the patch the last couple of days.
 
-Over the last few days I spent more time drilling into the problem.
-This is an attempt at summarizing my findings in order to see what other
-people think about this.
+On Mon, Jul 10, 2023 at 9:58=E2=80=AFPM Michael S. Tsirkin <mst@redhat.com>=
+ wrote:
 
-When running binaries mounted from virtiofs they may either: fail with a
-segfault, fail with badaddr, get stuck or - sometimes - succeed.
+> On Mon, Jul 10, 2023 at 04:35:12PM +0100, Alex Benn=C3=A9e wrote:
+> > To use the generic device the user will need to provide the config
+> > region size via the command line. We also add a notifier so the guest
+> > can be pinged if the remote daemon updates the config.
+> >
+> > With these changes:
+> >
+> >   -device vhost-user-device-pci,virtio-id=3D41,num_vqs=3D2,config_size=
+=3D8
+> >
+> > is equivalent to:
+> >
+> >   -device vhost-user-gpio-pci
+> >
+> > Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+>
+>
+> This one I think it's best to defer until we get a better
+> handle on how we want the configuration to look.
+>
+>
+> > ---
+> >  include/hw/virtio/vhost-user-device.h |  1 +
+> >  hw/virtio/vhost-user-device.c         | 58 ++++++++++++++++++++++++++-
+> >  2 files changed, 58 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/include/hw/virtio/vhost-user-device.h
+> b/include/hw/virtio/vhost-user-device.h
+> > index 9105011e25..3ddf88a146 100644
+> > --- a/include/hw/virtio/vhost-user-device.h
+> > +++ b/include/hw/virtio/vhost-user-device.h
+> > @@ -22,6 +22,7 @@ struct VHostUserBase {
+> >      CharBackend chardev;
+> >      uint16_t virtio_id;
+> >      uint32_t num_vqs;
+> > +    uint32_t config_size;
+> >      /* State tracking */
+> >      VhostUserState vhost_user;
+> >      struct vhost_virtqueue *vhost_vq;
+> > diff --git a/hw/virtio/vhost-user-device.c
+> b/hw/virtio/vhost-user-device.c
+> > index b0239fa033..2b028cae08 100644
+> > --- a/hw/virtio/vhost-user-device.c
+> > +++ b/hw/virtio/vhost-user-device.c
+> > @@ -117,6 +117,42 @@ static uint64_t vub_get_features(VirtIODevice *vde=
+v,
+> >      return vub->vhost_dev.features & ~(1ULL <<
+> VHOST_USER_F_PROTOCOL_FEATURES);
+> >  }
+> >
+> > +/*
+> > + * To handle VirtIO config we need to know the size of the config
+> > + * space. We don't cache the config but re-fetch it from the guest
+> > + * every time in case something has changed.
+> > + */
+> > +static void vub_get_config(VirtIODevice *vdev, uint8_t *config)
+> > +{
+> > +    VHostUserBase *vub =3D VHOST_USER_BASE(vdev);
+> > +    Error *local_err =3D NULL;
+> > +
+> > +    /*
+> > +     * There will have been a warning during vhost_dev_init, but lets
+> > +     * assert here as nothing will go right now.
+> > +     */
+> > +    g_assert(vub->config_size && vub->vhost_user.supports_config =3D=
+=3D
+> true);
+> > +
+> > +    if (vhost_dev_get_config(&vub->vhost_dev, config,
+> > +                             vub->config_size, &local_err)) {
+> > +        error_report_err(local_err);
+> > +    }
+> > +}
+> > +
+> > +/*
+> > + * When the daemon signals an update to the config we just need to
+> > + * signal the guest as we re-read the config on demand above.
+> > + */
+> > +static int vub_config_notifier(struct vhost_dev *dev)
+> > +{
+> > +    virtio_notify_config(dev->vdev);
+> > +    return 0;
+> > +}
+> > +
+> > +const VhostDevConfigOps vub_config_ops =3D {
+> > +    .vhost_dev_config_notifier =3D vub_config_notifier,
+> > +};
+> > +
+> >  static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+> >  {
+> >      /*
+> > @@ -141,12 +177,21 @@ static int vub_connect(DeviceState *dev)
+> >  {
+> >      VirtIODevice *vdev =3D VIRTIO_DEVICE(dev);
+> >      VHostUserBase *vub =3D VHOST_USER_BASE(vdev);
+> > +    struct vhost_dev *vhost_dev =3D &vub->vhost_dev;
+> >
+> >      if (vub->connected) {
+> >          return 0;
+> >      }
+> >      vub->connected =3D true;
+> >
+> > +    /*
+> > +     * If we support VHOST_USER_GET_CONFIG we must enable the notifier
+> > +     * so we can ping the guest when it updates.
+> > +     */
+> > +    if (vub->vhost_user.supports_config) {
+> > +        vhost_dev_set_config_notifier(vhost_dev, &vub_config_ops);
+> > +    }
+> > +
+> >      /* restore vhost state */
+> >      if (virtio_device_started(vdev, vdev->status)) {
+> >          vub_start(vdev);
+> > @@ -214,11 +259,20 @@ static void vub_device_realize(DeviceState *dev,
+> Error **errp)
+> >          vub->num_vqs =3D 1; /* reasonable default? */
+> >      }
+> >
+> > +    /*
+> > +     * We can't handle config requests unless we know the size of the
+> > +     * config region, specialisations of the vhost-user-device will be
+> > +     * able to set this.
+> > +     */
+> > +    if (vub->config_size) {
+> > +        vub->vhost_user.supports_config =3D true;
+> > +    }
+>
 
-Environment:
-  Host: Fedora 38 running 6.4.11-200.fc38.x86_64
-  Guest: Yocto-based image: 6.4.9-yocto-standard, aarch64
-  virtiofsd: latest main + some debug prints [1]
-  QEMU: built from recent git [2]
-
-virtiofsd invocation:
-  RUST_LOG=3D"debug" ./virtiofsd --seccomp=3Dnone --sandbox=3Dnone \
-    --socket-path "fs.sock0" --shared-dir $PWD/share-dir/ --cache=3Dnever
-
-QEMU invocation:
-  ~/projects/qemu/build/qemu-system-aarch64 -kernel Image -machine virt \
-    -cpu cortex-a57 \
-    -serial mon:stdio \
-    -device virtio-net-pci,netdev=3Dnet0 \
-    -netdev user,id=3Dnet0,hostfwd=3Dtcp::2223-:22 \
-    -display none -m 2048 -smp 4 \
-    -object memory-backend-memfd,id=3Dmem,size=3D2048M,share=3Don \
-    -numa node,memdev=3Dmem \
-    -hda trs-overlay-guest.qcow2 \
-    -chardev socket,id=3Dchar0,path=3D"fs.sock0" \
-    -device vhost-user-fs-pci,queue-size=3D1024,chardev=3Dchar0,tag=3D/dev/=
-root \
-    -append 'root=3D/dev/vda2 ro log_buf_len=3D8M'
-
-I figured that launching virtiofsd with --cache=3Dalways masks the
-problem. Therefore, I set --cache=3Dnever, but I think I observed no
-difference compared to the default setting (auto).
-
-Adding logging to virtiofsd and kernel _feeled_ like it made the problem
-harder to reproduce - leaving me with the impression that some race is
-happening on somewhere.
-
-Trying to rule out that virtiofsd is returning corrupted data, I added
-some logging and hashsum calculation hacks to it [1]. The hashes check
-out across multiple accesses and the order and kind of queued messages
-is exactly the same in both the error case and crash case. fio was also
-unable to find any errors with a naive job description [3].
-
-Next, I tried to capture info on the guest side. This became a bit
-tricky since the crashes became pretty rare once I followed a fixed
-pattern of starting log capture, running perf and trying to reproduce
-the problem. Ultimately, I had the most consistent results with
-immediately running a program twice:
-
-  /mnt/ld-linux-aarch64.so.1 /mnt/ls.coreutils /; \
-    /mnt/ld-linux-aarch64.so.1 /mnt/ls.coreutils /
-
-  (/mnt being the virtiofs mount)
-
-For collecting logs, I made a hack to the guest kernel in order to dump
-the page content after receiving the virtiofs responses [4]. Reproducing
-the problem with this, leaves me with logs that seem to suggest that
-virtiofsd is returning identical content, but the guest kernel seems to
-receive differing pages:
-
-good-kernel [5]:
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 3 unique 0x312 nodeid 0=
-x1 in.len 56 out.len 104
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 1 unique 0x314 nodeid 0=
-x1 in.len 53 out.len 128
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 3 unique 0x316 nodeid 0=
-x29 in.len 56 out.len 104
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 14 unique 0x318 nodeid =
-0x29 in.len 48 out.len 16
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 15 unique 0x31a nodeid =
-0x29 in.len 80 out.len 832
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs: page: 000000006996d520
-  kernel: virtio_fs: to: 00000000de590c14
-  kernel: virtio_fs rsp:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ..=
-..............
-  kernel: virtio_fs rsp:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ..=
-..............
-  kernel: virtio_fs rsp:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ..=
-..............
-  kernel: virtio_fs rsp:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ..=
-..............
-  [...]
-
-bad-kernel [6]:
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 3 unique 0x162 nodeid 0=
-x1 in.len 56 out.len 104
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 1 unique 0x164 nodeid 0=
-x1 in.len 53 out.len 128
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 3 unique 0x166 nodeid 0=
-x16 in.len 56 out.len 104
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 14 unique 0x168 nodeid =
-0x16 in.len 48 out.len 16
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs_wake_pending_and_unlock: opcode 15 unique 0x16a nodeid =
-0x16 in.len 80 out.len 832
-  kernel: virtiofs virtio1: virtio_fs_vq_done requests.0
-  kernel: virtio_fs: page: 000000006ce9a559
-  kernel: virtio_fs: to: 000000007ae8b946
-  kernel: virtio_fs rsp:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ..=
-..............
-  kernel: virtio_fs rsp:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ..=
-..............
-  kernel: virtio_fs rsp:80 40 de c8 ff ff 00 00 cc 2b 62 ae ff ff 00 00  .@=
-.......+b.....
-  kernel: virtio_fs rsp:02 4e de c8 ff ff 00 00 00 00 00 00 00 00 00 00  .N=
-..............
-  [...]
-
-When looking at the corresponding output from virtiofsd, it claims to
-have returned identical data:
-
-good-virtiofsd [7]:
-  [DEBUG virtiofsd::server] Received request: opcode=3DRead (15), inode=3D4=
-1, unique=3D794, pid=3D481
-  [src/server.rs:618] r.read_obj().map_err(Error::DecodeMessage)? =3D ReadI=
-n {
-      fh: 31,
-      offset: 0,
-      size: 832,
-      read_flags: 2,
-      lock_owner: 6838554705639967244,
-      flags: 131072,
-      padding: 0,
-  }
-  [src/file_traits.rs:161] hash =3D 2308490450751364994
-  [DEBUG virtiofsd::server] Replying OK, header: OutHeader { len: 848, erro=
-r: 0, unique: 794 }
-
-bad-virtiofsd [8]:
-  [DEBUG virtiofsd::server] Received request: opcode=3DRead (15), inode=3D2=
-2, unique=3D362, pid=3D406
-  [src/server.rs:618] r.read_obj().map_err(Error::DecodeMessage)? =3D ReadI=
-n {
-      fh: 12,
-      offset: 0,
-      size: 832,
-      read_flags: 2,
-      lock_owner: 6181120926258395554,
-      flags: 131072,
-      padding: 0,
-  }
-  [src/file_traits.rs:161] hash =3D 2308490450751364994
-  [DEBUG virtiofsd::server] Replying OK, header: OutHeader { len: 848, erro=
-r: 0, unique: 362 }
-
-The "corruption" only seems to happen in this one page, all other pages
-are identical between runs (except that the bad run terminates earlier).
-
-What do the experts think here? To me it feels a bit like some kind of
-corruption is going on. Or am I misinterpreting things here?
-
-Which further analysis steps would you suggest?
+Shouldn't the `supports_config =3D true' be set before we
+call vhost_dev_init() a few lines above?
+Otherwise, we end up checking the `supports_config` attribute from within
+`vhost_user_backend_init()` (in vhost_user source file)
+before the VhostUserState is set, causing this warning to pop if the
+backend supports the CONFIG feature:
+```
+qemu-system-x86_64: warning: vhost-user backend supports
+VHOST_USER_PROTOCOL_F_CONFIG but QEMU does not.
+```
 
 
-Further notes:
+> > +
+> >      if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
+> >          return;
+> >      }
+> >
+> > -    virtio_init(vdev, vub->virtio_id, 0);
+> > +    virtio_init(vdev, vub->virtio_id, vub->config_size);
+> >
+> >      /*
+> >       * Disable guest notifiers, by default all notifications will be
+> via the
+> > @@ -268,6 +322,7 @@ static void vub_class_init(ObjectClass *klass, void
+> *data)
+> >      vdc->realize =3D vub_device_realize;
+> >      vdc->unrealize =3D vub_device_unrealize;
+> >      vdc->get_features =3D vub_get_features;
+> > +    vdc->get_config =3D vub_get_config;
+> >      vdc->set_status =3D vub_set_status;
+> >  }
+> >
+> > @@ -295,6 +350,7 @@ static Property vud_properties[] =3D {
+> >      DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+> >      DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
+> >      DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
+> > +    DEFINE_PROP_UINT32("config_size", VHostUserBase, config_size, 0),
+> >      DEFINE_PROP_END_OF_LIST(),
+> >  };
+> >
+> > --
+> > 2.39.2
+>
+>
+>
 
-After collecting the above results, I realized that running the guest
-with -smp 1 makes the problems a lot worse. So maybe that is a better
-choice when trying to reproduce it.
+--0000000000006c62e5060438ca4c
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Repo with my scripts is available at:
-https://git.codelinaro.org/erik_schilling/jira-orko-65-bootstrap-k3s-config=
-/
+<div dir=3D"ltr"><div dir=3D"ltr"><div><div dir=3D"ltr" class=3D"gmail_sign=
+ature"><div dir=3D"ltr">Sorry to bring up this post, it&#39;s been a while =
+since you posted.<br></div></div></div><div>But I have been testing the=C2=
+=A0patch the last couple of days.</div></div><br><div class=3D"gmail_quote"=
+><div dir=3D"ltr" class=3D"gmail_attr">On Mon, Jul 10, 2023 at 9:58=E2=80=
+=AFPM Michael S. Tsirkin &lt;<a href=3D"mailto:mst@redhat.com">mst@redhat.c=
+om</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margi=
+n:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex=
+">On Mon, Jul 10, 2023 at 04:35:12PM +0100, Alex Benn=C3=A9e wrote:<br>
+&gt; To use the generic device the user will need to provide the config<br>
+&gt; region size via the command line. We also add a notifier so the guest<=
+br>
+&gt; can be pinged if the remote daemon updates the config.<br>
+&gt; <br>
+&gt; With these changes:<br>
+&gt; <br>
+&gt;=C2=A0 =C2=A0-device vhost-user-device-pci,virtio-id=3D41,num_vqs=3D2,c=
+onfig_size=3D8<br>
+&gt; <br>
+&gt; is equivalent to:<br>
+&gt; <br>
+&gt;=C2=A0 =C2=A0-device vhost-user-gpio-pci<br>
+&gt; <br>
+&gt; Signed-off-by: Alex Benn=C3=A9e &lt;<a href=3D"mailto:alex.bennee@lina=
+ro.org" target=3D"_blank">alex.bennee@linaro.org</a>&gt;<br>
+<br>
+<br>
+This one I think it&#39;s best to defer until we get a better<br>
+handle on how we want the configuration to look.<br>
+<br>
+<br>
+&gt; ---<br>
+&gt;=C2=A0 include/hw/virtio/vhost-user-device.h |=C2=A0 1 +<br>
+&gt;=C2=A0 hw/virtio/vhost-user-device.c=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0|=
+ 58 ++++++++++++++++++++++++++-<br>
+&gt;=C2=A0 2 files changed, 58 insertions(+), 1 deletion(-)<br>
+&gt; <br>
+&gt; diff --git a/include/hw/virtio/vhost-user-device.h b/include/hw/virtio=
+/vhost-user-device.h<br>
+&gt; index 9105011e25..3ddf88a146 100644<br>
+&gt; --- a/include/hw/virtio/vhost-user-device.h<br>
+&gt; +++ b/include/hw/virtio/vhost-user-device.h<br>
+&gt; @@ -22,6 +22,7 @@ struct VHostUserBase {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 CharBackend chardev;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 uint16_t virtio_id;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 uint32_t num_vqs;<br>
+&gt; +=C2=A0 =C2=A0 uint32_t config_size;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 /* State tracking */<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 VhostUserState vhost_user;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 struct vhost_virtqueue *vhost_vq;<br>
+&gt; diff --git a/hw/virtio/vhost-user-device.c b/hw/virtio/vhost-user-devi=
+ce.c<br>
+&gt; index b0239fa033..2b028cae08 100644<br>
+&gt; --- a/hw/virtio/vhost-user-device.c<br>
+&gt; +++ b/hw/virtio/vhost-user-device.c<br>
+&gt; @@ -117,6 +117,42 @@ static uint64_t vub_get_features(VirtIODevice *vd=
+ev,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 return vub-&gt;vhost_dev.features &amp; ~(1ULL &lt=
+;&lt; VHOST_USER_F_PROTOCOL_FEATURES);<br>
+&gt;=C2=A0 }<br>
+&gt;=C2=A0 <br>
+&gt; +/*<br>
+&gt; + * To handle VirtIO config we need to know the size of the config<br>
+&gt; + * space. We don&#39;t cache the config but re-fetch it from the gues=
+t<br>
+&gt; + * every time in case something has changed.<br>
+&gt; + */<br>
+&gt; +static void vub_get_config(VirtIODevice *vdev, uint8_t *config)<br>
+&gt; +{<br>
+&gt; +=C2=A0 =C2=A0 VHostUserBase *vub =3D VHOST_USER_BASE(vdev);<br>
+&gt; +=C2=A0 =C2=A0 Error *local_err =3D NULL;<br>
+&gt; +<br>
+&gt; +=C2=A0 =C2=A0 /*<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0* There will have been a warning during vhost_dev=
+_init, but lets<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0* assert here as nothing will go right now.<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0*/<br>
+&gt; +=C2=A0 =C2=A0 g_assert(vub-&gt;config_size &amp;&amp; vub-&gt;vhost_u=
+ser.supports_config =3D=3D true);<br>
+&gt; +<br>
+&gt; +=C2=A0 =C2=A0 if (vhost_dev_get_config(&amp;vub-&gt;vhost_dev, config=
+,<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0=
+ =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0vub-&gt;config_size, &amp;local_err)) {<=
+br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0 error_report_err(local_err);<br>
+&gt; +=C2=A0 =C2=A0 }<br>
+&gt; +}<br>
+&gt; +<br>
+&gt; +/*<br>
+&gt; + * When the daemon signals an update to the config we just need to<br=
+>
+&gt; + * signal the guest as we re-read the config on demand above.<br>
+&gt; + */<br>
+&gt; +static int vub_config_notifier(struct vhost_dev *dev)<br>
+&gt; +{<br>
+&gt; +=C2=A0 =C2=A0 virtio_notify_config(dev-&gt;vdev);<br>
+&gt; +=C2=A0 =C2=A0 return 0;<br>
+&gt; +}<br>
+&gt; +<br>
+&gt; +const VhostDevConfigOps vub_config_ops =3D {<br>
+&gt; +=C2=A0 =C2=A0 .vhost_dev_config_notifier =3D vub_config_notifier,<br>
+&gt; +};<br>
+&gt; +<br>
+&gt;=C2=A0 static void vub_handle_output(VirtIODevice *vdev, VirtQueue *vq)=
+<br>
+&gt;=C2=A0 {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 /*<br>
+&gt; @@ -141,12 +177,21 @@ static int vub_connect(DeviceState *dev)<br>
+&gt;=C2=A0 {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 VirtIODevice *vdev =3D VIRTIO_DEVICE(dev);<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 VHostUserBase *vub =3D VHOST_USER_BASE(vdev);<br>
+&gt; +=C2=A0 =C2=A0 struct vhost_dev *vhost_dev =3D &amp;vub-&gt;vhost_dev;=
+<br>
+&gt;=C2=A0 <br>
+&gt;=C2=A0 =C2=A0 =C2=A0 if (vub-&gt;connected) {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 return 0;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 }<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 vub-&gt;connected =3D true;<br>
+&gt;=C2=A0 <br>
+&gt; +=C2=A0 =C2=A0 /*<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0* If we support VHOST_USER_GET_CONFIG we must ena=
+ble the notifier<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0* so we can ping the guest when it updates.<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0*/<br>
+&gt; +=C2=A0 =C2=A0 if (vub-&gt;vhost_user.supports_config) {<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0 vhost_dev_set_config_notifier(vhost_dev, =
+&amp;vub_config_ops);<br>
+&gt; +=C2=A0 =C2=A0 }<br>
+&gt; +<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 /* restore vhost state */<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 if (virtio_device_started(vdev, vdev-&gt;status)) =
+{<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 vub_start(vdev);<br>
+&gt; @@ -214,11 +259,20 @@ static void vub_device_realize(DeviceState *dev,=
+ Error **errp)<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 vub-&gt;num_vqs =3D 1; /* reasonable=
+ default? */<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 }<br>
+&gt;=C2=A0 <br>
+&gt; +=C2=A0 =C2=A0 /*<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0* We can&#39;t handle config requests unless we k=
+now the size of the<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0* config region, specialisations of the vhost-use=
+r-device will be<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0* able to set this.<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0*/<br>
+&gt; +=C2=A0 =C2=A0 if (vub-&gt;config_size) {<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0 vub-&gt;vhost_user.supports_config =3D tr=
+ue;<br>
+&gt; +=C2=A0 =C2=A0 }<br></blockquote><div><br></div><div>Shouldn&#39;t the=
+ `supports_config =3D true&#39; be set before we call=C2=A0vhost_dev_init()=
+ a few lines above?</div><div>Otherwise, we end up checking the `supports_c=
+onfig` attribute from within `vhost_user_backend_init()` (in vhost_user sou=
+rce file)</div><div>before the VhostUserState is set, causing this warning =
+to pop if the backend supports the CONFIG feature:</div><div>```<br></div><=
+div>qemu-system-x86_64: warning: vhost-user backend supports VHOST_USER_PRO=
+TOCOL_F_CONFIG but QEMU does not.<br></div><div>```</div><div>=C2=A0</div><=
+blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-l=
+eft:1px solid rgb(204,204,204);padding-left:1ex">
+&gt; +<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 if (!vhost_user_init(&amp;vub-&gt;vhost_user, &amp=
+;vub-&gt;chardev, errp)) {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 return;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 }<br>
+&gt;=C2=A0 <br>
+&gt; -=C2=A0 =C2=A0 virtio_init(vdev, vub-&gt;virtio_id, 0);<br>
+&gt; +=C2=A0 =C2=A0 virtio_init(vdev, vub-&gt;virtio_id, vub-&gt;config_siz=
+e);<br>
+&gt;=C2=A0 <br>
+&gt;=C2=A0 =C2=A0 =C2=A0 /*<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0* Disable guest notifiers, by default all no=
+tifications will be via the<br>
+&gt; @@ -268,6 +322,7 @@ static void vub_class_init(ObjectClass *klass, voi=
+d *data)<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 vdc-&gt;realize =3D vub_device_realize;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 vdc-&gt;unrealize =3D vub_device_unrealize;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 vdc-&gt;get_features =3D vub_get_features;<br>
+&gt; +=C2=A0 =C2=A0 vdc-&gt;get_config =3D vub_get_config;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 vdc-&gt;set_status =3D vub_set_status;<br>
+&gt;=C2=A0 }<br>
+&gt;=C2=A0 <br>
+&gt; @@ -295,6 +350,7 @@ static Property vud_properties[] =3D {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 DEFINE_PROP_CHR(&quot;chardev&quot;, VHostUserBase=
+, chardev),<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 DEFINE_PROP_UINT16(&quot;virtio-id&quot;, VHostUse=
+rBase, virtio_id, 0),<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 DEFINE_PROP_UINT32(&quot;num_vqs&quot;, VHostUserB=
+ase, num_vqs, 1),<br>
+&gt; +=C2=A0 =C2=A0 DEFINE_PROP_UINT32(&quot;config_size&quot;, VHostUserBa=
+se, config_size, 0),<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 DEFINE_PROP_END_OF_LIST(),<br>
+&gt;=C2=A0 };<br>
+&gt;=C2=A0 <br>
+&gt; -- <br>
+&gt; 2.39.2<br>
+<br>
+<br>
+</blockquote></div></div>
 
-The scripts are just quick and dirty implementations and are not
-particulary portable.
-
-- Erik
-
-[1] https://gitlab.com/ablu/virtiofsd/-/commit/18fd0c1849e15bc55fbdd6e1f169=
-801b2b03da1f
-[2] https://gitlab.com/qemu-project/qemu/-/commit/50e7a40af372ee5931c99ef73=
-90f5d3d6fbf6ec4
-[3] https://git.codelinaro.org/erik_schilling/jira-orko-65-bootstrap-k3s-co=
-nfig/-/blob/397a6310dea35973025e3d61f46090bf0c092762/share-dir/write-and-ve=
-rify-mmap.fio
-[4] https://github.com/Ablu/linux/commit/3880b9f8affb01aeabb0a04fe76ad7701d=
-c0bb95
-[5] Line 12923: https://git.codelinaro.org/erik_schilling/jira-orko-65-boot=
-strap-k3s-config/-/blob/main/logs/2023-08-29%2013%3A42%3A35%2B02%3A00/good-=
-drop-bad-1.txt
-[6] Line 12923: https://git.codelinaro.org/erik_schilling/jira-orko-65-boot=
-strap-k3s-config/-/blob/main/logs/2023-08-29%2013%3A42%3A35%2B02%3A00/good-=
-bad-1.txt
-[7] https://git.codelinaro.org/erik_schilling/jira-orko-65-bootstrap-k3s-co=
-nfig/-/blob/main/logs/2023-08-29%2013%3A42%3A35%2B02%3A00/virtiofsd.txt#L25=
-38-2549
-[8] https://git.codelinaro.org/erik_schilling/jira-orko-65-bootstrap-k3s-co=
-nfig/-/blob/main/logs/2023-08-29%2013%3A42%3A35%2B02%3A00/virtiofsd.txt#L10=
-52-1063
+--0000000000006c62e5060438ca4c--
 

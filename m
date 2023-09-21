@@ -1,27 +1,26 @@
 Return-Path: <akihiko.odaki@daynix.com>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=daynix-com.20230601.gappssmtp.com; s=20230601; t=1695282895; x=1695887695;
+ d=daynix-com.20230601.gappssmtp.com; s=20230601; t=1695282884; x=1695887684;
  darn=redhat.com; 
  h=content-transfer-encoding:mime-version:references:in-reply-to
  :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=jlU7vc1UjVKlw3Dv2jSmgf2SIHJeXqpTwAZU3tpQIrQ=;
- b=DDeZLOAe99d1Z9BUtob/J0n9I5Vuljxrx4pwaCG2CkbAZV/g9bXrMFKvqwFNfbxGFr
- //S86ZhZeKTaHOSkPH0mtFnfMBzIPVq2DeR89dyV0fQ8Ny6KnZbEMCLAcAXQFfXOKDj+
- mIJEDJkEFG26+jasP1TxEKsFSE8YHTASTyNC1Hh1WX4Q8JfsXJGkQsVnRpEb/kAplok1
- Uy6Pq+FhlFF6rT07eJSa/CrpA1nWf5fcHrMcERGreGg/3NrpcfNu3sOj2mIuSYQiMFdf
- 5kcQgVlKbm4wLhYde5Bkdd/1m/WTbUdG5R1/rgkxfo3xwqqonu4m3K5Y3PyOws0v5sgA
- WI1w==
+ bh=uI/Kp4K+XtqHxtYAeT48aX1q/ar4g9aCgFPx0CsLxbY=;
+ b=Wo289pXVt4YOyk2KN3P1K0ctD9phfFnyCSZw4nJCZoazmlBKUtIeFxSXZs+xY8QZRa
+ QlgBP2l1rQ4HHpGTlYXjOoJwc2sO29U5b9eTbDfTjjiKp4p/62vkLk3+W1r8SyXqyTLJ
+ VBIpKFPPqhHOy/EE8D17gwizPLx3Ngrzka6JIOBUr6G87JKOrg5RcNkRMRECQnYhdQyy
+ W81T4wdKw4BS3qJgzdkbZESsrGgYXJYpij4A2jGadur0kMIR6M0/x8TyYvAhhK5YZw88
+ HU4NBgLHMn/7XsaTvkio8rMCXLyYmelQe71BumxC3ABX3eCKK8gj+iRZa/XkIZpvV/n0
+ 38Vw==
 From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 21 Sep 2023 16:54:17 +0900
-Message-ID: <20230921075425.16738-4-akihiko.odaki@daynix.com>
+Date: Thu, 21 Sep 2023 16:54:15 +0900
+Message-ID: <20230921075425.16738-2-akihiko.odaki@daynix.com>
 In-Reply-To: <20230921075425.16738-1-akihiko.odaki@daynix.com>
 References: <20230921075425.16738-1-akihiko.odaki@daynix.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH v3 3/8] contrib/rdmacm-mux: Use
- qemu_get_runtime_dir()
+Subject: [Virtio-fs] [PATCH v3 1/8] util: Introduce qemu_get_runtime_dir()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,110 +31,135 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr . David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-qemu_get_runtime_dir() is used to construct the default Unix socket
-path.
+qemu_get_runtime_dir() returns a dynamically allocated directory path
+that is appropriate for storing runtime files. It corresponds to "run"
+directory in Unix.
+
+With a tree-wide search, it was found that there are several cases
+where such a functionality is implemented so let's have one as a common
+utlity function.
+
+A notable feature of qemu_get_runtime_dir() is that it uses
+$XDG_RUNTIME_DIR if available. While the function is often called by
+executables which requires root privileges, it is still possible that
+they are called from a user without privilege to write the system
+runtime directory. In fact, I decided to write this patch when I ran
+virtiofsd in a Linux namespace created by a normal user and realized
+it tries to write the system runtime directory, not writable in this
+case. $XDG_RUNTIME_DIR should provide a writable directory in such
+cases.
+
+This function does not use qemu_get_local_state_dir() or its logic
+for Windows. Actually the implementation of qemu_get_local_state_dir()
+for Windows seems not right as it calls g_get_system_data_dirs(),
+which refers to $XDG_DATA_DIRS. In Unix terminology, it is basically
+"/usr/share", not "/var", which qemu_get_local_state_dir() is intended
+to provide. Instead, this function try to use the following in order:
+- $XDG_RUNTIME_DIR
+- LocalAppData folder
+- get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR "/run")
+
+This function does not use g_get_user_runtime_dir() either as it
+falls back to g_get_user_cache_dir() when $XDG_DATA_DIRS is not
+available. In the case, we rather use:
+get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR "/run")
 
 Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
 ---
- contrib/rdmacm-mux/main.c      | 22 ++++++++++++++--------
- contrib/rdmacm-mux/meson.build |  2 +-
- 2 files changed, 15 insertions(+), 9 deletions(-)
+ include/qemu/osdep.h | 12 ++++++++++++
+ util/oslib-posix.c   | 11 +++++++++++
+ util/oslib-win32.c   | 26 ++++++++++++++++++++++++++
+ 3 files changed, 49 insertions(+)
 
-diff --git a/contrib/rdmacm-mux/main.c b/contrib/rdmacm-mux/main.c
-index 771ca01e03..00c14031ca 100644
---- a/contrib/rdmacm-mux/main.c
-+++ b/contrib/rdmacm-mux/main.c
-@@ -14,6 +14,7 @@
+diff --git a/include/qemu/osdep.h b/include/qemu/osdep.h
+index 2897720fac..bb857c910f 100644
+--- a/include/qemu/osdep.h
++++ b/include/qemu/osdep.h
+@@ -636,6 +636,18 @@ void qemu_set_cloexec(int fd);
+  */
+ char *qemu_get_local_state_dir(void);
+ 
++/**
++ * qemu_get_runtime_dir:
++ *
++ * Return a dynamically allocated directory path that is appropriate for storing
++ * runtime files. It corresponds to "run" directory in Unix, and uses
++ * $XDG_RUNTIME_DIR if available.
++ *
++ * The caller is responsible for releasing the value returned with g_free()
++ * after use.
++ */
++char *qemu_get_runtime_dir(void);
++
+ /**
+  * qemu_getauxval:
+  * @type: the auxiliary vector key to lookup
+diff --git a/util/oslib-posix.c b/util/oslib-posix.c
+index e86fd64e09..0c82717be5 100644
+--- a/util/oslib-posix.c
++++ b/util/oslib-posix.c
+@@ -273,6 +273,17 @@ qemu_get_local_state_dir(void)
+     return get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR);
+ }
+ 
++char *
++qemu_get_runtime_dir(void)
++{
++    char *env = getenv("XDG_RUNTIME_DIR");
++    if (env) {
++        return g_strdup(env);
++    }
++
++    return get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR "/run");
++}
++
+ void qemu_set_tty_echo(int fd, bool echo)
+ {
+     struct termios tty;
+diff --git a/util/oslib-win32.c b/util/oslib-win32.c
+index 19a0ea7fbe..38df7b57b5 100644
+--- a/util/oslib-win32.c
++++ b/util/oslib-win32.c
+@@ -27,6 +27,8 @@
   */
  
  #include "qemu/osdep.h"
-+#include "qemu/cutils.h"
- #include <sys/poll.h>
- #include <sys/ioctl.h>
- #include <pthread.h>
-@@ -40,8 +41,6 @@
- #define CM_REQ_DGID_POS      80
- #define CM_SIDR_REQ_DGID_POS 44
- 
--/* The below can be override by command line parameter */
--#define UNIX_SOCKET_PATH "/var/run/rdmacm-mux"
- /* Has format %s-%s-%d" <path>-<rdma-dev--name>-<port> */
- #define SOCKET_PATH_MAX (PATH_MAX - NAME_MAX - sizeof(int) - 2)
- #define RDMA_PORT_NUM 1
-@@ -77,7 +76,13 @@ typedef struct RdmaCmServer {
- 
- static RdmaCMServer server = {0};
- 
--static void usage(const char *progname)
-+static char *get_default_unix_socket_path(void)
-+{
-+    g_autofree char *run = qemu_get_runtime_dir();
-+    return g_build_filename(run, "rdmacm-mux", NULL);
-+}
-+
-+static void usage(const char *progname, const char *default_unix_socket_path)
- {
-     printf("Usage: %s [OPTION]...\n"
-            "Start a RDMA-CM multiplexer\n"
-@@ -86,7 +91,7 @@ static void usage(const char *progname)
-            "\t-d rdma-device-name   Name of RDMA device to register with\n"
-            "\t-s unix-socket-path   Path to unix socket to listen on (default %s)\n"
-            "\t-p rdma-device-port   Port number of RDMA device to register with (default %d)\n",
--           progname, UNIX_SOCKET_PATH, RDMA_PORT_NUM);
-+           progname, default_unix_socket_path, RDMA_PORT_NUM);
++#include <shlobj.h>
++#include <wchar.h>
+ #include <windows.h>
+ #include "qapi/error.h"
+ #include "qemu/main-loop.h"
+@@ -237,6 +239,30 @@ qemu_get_local_state_dir(void)
+     return g_strdup(data_dirs[0]);
  }
  
- static void help(const char *progname)
-@@ -97,16 +102,16 @@ static void help(const char *progname)
- static void parse_args(int argc, char *argv[])
++char *
++qemu_get_runtime_dir(void)
++{
++    size_t size = GetEnvironmentVariableA("XDG_RUNTIME_DIR", NULL, 0);
++    if (size) {
++        char *env = g_malloc(size);
++        GetEnvironmentVariableA("XDG_RUNTIME_DIR", env, size);
++        return env;
++    }
++
++    PWSTR wpath;
++    const wchar_t *cwpath;
++    if (!SHGetKnownFolderPath(&FOLDERID_LocalAppData, KF_FLAG_DEFAULT, NULL, &wpath)) {
++        cwpath = wpath;
++        size = wcsrtombs(NULL, &cwpath, 0, &(mbstate_t){0}) + 1;
++        char *path = g_malloc(size);
++        wcsrtombs(path, &cwpath, size, &(mbstate_t){0});
++        CoTaskMemFree(wpath);
++        return path;
++    }
++
++    return get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR "/run");
++}
++
+ void qemu_set_tty_echo(int fd, bool echo)
  {
-     int c;
--    char unix_socket_path[SOCKET_PATH_MAX];
-+    g_autofree char *default_unix_socket_path = get_default_unix_socket_path();
-+    char *unix_socket_path = default_unix_socket_path;
- 
-     strcpy(server.args.rdma_dev_name, "");
--    strcpy(unix_socket_path, UNIX_SOCKET_PATH);
-     server.args.rdma_port_num = RDMA_PORT_NUM;
- 
-     while ((c = getopt(argc, argv, "hs:d:p:")) != -1) {
-         switch (c) {
-         case 'h':
--            usage(argv[0]);
-+            usage(argv[0], default_unix_socket_path);
-             exit(0);
- 
-         case 'd':
-@@ -115,7 +120,7 @@ static void parse_args(int argc, char *argv[])
- 
-         case 's':
-             /* This is temporary, final name will build below */
--            strncpy(unix_socket_path, optarg, SOCKET_PATH_MAX - 1);
-+            unix_socket_path = optarg;
-             break;
- 
-         case 'p':
-@@ -811,6 +816,7 @@ int main(int argc, char *argv[])
- {
-     int rc;
- 
-+    qemu_init_exec_dir(argv[0]);
-     memset(&server, 0, sizeof(server));
- 
-     parse_args(argc, argv);
-diff --git a/contrib/rdmacm-mux/meson.build b/contrib/rdmacm-mux/meson.build
-index 36c9c89630..59f60f9cac 100644
---- a/contrib/rdmacm-mux/meson.build
-+++ b/contrib/rdmacm-mux/meson.build
-@@ -1,7 +1,7 @@
- if have_pvrdma
-   # FIXME: broken on big endian architectures
-   executable('rdmacm-mux', files('main.c'), genh,
--             dependencies: [glib, libumad],
-+             dependencies: [glib, libumad, qemuutil],
-              build_by_default: false,
-              install: false)
- endif
+     HANDLE handle = (HANDLE)_get_osfhandle(fd);
 -- 
 2.41.0
 

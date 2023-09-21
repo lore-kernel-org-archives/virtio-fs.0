@@ -1,26 +1,16 @@
-Return-Path: <akihiko.odaki@daynix.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=daynix-com.20230601.gappssmtp.com; s=20230601; t=1695282907; x=1695887707;
- darn=redhat.com; 
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=+WqIB3gVUWoV5tx6z3hTNmJPFl9aZDKmRqWqmbRKnMA=;
- b=SuudaWJhJFp+JnKEI4g0X7aluCUzOvdV0eNRM6Bqx8Cr0Dcu6v96iiCFH0nz5e33rf
- 2FODbOXc+AFOPxSCqbzwdxdSAvu3rjQ6V6OLlSntNpo20DMbsPkMfuNi1a40NLn19Kkk
- l7BUTIiF9Vt4wKx+8g/VwXFdVhPX4r8mVTHtq5z4wgMVzllVWTdQK3zT4Q0GuOq6Gikv
- Y/Adf6bW5DBjVqG+lXm3ZWt7oZ9Ch0mSbtGyv6bnUoO85EnznVznSzMyD+aKJQBi6F7d
- pGhPxgqY4f42asO63mewUCGreoG38t78YSRqeaJGx5TK1i7FogjrdVjEmwEDo6oOa9aM
- Ptew==
-From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 21 Sep 2023 16:54:19 +0900
-Message-ID: <20230921075425.16738-6-akihiko.odaki@daynix.com>
-In-Reply-To: <20230921075425.16738-1-akihiko.odaki@daynix.com>
-References: <20230921075425.16738-1-akihiko.odaki@daynix.com>
+Return-Path: <kkostiuk@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH v3 5/8] scsi: Use qemu_get_runtime_dir()
+References: <20221110100629.61496-1-akihiko.odaki@daynix.com>
+ <20221110100629.61496-2-akihiko.odaki@daynix.com>
+ <CAPMcbCrGkXzeZex_veDYV8HSMMzH8d=zy1jkf21t4qFekGmDpg@mail.gmail.com>
+ <f3895076-5ccc-4542-8cc5-635a99cff182@daynix.com>
+In-Reply-To: <f3895076-5ccc-4542-8cc5-635a99cff182@daynix.com>
+From: Konstantin Kostiuk <kkostiuk@redhat.com>
+Date: Thu, 21 Sep 2023 12:52:58 +0300
+Message-ID: <CAPMcbCpwJb+uE0U_d+NYScVest1QGB3extUZ9xM10YeGM0-tVQ@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000a29d5b0605db7524"
+Subject: Re: [Virtio-fs] [PATCH v2 01/10] qga: Remove platform GUID
+ definitions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,33 +19,164 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr . David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
+To: Akihiko Odaki <akihiko.odaki@daynix.com>
+Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>
 
-qemu_get_runtime_dir() is used to construct the default paths.
+--000000000000a29d5b0605db7524
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
----
- scsi/qemu-pr-helper.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Hi Akihiko,
 
-diff --git a/scsi/qemu-pr-helper.c b/scsi/qemu-pr-helper.c
-index c6c6347e9b..507f23357f 100644
---- a/scsi/qemu-pr-helper.c
-+++ b/scsi/qemu-pr-helper.c
-@@ -77,10 +77,10 @@ static int gid = -1;
- 
- static void compute_default_paths(void)
- {
--    g_autofree char *state = qemu_get_local_state_dir();
-+    g_autofree char *run = qemu_get_runtime_dir();
- 
--    socket_path = g_build_filename(state, "run", "qemu-pr-helper.sock", NULL);
--    pidfile = g_build_filename(state, "run", "qemu-pr-helper.pid", NULL);
-+    socket_path = g_build_filename(run, "qemu-pr-helper.sock", NULL);
-+    pidfile = g_build_filename(run, "qemu-pr-helper.pid", NULL);
- }
- 
- static void usage(const char *name)
--- 
-2.41.0
+Thanks for ping.
+I will merge this commit with other qga fixes.
+
+Best Regards,
+Konstantin Kostiuk.
+
+
+On Thu, Sep 21, 2023 at 10:58=E2=80=AFAM Akihiko Odaki <akihiko.odaki@dayni=
+x.com>
+wrote:
+
+> On 2022/11/17 18:45, Konstantin Kostiuk wrote:
+> > Reviewed-by: Konstantin Kostiuk <kkostiuk@redhat.com
+> > <mailto:kkostiuk@redhat.com>>
+> >
+> > Will merge this patch in QGA series
+> >
+> > On Thu, Nov 10, 2022 at 12:06 PM Akihiko Odaki <akihiko.odaki@daynix.co=
+m
+> > <mailto:akihiko.odaki@daynix.com>> wrote:
+> >
+> >     GUID_DEVINTERFACE_DISK and GUID_DEVINTERFACE_STORAGEPORT are alread=
+y
+> >     defined by MinGW-w64. They are not only unnecessary, but can lead t=
+o
+> >     duplicate definition errors at link time with some unknown conditio=
+n.
+> >
+> >     Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com
+> >     <mailto:akihiko.odaki@daynix.com>>
+> >     ---
+> >       qga/commands-win32.c | 7 -------
+> >       1 file changed, 7 deletions(-)
+> >
+> >     diff --git a/qga/commands-win32.c b/qga/commands-win32.c
+> >     index ec9f55b453..dde5d401bb 100644
+> >     --- a/qga/commands-win32.c
+> >     +++ b/qga/commands-win32.c
+> >     @@ -506,13 +506,6 @@ static GuestDiskBusType
+> >     find_bus_type(STORAGE_BUS_TYPE bus)
+> >           return win2qemu[(int)bus];
+> >       }
+> >
+> >     -DEFINE_GUID(GUID_DEVINTERFACE_DISK,
+> >     -        0x53f56307L, 0xb6bf, 0x11d0, 0x94, 0xf2,
+> >     -        0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);
+> >     -DEFINE_GUID(GUID_DEVINTERFACE_STORAGEPORT,
+> >     -        0x2accfe60L, 0xc130, 0x11d2, 0xb0, 0x82,
+> >     -        0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);
+> >     -
+> >       static void get_pci_address_for_device(GuestPCIAddress *pci,
+> >                                              HDEVINFO dev_info)
+> >       {
+> >     --
+> >     2.38.1
+> >
+>
+> Hi Konstantin,
+>
+> This patch seems missed since then. Can you merge it?
+>
+> Regards,
+> Akihiko Odaki
+>
+>
+
+--000000000000a29d5b0605db7524
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div>Hi Akihiko,</div><div><br></div><div>Thanks for ping.=
+ <br></div><div>I will merge this commit with other qga fixes.<br></div><di=
+v><br></div><div><div><div><div dir=3D"ltr" class=3D"gmail_signature" data-=
+smartmail=3D"gmail_signature"><div dir=3D"ltr"><div>Best Regards,</div><div=
+>Konstantin Kostiuk.</div></div></div></div><br></div></div></div><br><div =
+class=3D"gmail_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Thu, Sep 21,=
+ 2023 at 10:58=E2=80=AFAM Akihiko Odaki &lt;<a href=3D"mailto:akihiko.odaki=
+@daynix.com">akihiko.odaki@daynix.com</a>&gt; wrote:<br></div><blockquote c=
+lass=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px soli=
+d rgb(204,204,204);padding-left:1ex">On 2022/11/17 18:45, Konstantin Kostiu=
+k wrote:<br>
+&gt; Reviewed-by: Konstantin Kostiuk &lt;<a href=3D"mailto:kkostiuk@redhat.=
+com" target=3D"_blank">kkostiuk@redhat.com</a> <br>
+&gt; &lt;mailto:<a href=3D"mailto:kkostiuk@redhat.com" target=3D"_blank">kk=
+ostiuk@redhat.com</a>&gt;&gt;<br>
+&gt; <br>
+&gt; Will merge this patch in QGA series<br>
+&gt; <br>
+&gt; On Thu, Nov 10, 2022 at 12:06 PM Akihiko Odaki &lt;<a href=3D"mailto:a=
+kihiko.odaki@daynix.com" target=3D"_blank">akihiko.odaki@daynix.com</a> <br=
+>
+&gt; &lt;mailto:<a href=3D"mailto:akihiko.odaki@daynix.com" target=3D"_blan=
+k">akihiko.odaki@daynix.com</a>&gt;&gt; wrote:<br>
+&gt; <br>
+&gt;=C2=A0 =C2=A0 =C2=A0GUID_DEVINTERFACE_DISK and GUID_DEVINTERFACE_STORAG=
+EPORT are already<br>
+&gt;=C2=A0 =C2=A0 =C2=A0defined by MinGW-w64. They are not only unnecessary=
+, but can lead to<br>
+&gt;=C2=A0 =C2=A0 =C2=A0duplicate definition errors at link time with some =
+unknown condition.<br>
+&gt; <br>
+&gt;=C2=A0 =C2=A0 =C2=A0Signed-off-by: Akihiko Odaki &lt;<a href=3D"mailto:=
+akihiko.odaki@daynix.com" target=3D"_blank">akihiko.odaki@daynix.com</a><br=
+>
+&gt;=C2=A0 =C2=A0 =C2=A0&lt;mailto:<a href=3D"mailto:akihiko.odaki@daynix.c=
+om" target=3D"_blank">akihiko.odaki@daynix.com</a>&gt;&gt;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0---<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0qga/commands-win32.c | 7 -------<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A01 file changed, 7 deletions(-)<br>
+&gt; <br>
+&gt;=C2=A0 =C2=A0 =C2=A0diff --git a/qga/commands-win32.c b/qga/commands-wi=
+n32.c<br>
+&gt;=C2=A0 =C2=A0 =C2=A0index ec9f55b453..dde5d401bb 100644<br>
+&gt;=C2=A0 =C2=A0 =C2=A0--- a/qga/commands-win32.c<br>
+&gt;=C2=A0 =C2=A0 =C2=A0+++ b/qga/commands-win32.c<br>
+&gt;=C2=A0 =C2=A0 =C2=A0@@ -506,13 +506,6 @@ static GuestDiskBusType<br>
+&gt;=C2=A0 =C2=A0 =C2=A0find_bus_type(STORAGE_BUS_TYPE bus)<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0return win2qemu[(int)bus];<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0}<br>
+&gt; <br>
+&gt;=C2=A0 =C2=A0 =C2=A0-DEFINE_GUID(GUID_DEVINTERFACE_DISK,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x53f56307L, 0xb6bf, 0=
+x11d0, 0x94, 0xf2,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x00, 0xa0, 0xc9, 0x1e=
+, 0xfb, 0x8b);<br>
+&gt;=C2=A0 =C2=A0 =C2=A0-DEFINE_GUID(GUID_DEVINTERFACE_STORAGEPORT,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x2accfe60L, 0xc130, 0=
+x11d2, 0xb0, 0x82,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x00, 0xa0, 0xc9, 0x1e=
+, 0xfb, 0x8b);<br>
+&gt;=C2=A0 =C2=A0 =C2=A0-<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0static void get_pci_address_for_device(Guest=
+PCIAddress *pci,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 HDEVINFO dev_info)<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0{<br>
+&gt;=C2=A0 =C2=A0 =C2=A0-- <br>
+&gt;=C2=A0 =C2=A0 =C2=A02.38.1<br>
+&gt; <br>
+<br>
+Hi Konstantin,<br>
+<br>
+This patch seems missed since then. Can you merge it?<br>
+<br>
+Regards,<br>
+Akihiko Odaki<br>
+<br>
+</blockquote></div>
+
+--000000000000a29d5b0605db7524--
 

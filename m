@@ -1,30 +1,16 @@
-Return-Path: <akihiko.odaki@daynix.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=daynix-com.20230601.gappssmtp.com; s=20230601; t=1695304603; x=1695909403;
- darn=redhat.com; 
- h=content-transfer-encoding:in-reply-to:from:content-language
- :references:cc:to:subject:user-agent:mime-version:date:message-id
- :from:to:cc:subject:date:message-id:reply-to;
- bh=aLlclXdwLtN4CPnz5WCduKG/f/78DAzPIWKjXDxK/qc=;
- b=EeETOCwGeA1VDEqfpytEUkp1og3AOa5WOH7yQylcpDXOCSVKNG/C8eD6Iruw7Emqcr
- jZ/Yv/66dh30thpKbLr0Al4936K2IfXEqXy4SJf0rfVwLAGNzmvuU3P8Z5GFwqf+Oe+B
- xKgdxjxJgmS6qSc/+zhtGGrRuolYRnxSpZiRyV4CsCIBeYKvEs9hHeBW3ucWenQwSeMf
- Vnwar4Ymf6dJ2r2A8tGr07v4PjN2p3uNZnFTSK1SCJfZ96wxU0Zyor/Q4VRLM2V5ADNR
- +2RoQVoEQEAHU7y4pXm+49AHXw8Bd5SNSh/3AfZ+rfGuig2iSRYzaeR3PP78Jat0jGaM
- +olQ==
-Message-ID: <32d74d08-f6f1-4958-aab7-03144efcbc82@daynix.com>
-Date: Thu, 21 Sep 2023 22:56:38 +0900
+Return-Path: <stefanha@redhat.com>
+Date: Mon, 25 Sep 2023 15:04:31 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20230925190431.GB323580@fedora>
+References: <20230915102531.55894-1-hreitz@redhat.com>
+ <20230915102531.55894-2-hreitz@redhat.com>
 MIME-Version: 1.0
-References: <20221110100629.61496-1-akihiko.odaki@daynix.com>
- <20221110100629.61496-8-akihiko.odaki@daynix.com>
- <20230921125828.GA3860191@fedora>
-From: Akihiko Odaki <akihiko.odaki@daynix.com>
-In-Reply-To: <20230921125828.GA3860191@fedora>
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v2 07/10] virtiofsd: Use
- qemu_get_runtime_dir()
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="G/2yNfBg+jWKHP+w"
+Content-Disposition: inline
+In-Reply-To: <20230915102531.55894-2-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 1/5] vhost-user.rst: Migrating
+ back-end-internal state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,52 +19,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, German Maglione <gmaglione@redhat.com>
 
-On 2023/09/21 21:58, Stefan Hajnoczi wrote:
-> On Thu, Nov 10, 2022 at 07:06:26PM +0900, Akihiko Odaki wrote:
->> qemu_get_runtime_dir() is used to construct the path to a lock file.
->>
->> Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
->> ---
->>   tools/virtiofsd/fuse_virtio.c | 6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
->> index 9368e292e4..b9eeed85e6 100644
->> --- a/tools/virtiofsd/fuse_virtio.c
->> +++ b/tools/virtiofsd/fuse_virtio.c
->> @@ -901,12 +901,12 @@ static bool fv_socket_lock(struct fuse_session *se)
->>   {
->>       g_autofree gchar *sk_name = NULL;
->>       g_autofree gchar *pidfile = NULL;
->> -    g_autofree gchar *state = NULL;
->> +    g_autofree gchar *run = NULL;
->>       g_autofree gchar *dir = NULL;
->>       Error *local_err = NULL;
->>   
->> -    state = qemu_get_local_state_dir();
->> -    dir = g_build_filename(state, "run", "virtiofsd", NULL);
->> +    run = qemu_get_runtime_dir();
->> +    dir = g_build_filename(run, "virtiofsd", NULL);
->>   
->>       if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
->>           fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s\n",
-> 
-> tools/virtiofsd/ no longer exists. Which version of QEMU did you develop against?
-> 
-> commit e0dc2631ec4ac718ebe22ddea0ab25524eb37b0e
-> Author: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> Date:   Wed Jan 18 12:11:51 2023 +0000
-> 
->      virtiofsd: Remove source
-> 
-> Stefan
 
-It is an old version of the series. You can find the latest version at:
-https://patchew.org/QEMU/20230921075425.16738-1-akihiko.odaki@daynix.com/
+--G/2yNfBg+jWKHP+w
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Regards,
-Akihiko Odaki
+On Fri, Sep 15, 2023 at 12:25:26PM +0200, Hanna Czenczek wrote:
+> For vhost-user devices, qemu can migrate the virtio state, but not the
+> back-end's internal state.  To do so, we need to be able to transfer
+> this internal state between front-end (qemu) and back-end.
+>=20
+> At this point, this new feature is added for the purpose of virtio-fs
+> migration.  Because virtiofsd's internal state will not be too large, we
+> believe it is best to transfer it as a single binary blob after the
+> streaming phase.
+>=20
+> These are the additions to the protocol:
+> - New vhost-user protocol feature VHOST_USER_PROTOCOL_F_DEVICE_STATE
+> - SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a file
+>   descriptor over which to transfer the state.
+> - CHECK_DEVICE_STATE: After the state has been transferred through the
+>   file descriptor, the front-end invokes this function to verify
+>   success.  There is no in-band way (through the file descriptor) to
+>   indicate failure, so we need to check explicitly.
+>=20
+> Once the transfer FD has been established via SET_DEVICE_STATE_FD
+> (which includes establishing the direction of transfer and migration
+> phase), the sending side writes its data into it, and the reading side
+> reads it until it sees an EOF.  Then, the front-end will check for
+> success via CHECK_DEVICE_STATE, which on the destination side includes
+> checking for integrity (i.e. errors during deserialization).
+>=20
+> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> ---
+>  docs/interop/vhost-user.rst | 170 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 170 insertions(+)
 
+Great documentation!
+
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--G/2yNfBg+jWKHP+w
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUR2b8ACgkQnKSrs4Gr
+c8iMLwf/f5GkieEgVbXuahClGPFQAjBdciOmypJvZyRxcTvOhb4fu6UOJRRSe7Sr
++r8lF6GyaMpq3MyT58JgMVL9tKRaNNGNEEzVPVqrB2sugMet2ZHZA7pSaGKa8Y8R
+q9dEeSTmBBZyX0DXlFcP64PCjU6GmooJ0evS0kIMdIFgv4wUW12MiDtP3YDgwphD
+iALLapDCmcvMOUESc6KSpIeDjwU4qrUmpGzhqdQzoh4FJaKjuLaWZuye+Nlnvens
+SXpvgTlMJNzBZrNuqtGJY7bnUPYbQfXvcTVQxMF241mq11IuiUndEi3D5SVLOvlK
++P3n0iB1UF6Jcz+R8mwswUxS91xs6g==
+=2EeV
+-----END PGP SIGNATURE-----
+
+--G/2yNfBg+jWKHP+w--

@@ -1,16 +1,16 @@
 Return-Path: <stefanha@redhat.com>
-Date: Mon, 25 Sep 2023 15:15:08 -0400
+Date: Mon, 25 Sep 2023 16:18:38 -0400
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20230925191508.GC323580@fedora>
+Message-ID: <20230925201838.GD323580@fedora>
 References: <20230915102531.55894-1-hreitz@redhat.com>
- <20230915102531.55894-3-hreitz@redhat.com>
+ <20230915102531.55894-4-hreitz@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="BfM2EkcGqH2TU2ew"
+ protocol="application/pgp-signature"; boundary="muhzgkgoTP5FcE5Q"
 Content-Disposition: inline
-In-Reply-To: <20230915102531.55894-3-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 2/5] vhost-user.rst: Clarify
- enabling/disabling vrings
+In-Reply-To: <20230915102531.55894-4-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 3/5] vhost-user: Interface for migration
+ state transfer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,97 +23,38 @@ To: Hanna Czenczek <hreitz@redhat.com>
 Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, German Maglione <gmaglione@redhat.com>
 
 
---BfM2EkcGqH2TU2ew
+--muhzgkgoTP5FcE5Q
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Sep 15, 2023 at 12:25:27PM +0200, Hanna Czenczek wrote:
-> Currently, the vhost-user documentation says that rings are to be
-> initialized in a disabled state when VHOST_USER_F_PROTOCOL_FEATURES is
-> negotiated.  However, by the time of feature negotiation, all rings have
-> already been initialized, so it is not entirely clear what this means.
->=20
-> At least the vhost-user-backend Rust crate's implementation interpreted
-> it to mean that whenever this feature is negotiated, all rings are to
-> put into a disabled state, which means that every SET_FEATURES call
-> would disable all rings, effectively halting the device.  This is
-> problematic because the VHOST_F_LOG_ALL feature is also set or cleared
-> this way, which happens during migration.  Doing so should not halt the
-> device.
->=20
-> Other implementations have interpreted this to mean that the device is
-> to be initialized with all rings disabled, and a subsequent SET_FEATURES
-> call that does not set VHOST_USER_F_PROTOCOL_FEATURES will enable all of
-> them.  Here, SET_FEATURES will never disable any ring.
->=20
-> This interpretation does not suffer the problem of unintentionally
-> halting the device whenever features are set or cleared, so it seems
-> better and more reasonable.
->=20
-> We should clarify this in the documentation.
+On Fri, Sep 15, 2023 at 12:25:28PM +0200, Hanna Czenczek wrote:
+> Add the interface for transferring the back-end's state during migration
+> as defined previously in vhost-user.rst.
 >=20
 > Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
 > ---
->  docs/interop/vhost-user.rst | 20 ++++++++++++++------
->  1 file changed, 14 insertions(+), 6 deletions(-)
->=20
-> diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-> index bb4dd0fd60..9b9b802c60 100644
-> --- a/docs/interop/vhost-user.rst
-> +++ b/docs/interop/vhost-user.rst
-> @@ -409,12 +409,20 @@ and stop ring upon receiving ``VHOST_USER_GET_VRING=
-_BASE``.
-> =20
->  Rings can be enabled or disabled by ``VHOST_USER_SET_VRING_ENABLE``.
-> =20
-> -If ``VHOST_USER_F_PROTOCOL_FEATURES`` has not been negotiated, the
-> -ring starts directly in the enabled state.
-> -
-> -If ``VHOST_USER_F_PROTOCOL_FEATURES`` has been negotiated, the ring is
-> -initialized in a disabled state and is enabled by
-> -``VHOST_USER_SET_VRING_ENABLE`` with parameter 1.
-> +If ``VHOST_USER_SET_FEATURES`` does not negotiate
-> +``VHOST_USER_F_PROTOCOL_FEATURES``, rings are enabled immediately when
-> +started.
-> +
-> +If ``VHOST_USER_SET_FEATURES`` does negotiate
-> +``VHOST_USER_F_PROTOCOL_FEATURES``, each ring will remain in the disabled
-> +state until ``VHOST_USER_SET_VRING_ENABLE`` enables it with parameter 1.
-> +
-> +Back-end implementations that support ``VHOST_USER_F_PROTOCOL_FEATURES``
-> +should implement this by initializing each ring in a disabled state, and
-> +enabling them when ``VHOST_USER_SET_FEATURES`` is used without
-> +negotiating ``VHOST_USER_F_PROTOCOL_FEATURES``.  Other than that, rings
-> +should only be enabled and disabled through
-> +``VHOST_USER_SET_VRING_ENABLE``.
+>  include/hw/virtio/vhost-backend.h |  24 +++++
+>  include/hw/virtio/vhost.h         |  79 ++++++++++++++++
+>  hw/virtio/vhost-user.c            | 148 ++++++++++++++++++++++++++++++
+>  hw/virtio/vhost.c                 |  37 ++++++++
+>  4 files changed, 288 insertions(+)
 
-The "Ring states" section starts by saying there are three states:
-"stopped", "started but disabled", and "started and enabled". But this
-patch talks about a "disabled state". Can you rephrase this patch to use
-the exact state names defined earlier in the spec?
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-> =20
->  While processing the rings (whether they are enabled or not), the back-e=
-nd
->  must support changing some configuration aspects on the fly.
-> --=20
-> 2.41.0
->=20
-
---BfM2EkcGqH2TU2ew
+--muhzgkgoTP5FcE5Q
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUR3DwACgkQnKSrs4Gr
-c8g9OQgAw8L3+6/Kc6EjS93xCmyTwcdvnQg8LYZE6adnPD3bVfZml0+/68IeKmnH
-10OWY+63EMBWuxXfj1AIleVrF/SX89dsLJ59lfiu2fR7ODldnCHMZ+c1vrg7D7Ve
-FBCoo5iSG4UaIEz2EQIkl4kUOs7gXwiIRuzxcuAI3BLxFLdT8j7Q0pxmNn3iQO4O
-aksrnhGm6SCcDwcAicxhPPYnyyeEuiAOBumvfypVIgWHk7by31hvsruJ1aHDMUvi
-JmOpK8qv7SQwfzJnHNfl2odWMM3GNCSFZRCMMyRzoK7t9iDXwzQoztNZnvQjZ/VX
-BrgndZj3zTNo59zfT91lyvdsEMK5Kg==
-=minv
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUR6x4ACgkQnKSrs4Gr
+c8ikuAgAxVyVj19bGYPACb0rP8tXyXpMj+bzYHrVoB1XOdkKo/Knw46Eu9I4Ljtz
+8eHonM7YAOz6/3DTvMk6/wuiC3iMzs4FS0WZ+cKkfdiM6Opt9z8ultvuH4ZGbxQa
+nf/TVaQJY7rVditSx+0h8oBiQk0GbCS5cwSzItdfPYLF8/Q1ZeyG/0Qt2Iy3kRHe
+9s1Wuix6YZRNTLYi7uvlbAzVpKDzbnnCnVPwCznDSf2qZKWQg1xQdNxH79JSPaDn
+ujmwTstFEs8heh0ZxD3DZaxRXeSHIyqIe1RdpDn0u+YL7/45IMJrFXMGlLDj5h3w
+7lIu/+H92bNwLkMKL1OWGhWTa++tng==
+=ifEH
 -----END PGP SIGNATURE-----
 
---BfM2EkcGqH2TU2ew--
+--muhzgkgoTP5FcE5Q--

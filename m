@@ -1,16 +1,14 @@
 Return-Path: <stefanha@redhat.com>
-Date: Mon, 25 Sep 2023 16:26:42 -0400
+Date: Mon, 25 Sep 2023 16:48:52 -0400
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20230925202642.GF323580@fedora>
+Message-ID: <20230925204852.GG323580@fedora>
 References: <20230915102531.55894-1-hreitz@redhat.com>
- <20230915102531.55894-6-hreitz@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="d5khHiGNigsVFP+D"
+ protocol="application/pgp-signature"; boundary="K/zCvWGQCDPOsVDG"
 Content-Disposition: inline
-In-Reply-To: <20230915102531.55894-6-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 5/5] vhost-user-fs: Implement internal
- migration
+In-Reply-To: <20230915102531.55894-1-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 0/5] vhost-user: Back-end state migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,166 +18,111 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, German Maglione <gmaglione@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, German Maglione <gmaglione@redhat.com>
 
 
---d5khHiGNigsVFP+D
-Content-Type: text/plain; charset=us-ascii
+--K/zCvWGQCDPOsVDG
+Content-Type: text/plain; charset=utf-8
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Sep 15, 2023 at 12:25:30PM +0200, Hanna Czenczek wrote:
-> A virtio-fs device's VM state consists of:
-> - the virtio device (vring) state (VMSTATE_VIRTIO_DEVICE)
-> - the back-end's (virtiofsd's) internal state
+On Fri, Sep 15, 2023 at 12:25:25PM +0200, Hanna Czenczek wrote:
+> RFC:
+> https://lists.nongnu.org/archive/html/qemu-devel/2023-03/msg04263.html
 >=20
-> We get/set the latter via the new vhost operations to transfer migratory
-> state.  It is its own dedicated subsection, so that for external
-> migration, it can be disabled.
+> v1:
+> https://lists.nongnu.org/archive/html/qemu-devel/2023-04/msg01575.html
 >=20
-> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
-> ---
->  hw/virtio/vhost-user-fs.c | 101 +++++++++++++++++++++++++++++++++++++-
->  1 file changed, 100 insertions(+), 1 deletion(-)
+> v2:
+> https://lists.nongnu.org/archive/html/qemu-devel/2023-07/msg02604.html
+>=20
+> Hi,
+>=20
+> I=E2=80=99ve decided not to work on vhost-user SUSPEND/RESUME for now =E2=
+=80=93 it is
+> not technically required for virtio-fs migration, which is the actual
+> priority for me now.  While we do want to have SUSPEND/RESUME at some
+> point, the only practically existing reason for it is to be able to
+> implement vhost-level resetting in virtiofsd, but that is not related to
+> migration.
 
-CCing Anton so he is aware that internal migration is being added.
+QEMU sends VHOST_USER_SET_STATUS 0 in vhost_dev_stop(). Are you assuming
+that virtiofs back-ends do not reset the device upon receiving this
+message?
 
+> So one of the changes in v3 is that it no longer depends on the
+> vhost-user SUSPEND/RESUME series, and describes the migration protocol
+> without the device being suspended at any point, but merely that the
+> vrings are stopped.
 >=20
-> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> index 49d699ffc2..eb91723855 100644
-> --- a/hw/virtio/vhost-user-fs.c
-> +++ b/hw/virtio/vhost-user-fs.c
-> @@ -298,9 +298,108 @@ static struct vhost_dev *vuf_get_vhost(VirtIODevice=
- *vdev)
->      return &fs->vhost_dev;
->  }
-> =20
-> +/**
-> + * Fetch the internal state from virtiofsd and save it to `f`.
-> + */
-> +static int vuf_save_state(QEMUFile *f, void *pv, size_t size,
-> +                          const VMStateField *field, JSONWriter *vmdesc)
-> +{
-> +    VirtIODevice *vdev =3D pv;
-> +    VHostUserFS *fs =3D VHOST_USER_FS(vdev);
-> +    Error *local_error =3D NULL;
-> +    int ret;
-> +
-> +    ret =3D vhost_save_backend_state(&fs->vhost_dev, f, &local_error);
-> +    if (ret < 0) {
-> +        error_reportf_err(local_error,
-> +                          "Error saving back-end state of %s device %s "
-> +                          "(tag: \"%s\"): ",
-> +                          vdev->name, vdev->parent_obj.canonical_path,
-> +                          fs->conf.tag ?: "<none>");
-> +        return ret;
-> +    }
-> +
-> +    return 0;
-> +}
-> +
-> +/**
-> + * Load virtiofsd's internal state from `f` and send it over to virtiofs=
-d.
-> + */
-> +static int vuf_load_state(QEMUFile *f, void *pv, size_t size,
-> +                          const VMStateField *field)
-> +{
-> +    VirtIODevice *vdev =3D pv;
-> +    VHostUserFS *fs =3D VHOST_USER_FS(vdev);
-> +    Error *local_error =3D NULL;
-> +    int ret;
-> +
-> +    ret =3D vhost_load_backend_state(&fs->vhost_dev, f, &local_error);
-> +    if (ret < 0) {
-> +        error_reportf_err(local_error,
-> +                          "Error loading back-end state of %s device %s "
-> +                          "(tag: \"%s\"): ",
-> +                          vdev->name, vdev->parent_obj.canonical_path,
-> +                          fs->conf.tag ?: "<none>");
-> +        return ret;
-> +    }
-> +
-> +    return 0;
-> +}
-> +
-> +static bool vuf_is_internal_migration(void *opaque)
-> +{
-> +    /* TODO: Return false when an external migration is requested */
-> +    return true;
-> +}
-> +
-> +static int vuf_check_migration_support(void *opaque)
-> +{
-> +    VirtIODevice *vdev =3D opaque;
-> +    VHostUserFS *fs =3D VHOST_USER_FS(vdev);
-> +
-> +    if (!vhost_supports_device_state(&fs->vhost_dev)) {
-> +        error_report("Back-end of %s device %s (tag: \"%s\") does not su=
-pport "
-> +                     "migration through qemu",
-> +                     vdev->name, vdev->parent_obj.canonical_path,
-> +                     fs->conf.tag ?: "<none>");
-> +        return -ENOTSUP;
-> +    }
-> +
-> +    return 0;
-> +}
-> +
-> +static const VMStateDescription vuf_backend_vmstate;
-> +
->  static const VMStateDescription vuf_vmstate =3D {
->      .name =3D "vhost-user-fs",
-> -    .unmigratable =3D 1,
-> +    .version_id =3D 0,
-> +    .fields =3D (VMStateField[]) {
-> +        VMSTATE_VIRTIO_DEVICE,
-> +        VMSTATE_END_OF_LIST()
-> +    },
-> +    .subsections =3D (const VMStateDescription * []) {
-> +        &vuf_backend_vmstate,
-> +        NULL,
-> +    }
-> +};
-> +
-> +static const VMStateDescription vuf_backend_vmstate =3D {
-> +    .name =3D "vhost-user-fs-backend",
-> +    .version_id =3D 0,
-> +    .needed =3D vuf_is_internal_migration,
-> +    .pre_load =3D vuf_check_migration_support,
-> +    .pre_save =3D vuf_check_migration_support,
-> +    .fields =3D (VMStateField[]) {
-> +        {
-> +            .name =3D "back-end",
-> +            .info =3D &(const VMStateInfo) {
-> +                .name =3D "virtio-fs back-end state",
-> +                .get =3D vuf_load_state,
-> +                .put =3D vuf_save_state,
-> +            },
-> +        },
-> +        VMSTATE_END_OF_LIST()
-> +    },
->  };
-> =20
->  static Property vuf_properties[] =3D {
+> Other changes include:
+>=20
+> - Patch 1:
+>   - Rephrased a lot
+>   - Added a description for the VHOST_USER_SET_DEVICE_STATE_FD
+>     parameters
+>   - Renamed VHOST_USER_PROTOCOL_F_MIGRATORY_STATE to
+>     VHOST_USER_PROTOCOL_F_DEVICE_STATE
+>   - enum variants changed in value due to dropping the SUSPEND/RESUME
+>     dependency
+>=20
+> - Patch 2:
+>   - Pulled in, was a stand-alone patch before
+>   - Dropped a sentence about ring state before feature negotiations, as
+>     the rings are not to be used during that period anyway
+>   - Bit of rephrasing
+>=20
+> - Patch 3:
+>   - Renamed =E2=80=9Cmigratory state=E2=80=9D to =E2=80=9Cdevice state=E2=
+=80=9D
+>   - enum variants changed in value due to dropping the SUSPEND/RESUME
+>     dependency
+>=20
+> - Patch 4:
+>   - Changed `f` to @f (referencing parameter =E2=80=9Cf=E2=80=9D) in comm=
+ents
+>   - Use g_autofree for the transfer buffer
+>   - Note SUSPEND state as a future feature, not currently existing
+>   - Wrap read() and write() in RETRY_ON_EINTR()
+>=20
+> - Patch 5:
+>   - Renamed =E2=80=9Cmigratory state=E2=80=9D to =E2=80=9Cdevice state=E2=
+=80=9D
+>   - (kept R-b still)
+>=20
+>=20
+> Hanna Czenczek (5):
+>   vhost-user.rst: Migrating back-end-internal state
+>   vhost-user.rst: Clarify enabling/disabling vrings
+>   vhost-user: Interface for migration state transfer
+>   vhost: Add high-level state save/load functions
+>   vhost-user-fs: Implement internal migration
+>=20
+>  docs/interop/vhost-user.rst       | 188 ++++++++++++++++++++++-
+>  include/hw/virtio/vhost-backend.h |  24 +++
+>  include/hw/virtio/vhost.h         | 114 ++++++++++++++
+>  hw/virtio/vhost-user-fs.c         | 101 ++++++++++++-
+>  hw/virtio/vhost-user.c            | 148 ++++++++++++++++++
+>  hw/virtio/vhost.c                 | 241 ++++++++++++++++++++++++++++++
+>  6 files changed, 810 insertions(+), 6 deletions(-)
+>=20
 > --=20
 > 2.41.0
 >=20
 
---d5khHiGNigsVFP+D
+--K/zCvWGQCDPOsVDG
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEyBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUR7QIACgkQnKSrs4Gr
-c8hWOQf4lTXUOU2gOOGvvnfaMIpciHn+yEYaANnHB9OYIGqW2lIrhEJhX79nL0/H
-dRU+oduy+zya4lZd1Dt/Hmr/hecYo4IYRIIIp01RU7x9/QEk35BJalOcPlXTxx1K
-xEWQt6zLjip7XP8w3uenYqBS3aAQnzkcHCF78HVtYvrDR458Xq0d+slTfhgUTxch
-kqdH9Lzllle5tYzVWmnUB2df5J91NtbN6Kq7APpdY3VD0wRNAF7j8G9RJEyAZVDh
-Q68Cy1vIH+qdTo+wWaJYjSD5qYMAjJx1OpBif4iGMhzgjUgI+dTlZPG3xrK6jq4U
-pWW/+YfS/E+03GeWofilxJ2leBfH
-=D7XB
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUR8jMACgkQnKSrs4Gr
+c8jKKwf8C5etjvYMEZYDYIJGeOPOVSRiR04zFVZS+/VEolLYYRW0lUzWinu1wjhF
+PuPo+jaMNKTbuj/MAFiAhx6agRzKu/M57M1kQxjECSWHYYkKD0CkEz3xOQe0hvVu
+hP3MDse57FlX3whkKNnUSE1aTBcwj4l7pMXLljUpM+UwkzjqlnbZq8DI7XdUe2jG
+sTp9hYhA0h03V4ACXjd9Ov90QZWWRoOB1BvAawe4PClVdgaQQWM6DiPAsi8ELH6T
+9Vyo403dpuek4UvySNWLe7yBDlCT0wv48oXo2NNttzHcJ3G2TfxiFQFma3KlX0Od
+nlW5mEYBk8qwOgxXKjQU+dFjvRxKKg==
+=qDLO
 -----END PGP SIGNATURE-----
 
---d5khHiGNigsVFP+D--
+--K/zCvWGQCDPOsVDG--

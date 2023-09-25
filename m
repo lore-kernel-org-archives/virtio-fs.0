@@ -1,16 +1,16 @@
 Return-Path: <stefanha@redhat.com>
-Date: Mon, 25 Sep 2023 16:18:38 -0400
+Date: Mon, 25 Sep 2023 16:23:53 -0400
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20230925201838.GD323580@fedora>
+Message-ID: <20230925202353.GE323580@fedora>
 References: <20230915102531.55894-1-hreitz@redhat.com>
- <20230915102531.55894-4-hreitz@redhat.com>
+ <20230915102531.55894-5-hreitz@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="muhzgkgoTP5FcE5Q"
+ protocol="application/pgp-signature"; boundary="G1vLTDuBl/2qpJYj"
 Content-Disposition: inline
-In-Reply-To: <20230915102531.55894-4-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 3/5] vhost-user: Interface for migration
- state transfer
+In-Reply-To: <20230915102531.55894-5-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 4/5] vhost: Add high-level state
+ save/load functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,38 +23,42 @@ To: Hanna Czenczek <hreitz@redhat.com>
 Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, German Maglione <gmaglione@redhat.com>
 
 
---muhzgkgoTP5FcE5Q
+--G1vLTDuBl/2qpJYj
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Sep 15, 2023 at 12:25:28PM +0200, Hanna Czenczek wrote:
-> Add the interface for transferring the back-end's state during migration
-> as defined previously in vhost-user.rst.
+On Fri, Sep 15, 2023 at 12:25:29PM +0200, Hanna Czenczek wrote:
+> vhost_save_backend_state() and vhost_load_backend_state() can be used by
+> vhost front-ends to easily save and load the back-end's state to/from
+> the migration stream.
+>=20
+> Because we do not know the full state size ahead of time,
+> vhost_save_backend_state() simply reads the data in 1 MB chunks, and
+> writes each chunk consecutively into the migration stream, prefixed by
+> its length.  EOF is indicated by a 0-length chunk.
 >=20
 > Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
 > ---
->  include/hw/virtio/vhost-backend.h |  24 +++++
->  include/hw/virtio/vhost.h         |  79 ++++++++++++++++
->  hw/virtio/vhost-user.c            | 148 ++++++++++++++++++++++++++++++
->  hw/virtio/vhost.c                 |  37 ++++++++
->  4 files changed, 288 insertions(+)
+>  include/hw/virtio/vhost.h |  35 +++++++
+>  hw/virtio/vhost.c         | 204 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 239 insertions(+)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---muhzgkgoTP5FcE5Q
+--G1vLTDuBl/2qpJYj
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUR6x4ACgkQnKSrs4Gr
-c8ikuAgAxVyVj19bGYPACb0rP8tXyXpMj+bzYHrVoB1XOdkKo/Knw46Eu9I4Ljtz
-8eHonM7YAOz6/3DTvMk6/wuiC3iMzs4FS0WZ+cKkfdiM6Opt9z8ultvuH4ZGbxQa
-nf/TVaQJY7rVditSx+0h8oBiQk0GbCS5cwSzItdfPYLF8/Q1ZeyG/0Qt2Iy3kRHe
-9s1Wuix6YZRNTLYi7uvlbAzVpKDzbnnCnVPwCznDSf2qZKWQg1xQdNxH79JSPaDn
-ujmwTstFEs8heh0ZxD3DZaxRXeSHIyqIe1RdpDn0u+YL7/45IMJrFXMGlLDj5h3w
-7lIu/+H92bNwLkMKL1OWGhWTa++tng==
-=ifEH
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUR7FkACgkQnKSrs4Gr
+c8g53gf/efNh2hqj0IptWY7I+2HpZ9C+MMwAw60jvMILi4MzWiZAJt625pYSEqB6
+eR0ov0YpFTrcOAtiKyREswaYnZ5bLQMppoocjQh/qApgiOXR+7ugaW87Pj6itGf5
+yMenJBO7gURkeXfmFSUNzhiev5XOrKuSbw1IwWXEFzXIstT/dDujfYZ5Pr/M4Fjs
+aKbo/dAmPxUP3OzVSZe49igboCIHKop+6WH3d3kQlLb5mlNcbldDtg4scRKq9IRY
+slf5P/Cs47CpHbo5+USYEMg2FYA5tbU7+dlo3rd88e1Xkp9TDnVdpx1Akkmtke8j
+3fjYbcZ3uF2xHGxGejCKm1G/3Cg7xg==
+=kLNj
 -----END PGP SIGNATURE-----
 
---muhzgkgoTP5FcE5Q--
+--G1vLTDuBl/2qpJYj--

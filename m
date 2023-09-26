@@ -1,15 +1,16 @@
 Return-Path: <hreitz@redhat.com>
-Message-ID: <fc005d50-03ba-0b8f-d9af-64a5297395a3@redhat.com>
-Date: Tue, 26 Sep 2023 15:32:14 +0200
+Message-ID: <de0387fc-0342-a3bf-7d72-3130e94c50cd@redhat.com>
+Date: Tue, 26 Sep 2023 15:54:16 +0200
 MIME-Version: 1.0
 References: <20230915102531.55894-1-hreitz@redhat.com>
- <20230925204852.GG323580@fedora>
+ <20230915102531.55894-3-hreitz@redhat.com> <20230925191508.GC323580@fedora>
 From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <20230925204852.GG323580@fedora>
+In-Reply-To: <20230925191508.GC323580@fedora>
 Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v3 0/5] vhost-user: Back-end state migration
+Subject: Re: [Virtio-fs] [PATCH v3 2/5] vhost-user.rst: Clarify
+ enabling/disabling vrings
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,58 +20,99 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, qemu-devel@nongnu.org, "Michael S . Tsirkin" <mst@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, German Maglione <gmaglione@redhat.com>
 
-On 25.09.23 22:48, Stefan Hajnoczi wrote:
-> On Fri, Sep 15, 2023 at 12:25:25PM +0200, Hanna Czenczek wrote:
->> RFC:
->> https://lists.nongnu.org/archive/html/qemu-devel/2023-03/msg04263.html
+On 25.09.23 21:15, Stefan Hajnoczi wrote:
+> On Fri, Sep 15, 2023 at 12:25:27PM +0200, Hanna Czenczek wrote:
+>> Currently, the vhost-user documentation says that rings are to be
+>> initialized in a disabled state when VHOST_USER_F_PROTOCOL_FEATURES is
+>> negotiated.  However, by the time of feature negotiation, all rings have
+>> already been initialized, so it is not entirely clear what this means.
 >>
->> v1:
->> https://lists.nongnu.org/archive/html/qemu-devel/2023-04/msg01575.html
+>> At least the vhost-user-backend Rust crate's implementation interpreted
+>> it to mean that whenever this feature is negotiated, all rings are to
+>> put into a disabled state, which means that every SET_FEATURES call
+>> would disable all rings, effectively halting the device.  This is
+>> problematic because the VHOST_F_LOG_ALL feature is also set or cleared
+>> this way, which happens during migration.  Doing so should not halt the
+>> device.
 >>
->> v2:
->> https://lists.nongnu.org/archive/html/qemu-devel/2023-07/msg02604.html
+>> Other implementations have interpreted this to mean that the device is
+>> to be initialized with all rings disabled, and a subsequent SET_FEATURES
+>> call that does not set VHOST_USER_F_PROTOCOL_FEATURES will enable all of
+>> them.  Here, SET_FEATURES will never disable any ring.
 >>
->> Hi,
+>> This interpretation does not suffer the problem of unintentionally
+>> halting the device whenever features are set or cleared, so it seems
+>> better and more reasonable.
 >>
->> I’ve decided not to work on vhost-user SUSPEND/RESUME for now – it is
->> not technically required for virtio-fs migration, which is the actual
->> priority for me now.  While we do want to have SUSPEND/RESUME at some
->> point, the only practically existing reason for it is to be able to
->> implement vhost-level resetting in virtiofsd, but that is not related to
->> migration.
-> QEMU sends VHOST_USER_SET_STATUS 0 in vhost_dev_stop(). Are you assuming
-> that virtiofs back-ends do not reset the device upon receiving this
-> message?
+>> We should clarify this in the documentation.
+>>
+>> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+>> ---
+>>   docs/interop/vhost-user.rst | 20 ++++++++++++++------
+>>   1 file changed, 14 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+>> index bb4dd0fd60..9b9b802c60 100644
+>> --- a/docs/interop/vhost-user.rst
+>> +++ b/docs/interop/vhost-user.rst
+>> @@ -409,12 +409,20 @@ and stop ring upon receiving ``VHOST_USER_GET_VRING_BASE``.
+>>   
+>>   Rings can be enabled or disabled by ``VHOST_USER_SET_VRING_ENABLE``.
+>>   
+>> -If ``VHOST_USER_F_PROTOCOL_FEATURES`` has not been negotiated, the
+>> -ring starts directly in the enabled state.
+>> -
+>> -If ``VHOST_USER_F_PROTOCOL_FEATURES`` has been negotiated, the ring is
+>> -initialized in a disabled state and is enabled by
+>> -``VHOST_USER_SET_VRING_ENABLE`` with parameter 1.
+>> +If ``VHOST_USER_SET_FEATURES`` does not negotiate
+>> +``VHOST_USER_F_PROTOCOL_FEATURES``, rings are enabled immediately when
+>> +started.
+>> +
+>> +If ``VHOST_USER_SET_FEATURES`` does negotiate
+>> +``VHOST_USER_F_PROTOCOL_FEATURES``, each ring will remain in the disabled
+>> +state until ``VHOST_USER_SET_VRING_ENABLE`` enables it with parameter 1.
+>> +
+>> +Back-end implementations that support ``VHOST_USER_F_PROTOCOL_FEATURES``
+>> +should implement this by initializing each ring in a disabled state, and
+>> +enabling them when ``VHOST_USER_SET_FEATURES`` is used without
+>> +negotiating ``VHOST_USER_F_PROTOCOL_FEATURES``.  Other than that, rings
+>> +should only be enabled and disabled through
+>> +``VHOST_USER_SET_VRING_ENABLE``.
+> The "Ring states" section starts by saying there are three states:
+> "stopped", "started but disabled", and "started and enabled". But this
+> patch talks about a "disabled state". Can you rephrase this patch to use
+> the exact state names defined earlier in the spec?
 
-Absolutely.  vhost_dev_stop() is not in the migration-specific path, but 
-is called whenever the vCPUs are stopped, which indeed happens to be 
-part of migration, but is also used in other cases, like QMP stop.  We 
-have identified that it is wrong that we reset the back-end just because 
-the vCPUs are stopped (e.g. on migration), but it is what we do right 
-now when the VM is paused (e.g. through QMP stop).
+I would not want to do that.  We had the exact problem that the spec 
+wanted to remain high-level, and was not reflecting exactly what 
+existing implementations did, which resulted in confusion (at least for 
+me and the vhost Rust crates authors).
 
-Therefore, stateful back-ends cannot implement reset lest stop/cont 
-breaks the device.  I don’t think anybody really cares whether a 
-vhost-user back-end actually resets its internal state (if there is any) 
-when the guest driver asks for a reset on the virtio level, as long as 
-the guest driver is then able to initialize the device afterwards.  I do 
-think people care that stop/cont works, so it follows to me that no 
-stateful back-end will reset its internal state when receiving a 
-virtio/vhost reset.  If they do, stop/cont breaks, which is a 
-user-visible bug that needs to be addressed – either properly by 
-implementing SUSPEND/RESUME in both qemu and the affected back-ends, or 
-by using a similar work-around to virtiofsd, which is to ignore reset 
-commands.
+Notably, the existing implementations I’m aware of track 
+enabled/disabled even before the ring is started, exactly as formulated 
+here.
 
-It’s hard for me to imagine that people don’t care that stop/cont breaks 
-some vhost-user back-end, but suddenly would start to care that 
-migration doesn’t work – especially given that first of all someone will 
-need to manually implement any migration support in that back-end even 
-with this series, which means that really, the only back-end we are 
-talking about here is our virtiofsd.  To this day I’m not even aware of 
-any other back-end that has internal state.
+If we changed this to read something like “If VHOST_USER_SET_FEATURES is 
+ever called without negotiating VHOST_USER_F_PROTOCOL_FEATURES, the ring 
+must be enabled immediately when it is started; otherwise, when the ring 
+is started and VHOST_USER_F_PROTOCOL_FEATURES has always been set in 
+every VHOST_USER_SET_FEATURES call, the ring should be disabled when 
+started.” then this would conflict with the existing implementations:
+
+We never disallow VHOST_USER_SET_VRING_ENABLE when the ring is stopped.  
+Existing implementations track enabled/disabled before the rings are 
+started, and they initialize this state to “disabled”, setting it to 
+“enabled” on receiving VHOST_USER_SET_FEATURES without 
+VHOST_USER_F_PROTOCOL_FEATURES, as described above.  Therefore, if you 
+call VHOST_USER_SET_VRING_ENABLE 1 before the ring is started, the ring 
+will start enabled even with VHOST_USER_F_PROTOCOL_FEATURES.  This is 
+not possible if you only have three states.
+
+Maybe we should rather clarify that enabled/disabled is tracked even 
+while the ring is stopped.
 
 Hanna
 

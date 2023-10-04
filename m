@@ -1,14 +1,11 @@
 Return-Path: <hreitz@redhat.com>
 From: Hanna Czenczek <hreitz@redhat.com>
-Date: Wed,  4 Oct 2023 14:59:03 +0200
-Message-ID: <20231004125904.110781-8-hreitz@redhat.com>
-In-Reply-To: <20231004125904.110781-1-hreitz@redhat.com>
-References: <20231004125904.110781-1-hreitz@redhat.com>
+Date: Wed,  4 Oct 2023 14:58:56 +0200
+Message-ID: <20231004125904.110781-1-hreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 7/8] vhost: Add high-level state save/load
- functions
+Subject: [Virtio-fs] [PATCH v4 0/8] vhost-user: Back-end state migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,278 +17,93 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: Hanna Czenczek <hreitz@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, =?UTF-8?q?Eugenio=20P=C3=A9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
-vhost_save_backend_state() and vhost_load_backend_state() can be used by
-vhost front-ends to easily save and load the back-end's state to/from
-the migration stream.
+RFC:
+https://lists.nongnu.org/archive/html/qemu-devel/2023-03/msg04263.html
 
-Because we do not know the full state size ahead of time,
-vhost_save_backend_state() simply reads the data in 1 MB chunks, and
-writes each chunk consecutively into the migration stream, prefixed by
-its length.  EOF is indicated by a 0-length chunk.
+v1:
+https://lists.nongnu.org/archive/html/qemu-devel/2023-04/msg01575.html
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
----
- include/hw/virtio/vhost.h |  35 +++++++
- hw/virtio/vhost.c         | 204 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 239 insertions(+)
+v2:
+https://lists.nongnu.org/archive/html/qemu-devel/2023-07/msg02604.html
 
-diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
-index a0d03c9fdf..100fcc874d 100644
---- a/include/hw/virtio/vhost.h
-+++ b/include/hw/virtio/vhost.h
-@@ -426,4 +426,39 @@ int vhost_set_device_state_fd(struct vhost_dev *dev,
-  */
- int vhost_check_device_state(struct vhost_dev *dev, Error **errp);
- 
-+/**
-+ * vhost_save_backend_state(): High-level function to receive a vhost
-+ * back-end's state, and save it in @f.  Uses
-+ * `vhost_set_device_state_fd()` to get the data from the back-end, and
-+ * stores it in consecutive chunks that are each prefixed by their
-+ * respective length (be32).  The end is marked by a 0-length chunk.
-+ *
-+ * Must only be called while the device and all its vrings are stopped
-+ * (`VHOST_TRANSFER_STATE_PHASE_STOPPED`).
-+ *
-+ * @dev: The vhost device from which to save the state
-+ * @f: Migration stream in which to save the state
-+ * @errp: Potential error message
-+ *
-+ * Returns 0 on success, and -errno otherwise.
-+ */
-+int vhost_save_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp);
-+
-+/**
-+ * vhost_load_backend_state(): High-level function to load a vhost
-+ * back-end's state from @f, and send it over to the back-end.  Reads
-+ * the data from @f in the format used by `vhost_save_state()`, and uses
-+ * `vhost_set_device_state_fd()` to transfer it to the back-end.
-+ *
-+ * Must only be called while the device and all its vrings are stopped
-+ * (`VHOST_TRANSFER_STATE_PHASE_STOPPED`).
-+ *
-+ * @dev: The vhost device to which to send the sate
-+ * @f: Migration stream from which to load the state
-+ * @errp: Potential error message
-+ *
-+ * Returns 0 on success, and -errno otherwise.
-+ */
-+int vhost_load_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp);
-+
- #endif
-diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
-index 85e199f0aa..1465adf13a 100644
---- a/hw/virtio/vhost.c
-+++ b/hw/virtio/vhost.c
-@@ -2133,3 +2133,207 @@ int vhost_check_device_state(struct vhost_dev *dev, Error **errp)
-                "vhost transport does not support migration state transfer");
-     return -ENOSYS;
- }
-+
-+int vhost_save_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp)
-+{
-+    /* Maximum chunk size in which to transfer the state */
-+    const size_t chunk_size = 1 * 1024 * 1024;
-+    g_autofree void *transfer_buf = NULL;
-+    g_autoptr(GError) g_err = NULL;
-+    int pipe_fds[2], read_fd = -1, write_fd = -1, reply_fd = -1;
-+    int ret;
-+
-+    /* [0] for reading (our end), [1] for writing (back-end's end) */
-+    if (!g_unix_open_pipe(pipe_fds, FD_CLOEXEC, &g_err)) {
-+        error_setg(errp, "Failed to set up state transfer pipe: %s",
-+                   g_err->message);
-+        ret = -EINVAL;
-+        goto fail;
-+    }
-+
-+    read_fd = pipe_fds[0];
-+    write_fd = pipe_fds[1];
-+
-+    /*
-+     * VHOST_TRANSFER_STATE_PHASE_STOPPED means the device must be stopped.
-+     * Ideally, it is suspended, but SUSPEND/RESUME currently do not exist for
-+     * vhost-user, so just check that it is stopped at all.
-+     */
-+    assert(!dev->started);
-+
-+    /* Transfer ownership of write_fd to the back-end */
-+    ret = vhost_set_device_state_fd(dev,
-+                                    VHOST_TRANSFER_STATE_DIRECTION_SAVE,
-+                                    VHOST_TRANSFER_STATE_PHASE_STOPPED,
-+                                    write_fd,
-+                                    &reply_fd,
-+                                    errp);
-+    if (ret < 0) {
-+        error_prepend(errp, "Failed to initiate state transfer: ");
-+        goto fail;
-+    }
-+
-+    /* If the back-end wishes to use a different pipe, switch over */
-+    if (reply_fd >= 0) {
-+        close(read_fd);
-+        read_fd = reply_fd;
-+    }
-+
-+    transfer_buf = g_malloc(chunk_size);
-+
-+    while (true) {
-+        ssize_t read_ret;
-+
-+        read_ret = RETRY_ON_EINTR(read(read_fd, transfer_buf, chunk_size));
-+        if (read_ret < 0) {
-+            ret = -errno;
-+            error_setg_errno(errp, -ret, "Failed to receive state");
-+            goto fail;
-+        }
-+
-+        assert(read_ret <= chunk_size);
-+        qemu_put_be32(f, read_ret);
-+
-+        if (read_ret == 0) {
-+            /* EOF */
-+            break;
-+        }
-+
-+        qemu_put_buffer(f, transfer_buf, read_ret);
-+    }
-+
-+    /*
-+     * Back-end will not really care, but be clean and close our end of the pipe
-+     * before inquiring the back-end about whether transfer was successful
-+     */
-+    close(read_fd);
-+    read_fd = -1;
-+
-+    /* Also, verify that the device is still stopped */
-+    assert(!dev->started);
-+
-+    ret = vhost_check_device_state(dev, errp);
-+    if (ret < 0) {
-+        goto fail;
-+    }
-+
-+    ret = 0;
-+fail:
-+    if (read_fd >= 0) {
-+        close(read_fd);
-+    }
-+
-+    return ret;
-+}
-+
-+int vhost_load_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp)
-+{
-+    size_t transfer_buf_size = 0;
-+    g_autofree void *transfer_buf = NULL;
-+    g_autoptr(GError) g_err = NULL;
-+    int pipe_fds[2], read_fd = -1, write_fd = -1, reply_fd = -1;
-+    int ret;
-+
-+    /* [0] for reading (back-end's end), [1] for writing (our end) */
-+    if (!g_unix_open_pipe(pipe_fds, FD_CLOEXEC, &g_err)) {
-+        error_setg(errp, "Failed to set up state transfer pipe: %s",
-+                   g_err->message);
-+        ret = -EINVAL;
-+        goto fail;
-+    }
-+
-+    read_fd = pipe_fds[0];
-+    write_fd = pipe_fds[1];
-+
-+    /*
-+     * VHOST_TRANSFER_STATE_PHASE_STOPPED means the device must be stopped.
-+     * Ideally, it is suspended, but SUSPEND/RESUME currently do not exist for
-+     * vhost-user, so just check that it is stopped at all.
-+     */
-+    assert(!dev->started);
-+
-+    /* Transfer ownership of read_fd to the back-end */
-+    ret = vhost_set_device_state_fd(dev,
-+                                    VHOST_TRANSFER_STATE_DIRECTION_LOAD,
-+                                    VHOST_TRANSFER_STATE_PHASE_STOPPED,
-+                                    read_fd,
-+                                    &reply_fd,
-+                                    errp);
-+    if (ret < 0) {
-+        error_prepend(errp, "Failed to initiate state transfer: ");
-+        goto fail;
-+    }
-+
-+    /* If the back-end wishes to use a different pipe, switch over */
-+    if (reply_fd >= 0) {
-+        close(write_fd);
-+        write_fd = reply_fd;
-+    }
-+
-+    while (true) {
-+        size_t this_chunk_size = qemu_get_be32(f);
-+        ssize_t write_ret;
-+        const uint8_t *transfer_pointer;
-+
-+        if (this_chunk_size == 0) {
-+            /* End of state */
-+            break;
-+        }
-+
-+        if (transfer_buf_size < this_chunk_size) {
-+            transfer_buf = g_realloc(transfer_buf, this_chunk_size);
-+            transfer_buf_size = this_chunk_size;
-+        }
-+
-+        if (qemu_get_buffer(f, transfer_buf, this_chunk_size) <
-+                this_chunk_size)
-+        {
-+            error_setg(errp, "Failed to read state");
-+            ret = -EINVAL;
-+            goto fail;
-+        }
-+
-+        transfer_pointer = transfer_buf;
-+        while (this_chunk_size > 0) {
-+            write_ret = RETRY_ON_EINTR(
-+                write(write_fd, transfer_pointer, this_chunk_size)
-+            );
-+            if (write_ret < 0) {
-+                ret = -errno;
-+                error_setg_errno(errp, -ret, "Failed to send state");
-+                goto fail;
-+            } else if (write_ret == 0) {
-+                error_setg(errp, "Failed to send state: Connection is closed");
-+                ret = -ECONNRESET;
-+                goto fail;
-+            }
-+
-+            assert(write_ret <= this_chunk_size);
-+            this_chunk_size -= write_ret;
-+            transfer_pointer += write_ret;
-+        }
-+    }
-+
-+    /*
-+     * Close our end, thus ending transfer, before inquiring the back-end about
-+     * whether transfer was successful
-+     */
-+    close(write_fd);
-+    write_fd = -1;
-+
-+    /* Also, verify that the device is still stopped */
-+    assert(!dev->started);
-+
-+    ret = vhost_check_device_state(dev, errp);
-+    if (ret < 0) {
-+        goto fail;
-+    }
-+
-+    ret = 0;
-+fail:
-+    if (write_fd >= 0) {
-+        close(write_fd);
-+    }
-+
-+    return ret;
-+}
+v3:
+https://lists.nongnu.org/archive/html/qemu-devel/2023-09/msg03750.html
+
+
+Based-on: <20231004014532.1228637-1-stefanha@redhat.com>
+          ([PATCH v2 0/3] vhost: clean up device reset)
+
+
+Hi,
+
+This v4 includes largely unchanged patches from v3.  The main
+addition/change is what came out of the discussion between Stefan and me
+around how to proceed without SUSPEND/RESUME, which is that this series
+is now based on his reset fix, and it includes more documentation
+changes.
+
+Changes in detail:
+
+- Patch 1: Fall-out from the reset fix: Currently, the status byte is
+  effectively unused (qemu only uses it for resetting, which all
+  back-ends ignore; DPDK uses it to announce potential feature
+  negotiation failure, which qemu ignores).  It is also not defined what
+  exactly front-end or back-end should do with this byte, except
+  pointing at the virtio spec, which however naturally does not say how
+  this integrates with vhost-user’s RESET_DEVICE or [GS]ET_FEATURES.
+  Furthermore, there does not seem to be a use for this; we have
+  RESET_DEVICE for resetting, and we have [GS]ET_FEATURES (and
+  REPLY_ACK, which can be used on SET_FEATURES) for feature
+  negotation.
+  Therefore, deprecate the status byte, pointing to those other commands
+  instead.
+
+- Patch 2: Patch 4 defines a suspended state for the whole back-end if
+  all vrings are stopped.  I think this should be mentioned in
+  GET_VRING_BASE, but upon trying to add it, I found that it does not
+  even mention that it stops the vring (mentioned only in the Ring
+  States section), and remembered that the whole description of both
+  GET_VRING_BASE and SET_VRING_BASE really was not helpful when trying
+  to implement a vhost-user back-end.  Took the opportunity to overhaul
+  both.
+
+- Patch 3: This one’s from v3, but quite heavily modified.  Stefan
+  suggested consistently defining the started/stopped and
+  enabled/disabled states to be independent, and indeed doing so
+  simplifies a whole lot of stuff.  Specifically, it makes the magic
+  “enabled/disabled when started” go away.  Basically, I found this
+  change alone is enough to remove the confusion I had with the existing
+  documentation.
+
+- Patch 4: As suggested by Stefan, just define a suspended state without
+  introducing SUSPEND.  vDPA needs SUSPEND because its GET_VRING_BASE
+  does not stop the vring, but vhost-user’s does, so we can define the
+  suspended state to be when all vrings are stopped.
+
+- Patch 5: Reference the suspended state.
+
+- Patches 6 through 8: Unmodified, except for them being rebase on
+  Stefan’s series.
+
+
+Hanna Czenczek (8):
+  vhost-user.rst: Deprecate [GS]ET_STATUS
+  vhost-user.rst: Improve [GS]ET_VRING_BASE doc
+  vhost-user.rst: Clarify enabling/disabling vrings
+  vhost-user.rst: Introduce suspended state
+  vhost-user.rst: Migrating back-end-internal state
+  vhost-user: Interface for migration state transfer
+  vhost: Add high-level state save/load functions
+  vhost-user-fs: Implement internal migration
+
+ docs/interop/vhost-user.rst       | 318 +++++++++++++++++++++++++++---
+ include/hw/virtio/vhost-backend.h |  24 +++
+ include/hw/virtio/vhost.h         | 113 +++++++++++
+ hw/virtio/vhost-user-fs.c         | 101 +++++++++-
+ hw/virtio/vhost-user.c            | 148 ++++++++++++++
+ hw/virtio/vhost.c                 | 241 ++++++++++++++++++++++
+ 6 files changed, 917 insertions(+), 28 deletions(-)
+
 -- 
 2.41.0
 

@@ -1,13 +1,13 @@
 Return-Path: <hreitz@redhat.com>
 From: Hanna Czenczek <hreitz@redhat.com>
-Date: Wed,  4 Oct 2023 14:58:57 +0200
-Message-ID: <20231004125904.110781-2-hreitz@redhat.com>
+Date: Wed,  4 Oct 2023 14:59:00 +0200
+Message-ID: <20231004125904.110781-5-hreitz@redhat.com>
 In-Reply-To: <20231004125904.110781-1-hreitz@redhat.com>
 References: <20231004125904.110781-1-hreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 1/8] vhost-user.rst: Deprecate [GS]ET_STATUS
+Subject: [Virtio-fs] [PATCH v4 4/8] vhost-user.rst: Introduce suspended state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,84 +19,66 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: Hanna Czenczek <hreitz@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, =?UTF-8?q?Eugenio=20P=C3=A9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
-There is no clearly defined purpose for the virtio status byte in
-vhost-user: For resetting, we already have RESET_DEVICE; and for virtio
-feature negotiation, we have [GS]ET_FEATURES.  With the REPLY_ACK
-protocol extension, it is possible for SET_FEATURES to return errors
-(SET_PROTOCOL_FEATURES may be called before SET_FEATURES).
+In vDPA, GET_VRING_BASE does not stop the queried vring, which is why
+SUSPEND was introduced so that the returned index would be stable.  In
+vhost-user, it does stop the vring, so under the same reasoning, it can
+get away without SUSPEND.
 
-As for implementations, SET_STATUS is not widely implemented.  dpdk does
-implement it, but only uses it to signal feature negotiation failure.
-While it does log reset requests (SET_STATUS 0) as such, it effectively
-ignores them, in contrast to RESET_OWNER (which is deprecated, and today
-means the same thing as RESET_DEVICE).
-
-While qemu superficially has support for [GS]ET_STATUS, it does not
-forward the guest-set status byte, but instead just makes it up
-internally, and actually completely ignores what the back-end returns,
-only using it as the template for a subsequent SET_STATUS to add single
-bits to it.  Notably, after setting FEATURES_OK, it never reads it back
-to see whether the flag is still set, which is the only way in which
-dpdk uses the status byte.
-
-As-is, no front-end or back-end can rely on the other side handling this
-field in a useful manner, and it also provides no practical use over
-other mechanisms the vhost-user protocol has, which are more clearly
-defined.  Deprecate it.
+Still, we do want to clarify that if the device is completely stopped,
+i.e. all vrings are stopped, the back-end should cease to modify any
+state relating to the guest.  Do this by calling it "suspended".
 
 Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
 Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
 ---
- docs/interop/vhost-user.rst | 28 +++++++++++++++++++++-------
- 1 file changed, 21 insertions(+), 7 deletions(-)
+ docs/interop/vhost-user.rst | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
 diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-index 5a070adbc1..2f68e67a1a 100644
+index 9f4940a036..d282155562 100644
 --- a/docs/interop/vhost-user.rst
 +++ b/docs/interop/vhost-user.rst
-@@ -1424,21 +1424,35 @@ Front-end message types
-   :request payload: ``u64``
-   :reply payload: N/A
+@@ -426,6 +426,19 @@ back-end must enable all rings immediately.
+ While processing the rings (whether they are enabled or not), the back-end
+ must support changing some configuration aspects on the fly.
  
--  When the ``VHOST_USER_PROTOCOL_F_STATUS`` protocol feature has been
--  successfully negotiated, this message is submitted by the front-end to
--  notify the back-end with updated device status as defined in the Virtio
-+.. admonition:: Deprecated
++.. _suspended_device_state:
 +
-+  This is no longer used. Used to be sent by the front-end to notify the
-+  back-end with updated device status as defined in the Virtio
-   specification.
- 
-+  However, its purpose in vhost-user was never well-defined; for
-+  example, how or if it would replace VHOST_USER_RESET_DEVICE, or how it
-+  integrates with the feature negotiation phase.  Therefore,
-+  implementations in practice were less than strict in how the status
-+  value was handled, which means there was actually no protocol between
-+  front-end and back-end on the use of the status value.
++Suspended device state
++^^^^^^^^^^^^^^^^^^^^^^
 +
-+  For resetting, use VHOST_USER_RESET_DEVICE instead.  For feature
-+  negotiation with acknowledgment from the device, use
-+  VHOST_USER_SET_FEATURES with the :ref:`REPLY_ACK <reply_ack>` feature
-+  instead.
++While all vrings are stopped, the device is *suspended*.  In addition to
++not processing any vring (because they are stopped), the device must:
 +
- ``VHOST_USER_GET_STATUS``
-   :id: 40
-   :equivalent ioctl: VHOST_VDPA_GET_STATUS
-   :request payload: N/A
-   :reply payload: ``u64``
- 
--  When the ``VHOST_USER_PROTOCOL_F_STATUS`` protocol feature has been
--  successfully negotiated, this message is submitted by the front-end to
--  query the back-end for its device status as defined in the Virtio
--  specification.
-+.. admonition:: Deprecated
++* not write to any guest memory regions,
++* not send any notifications to the guest,
++* not send any messages to the front-end,
++* still process and reply to messages from the front-end.
 +
-+  This is no longer used. Used to be sent by the front-end to query the
-+  back-end for its device status as defined in the Virtio specification.
-+  Deprecated together with VHOST_USER_SET_STATUS.
+ Multiple queue support
+ ----------------------
  
+@@ -513,7 +526,8 @@ ancillary data, it may be used to inform the front-end that the log has
+ been modified.
  
- Back-end message types
+ Once the source has finished migration, rings will be stopped by the
+-source. No further update must be done before rings are restarted.
++source (:ref:`Suspended device state <suspended_device_state>`). No
++further update must be done before rings are restarted.
+ 
+ In postcopy migration the back-end is started before all the memory has
+ been received from the source host, and care must be taken to avoid
+@@ -1101,6 +1115,10 @@ Front-end message types
+   (*a vring descriptor index for split virtqueues* vs. *vring descriptor
+   indices for packed virtqueues*).
+ 
++  When and as long as all of a device’s vrings are stopped, it is
++  *suspended*, see :ref:`Suspended device state
++  <suspended_device_state>`.
++
+   The request payload’s *num* field is currently reserved and must be
+   set to 0.
+ 
 -- 
 2.41.0
 

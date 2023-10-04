@@ -1,12 +1,14 @@
-Return-Path: <alise.y@vicmarketsreport.com>
-Message-ID: <AOkAWwCmFw2gTJUL65JTkapY.1.1686737915814.Hmail.alise.y@vicmarketsreport.com>
+Return-Path: <hreitz@redhat.com>
+From: Hanna Czenczek <hreitz@redhat.com>
+Date: Wed,  4 Oct 2023 14:59:01 +0200
+Message-ID: <20231004125904.110781-6-hreitz@redhat.com>
+In-Reply-To: <20231004125904.110781-1-hreitz@redhat.com>
+References: <20231004125904.110781-1-hreitz@redhat.com>
 MIME-Version: 1.0
-From: Alise <alise.y@vicmarketsreport.com>
-Date: Wed, 14 Jun 2023 18:18:35 +0800 (GMT+08:00)
-Content-Type: multipart/alternative;
- BOUNDARY="=_Part_546589_1490931485.1686737915814"
-Subject: [Virtio-fs] =?utf-8?b?5biC5Zy656CU56m2IEEgbWFya2V0IHJlcG9ydCBv?=
- =?utf-8?q?n_Rare_Earth_Oxides_And_Rare_Earth_Compound_2023?=
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v4 5/8] vhost-user.rst: Migrating
+ back-end-internal state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,281 +17,250 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: Hanna Czenczek <hreitz@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, =?UTF-8?q?Eugenio=20P=C3=A9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
---=_Part_546589_1490931485.1686737915814
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: base64
+For vhost-user devices, qemu can migrate the virtio state, but not the
+back-end's internal state.  To do so, we need to be able to transfer
+this internal state between front-end (qemu) and back-end.
 
-SGkgdGhlcmUsClRoaXMgaXMgYSBSYXJlIEVhcnRoIE94aWRlcyBBbmQgUmFyZSBFYXJ0aCBDb21w
-b3VuZCBtYXJrZXQgYW5hbHlzaXMgcmVwb3J0IDIwMjMuIElmIHlvdSBhcmUgaW50ZXJlc3RlZCBp
-biB0aGlzIHJlcG9ydCBvciByZWxhdGVkIHJlcG9ydHMsIHBsZWFzZSBsZXQgbWUga25vdyBhbmQg
-SSB3aWxsIGJlIGhhcHB5IHRvIHNoYXJlIHNhbXBsZSByZXBvcnRzIHdpdGggeW91LgpNYW51ZmFj
-dHVyZXJzIExpc3RlZCBpbiB0aGUgcmVwb3J0OgogICAgQmVpZmFuZyBSYXJlIEVhcnRoCiAgICBM
-eW5hcyBDb3Jwb3JhdGlvbgogICAgTW9seWNvcnAKICAgIFNoaW4tRXRzdSBDaGVtaWNhbAogICAg
-SWx1a2EgUmVzb3VyY2VzCiAgICBBcmFmdXJhIFJlc291cmNlcwogICAgQWxrYW5lIFJlc291cmNl
-cwogICAgR3JlYXQgV2VzdGVybiBNaW5lcmFscyBHcm91cAogICAgUGVhayBSYXJlIEVhcnRocwog
-ICAgVWNvcmUgUmFyZSBNZXRhbHMKICAgIFRhbnRhbHVzIFJhcmUgRWFydGhzCiAgICBJbnRlcm5h
-dGlvbmFsIEZlcnJvIE1ldGFscwouLi4uLi4KTWF5YmUgaXQgd2lsbCBoZWxwIHRoZSBwcm9qZWN0
-IGxlYWRlci4gV2Ugd291bGQgYXBwcmVjaWF0ZSBpdCBpZiB5b3UgY291bGQgZm9yd2FyZCBpdC4K
-V2lzaCB5b3UgYSBuaWNlIGRheS4KQXByaWwgKFNhbGVzIE1hbmFnZXIpClQ6ICs4NiAxODgyMDE4
-MTQxNQpFOiBhcHJpbEB2aWNtYXJrZXRyZXNlYXJjaC5jb20KCgoNCg0K
---=_Part_546589_1490931485.1686737915814
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: base64
+At this point, this new feature is added for the purpose of virtio-fs
+migration.  Because virtiofsd's internal state will not be too large, we
+believe it is best to transfer it as a single binary blob after the
+streaming phase.
 
-PGRpdiBzdHlsZT0ibGluZS1oZWlnaHQ6MS43O2NvbG9yOiMwMDAwMDA7Zm9udC1zaXplOjE0cHg7
-Zm9udC1mYW1pbHk6QXJpYWwiPjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdo
-dDoxNTAlOyI+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxp
-YnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6
-J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owpt
-c28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+SGkgdGhlcmUsPC9zcGFuPjxzcGFuIHN0eWxlPSJt
-c28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZh
-bWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUt
-aGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBw
-dDsiPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD48cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGlu
-ZS1oZWlnaHQ6MTUwJTsiPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1p
-bHk65a6L5L2TO21zby1hc2NpaS1mb250LWZhbWlseTpDYWxpYnJpOwptc28taGFuc2ktZm9udC1m
-YW1pbHk6Q2FsaWJyaTttc28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5l
-LWhlaWdodDoxNTAlOwpmb250LXNpemU6MTIuMDAwMHB0O21zby1mb250LWtlcm5pbmc6MS4wMDAw
-cHQ7Ij48Zm9udCBmYWNlPSJDYWxpYnJpIj5UaGlzIGlzIGEgPC9mb250Pjwvc3Bhbj48c3BhbiBz
-dHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OuWui+S9kzttc28tYXNjaWktZm9u
-dC1mYW1pbHk6Q2FsaWJyaTsKbXNvLWhhbnNpLWZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWJpZGkt
-Zm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTsKY29sb3I6cmdi
-KDAsMCwyNTUpO2ZvbnQtc2l6ZToxMi4wMDAwcHQ7bXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsi
-Pjxmb250IGZhY2U9IkNhbGlicmkiPlJhcmUgRWFydGggT3hpZGVzIEFuZCBSYXJlIEVhcnRoIENv
-bXBvdW5kPC9mb250Pjwvc3Bhbj48c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQt
-ZmFtaWx5OuWui+S9kzttc28tYXNjaWktZm9udC1mYW1pbHk6Q2FsaWJyaTsKbXNvLWhhbnNpLWZv
-bnQtZmFtaWx5OkNhbGlicmk7bXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7
-bGluZS1oZWlnaHQ6MTUwJTsKY29sb3I6cmdiKDAsMTEyLDE5Mik7Zm9udC1zaXplOjEyLjAwMDBw
-dDttc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7PC9zcGFuPjxzcGFuIHN0eWxlPSJt
-c28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk65a6L5L2TO21zby1hc2NpaS1mb250LWZhbWls
-eTpDYWxpYnJpOwptc28taGFuc2ktZm9udC1mYW1pbHk6Q2FsaWJyaTttc28tYmlkaS1mb250LWZh
-bWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlOwpmb250LXNpemU6MTIuMDAw
-MHB0O21zby1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij48Zm9udCBmYWNlPSJDYWxpYnJpIj5tYXJr
-ZXQgYW5hbHlzaXMgcmVwb3J0IDwvZm9udD48L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1
-bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9
-kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUw
-JTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+MjAyMzwv
-c3Bhbj48c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OuWui+S9kztt
-c28tYXNjaWktZm9udC1mYW1pbHk6Q2FsaWJyaTsKbXNvLWhhbnNpLWZvbnQtZmFtaWx5OkNhbGli
-cmk7bXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUw
-JTsKZm9udC1zaXplOjEyLjAwMDBwdDttc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+PGZvbnQg
-ZmFjZT0iQ2FsaWJyaSI+LjwvZm9udD48L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjon
-eWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsK
-bXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtm
-b250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7SWYg
-eW91IGFyZSBpbnRlcmVzdGVkIGluIHRoaXMgcmVwb3J0IG9yIHJlbGF0ZWQgcmVwb3J0cywgcGxl
-YXNlIGxldCBtZSBrbm93IGFuZCBJIHdpbGwgYmUgaGFwcHkgdG8gc2hhcmUgc2FtcGxlIHJlcG9y
-dHMgd2l0aCB5b3U8L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZh
-bWlseTrlrovkvZM7bXNvLWFzY2lpLWZvbnQtZmFtaWx5OkNhbGlicmk7Cm1zby1oYW5zaS1mb250
-LWZhbWlseTpDYWxpYnJpO21zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xp
-bmUtaGVpZ2h0OjE1MCU7CmZvbnQtc2l6ZToxMi4wMDAwcHQ7bXNvLWZvbnQta2VybmluZzoxLjAw
-MDBwdDsiPjxmb250IGZhY2U9IkNhbGlicmkiPi48L2ZvbnQ+PC9zcGFuPjxzcGFuIHN0eWxlPSJt
-c28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk65a6L5L2TO21zby1hc2NpaS1mb250LWZhbWls
-eTpDYWxpYnJpOwptc28taGFuc2ktZm9udC1mYW1pbHk6Q2FsaWJyaTttc28tYmlkaS1mb250LWZh
-bWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlOwpmb250LXNpemU6MTIuMDAw
-MHB0O21zby1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij48bzpwPjwvbzpwPjwvc3Bhbj48L3A+PHAg
-Y2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE1MCU7Ij48c3BhbiBzdHlsZT0i
-bXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWZhcmVhc3QtZm9udC1m
-YW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5l
-LWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4wMDAwcHQ7Cm1zby1mb250LWtlcm5pbmc6MS4wMDAw
-cHQ7Ij5NYW51ZmFjdHVyZXJzIExpc3RlZCBpbiB0aGUgPC9zcGFuPjxzcGFuIHN0eWxlPSJtc28t
-c3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk65a6L5L2TO21zby1hc2NpaS1mb250LWZhbWlseTpD
-YWxpYnJpOwptc28taGFuc2ktZm9udC1mYW1pbHk6Q2FsaWJyaTttc28tYmlkaS1mb250LWZhbWls
-eTonVGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlOwpmb250LXNpemU6MTIuMDAwMHB0
-O21zby1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij48Zm9udCBmYWNlPSJDYWxpYnJpIj5yPC9mb250
-Pjwvc3Bhbj48c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OkNhbGli
-cmk7bXNvLWZhcmVhc3QtZm9udC1mYW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250LWZhbWlseTon
-VGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4wMDAwcHQ7Cm1z
-by1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij5lcG9ydDo8L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1z
-cGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5
-OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWln
-aHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+
-PG86cD48L286cD48L3NwYW4+PC9wPjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhl
-aWdodDoxNTAlOyI+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpD
-YWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1p
-bHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0
-Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7QmVp
-ZmFuZyBSYXJlIEVhcnRoPC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9u
-dC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRp
-LWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXpl
-OjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPjxvOnA+PC9vOnA+PC9zcGFu
-PjwvcD48cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTUwJTsiPjxzcGFu
-IHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFz
-dC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9t
-YW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2Vybmlu
-ZzoxLjAwMDBwdDsiPiZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwO0x5bmFzIENvcnBvcmF0aW9uPC9z
-cGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTtt
-c28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1l
-cyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZv
-bnQta2VybmluZzoxLjAwMDBwdDsiPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD48cCBjbGFzcz0iTXNv
-Tm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTUwJTsiPjxzcGFuIHN0eWxlPSJtc28tc3BhY2Vy
-dW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovk
-vZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1
-MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPiZuYnNw
-OyZuYnNwOyZuYnNwOyZuYnNwO01vbHljb3JwPC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2Vy
-dW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovk
-vZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1
-MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPjxvOnA+
-PC9vOnA+PC9zcGFuPjwvcD48cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6
-MTUwJTsiPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJy
-aTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidU
-aW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNv
-LWZvbnQta2VybmluZzoxLjAwMDBwdDsiPiZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwO1NoaW4tRXRz
-dSBDaGVtaWNhbDwvc3Bhbj48c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFt
-aWx5OkNhbGlicmk7bXNvLWZhcmVhc3QtZm9udC1mYW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250
-LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4w
-MDAwcHQ7Cm1zby1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij48bzpwPjwvbzpwPjwvc3Bhbj48L3A+
-PHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE1MCU7Ij48c3BhbiBzdHls
-ZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWZhcmVhc3QtZm9u
-dC1mYW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJzts
-aW5lLWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4wMDAwcHQ7Cm1zby1mb250LWtlcm5pbmc6MS4w
-MDAwcHQ7Ij4mbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDtJbHVrYSBSZXNvdXJjZXM8L3NwYW4+PHNw
-YW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJl
-YXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBS
-b21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJu
-aW5nOjEuMDAwMHB0OyI+PG86cD48L286cD48L3NwYW4+PC9wPjxwIGNsYXNzPSJNc29Ob3JtYWwi
-IHN0eWxlPSJsaW5lLWhlaWdodDoxNTAlOyI+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVz
-Jztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNv
-LWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250
-LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7Jm5ic3A7
-Jm5ic3A7Jm5ic3A7QXJhZnVyYSBSZXNvdXJjZXM8L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFj
-ZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWu
-i+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6
-MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+PG86
-cD48L286cD48L3NwYW4+PC9wPjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdo
-dDoxNTAlOyI+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxp
-YnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6
-J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owpt
-c28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7QWxrYW5l
-IFJlc291cmNlczwvc3Bhbj48c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFt
-aWx5OkNhbGlicmk7bXNvLWZhcmVhc3QtZm9udC1mYW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250
-LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4w
-MDAwcHQ7Cm1zby1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij48bzpwPjwvbzpwPjwvc3Bhbj48L3A+
-PHAgY2xhc3M9Ik1zb05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE1MCU7Ij48c3BhbiBzdHls
-ZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWZhcmVhc3QtZm9u
-dC1mYW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJzts
-aW5lLWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4wMDAwcHQ7Cm1zby1mb250LWtlcm5pbmc6MS4w
-MDAwcHQ7Ij4mbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDtHcmVhdCBXZXN0ZXJuIE1pbmVyYWxzIEdy
-b3VwPC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2Fs
-aWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5
-OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsK
-bXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD48cCBjbGFz
-cz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTUwJTsiPjxzcGFuIHN0eWxlPSJtc28t
-c3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZhbWls
-eTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVp
-Z2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsi
-PiZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwO1BlYWsgUmFyZSBFYXJ0aHM8L3NwYW4+PHNwYW4gc3R5
-bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZv
-bnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7
-bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEu
-MDAwMHB0OyI+PG86cD48L286cD48L3NwYW4+PC9wPjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxl
-PSJsaW5lLWhlaWdodDoxNTAlOyI+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250
-LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGkt
-Zm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6
-MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7Jm5ic3A7Jm5ic3A7
-Jm5ic3A7VWNvcmUgUmFyZSBNZXRhbHM8L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjon
-eWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsK
-bXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtm
-b250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+PG86cD48L286
-cD48L3NwYW4+PC9wPjxwIGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNTAl
-OyI+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21z
-by1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVz
-IE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9u
-dC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7VGFudGFsdXMgUmFy
-ZSBFYXJ0aHM8L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWls
-eTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1m
-YW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAw
-MHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+PG86cD48L286cD48L3NwYW4+PC9wPjxw
-IGNsYXNzPSJNc29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNTAlOyI+PHNwYW4gc3R5bGU9
-Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQt
-ZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGlu
-ZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAw
-MHB0OyI+Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7SW50ZXJuYXRpb25hbCBGZXJybyBNZXRhbHM8
-L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJp
-O21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1Rp
-bWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28t
-Zm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+PG86cD48L286cD48L3NwYW4+PC9wPjxwIGNsYXNzPSJN
-c29Ob3JtYWwiIHN0eWxlPSJsaW5lLWhlaWdodDoxNTAlOyI+PHNwYW4gc3R5bGU9Im1zby1zcGFj
-ZXJ1bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWu
-i+S9kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6
-MTUwJTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Li4u
-Li4uPC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2Fs
-aWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5
-OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsK
-bXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD48cCBjbGFz
-cz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWlnaHQ6MTUwJTsiPjxzcGFuIHN0eWxlPSJtc28t
-c3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZhbWls
-eTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVp
-Z2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsi
-Pk1heWJlIGl0IHdpbGwgaGVscCB0aGUgcHJvamVjdCBsZWFkZXIuIFdlIHdvdWxkIGFwcHJlY2lh
-dGUgaXQgaWYgeW91IGNvdWxkIGZvcndhcmQgaXQuPC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3Bh
-Y2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrl
-rovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0
-OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPjxv
-OnA+PC9vOnA+PC9zcGFuPjwvcD48cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGluZS1oZWln
-aHQ6MTUwJTsiPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2Fs
-aWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5
-OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsK
-bXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPldpc2ggeW91IGEgbmljZSBkYXkuIDwvc3Bhbj48
-c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWZh
-cmVhc3QtZm9udC1mYW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3
-IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4wMDAwcHQ7Cm1zby1mb250LWtl
-cm5pbmc6MS4wMDAwcHQ7Ij48bzpwPjwvbzpwPjwvc3Bhbj48L3A+PHAgY2xhc3M9Ik1zb05vcm1h
-bCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE1MCU7Ij48c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5
-ZXMnO2ZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWZhcmVhc3QtZm9udC1mYW1pbHk65a6L5L2TOwpt
-c28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlO2Zv
-bnQtc2l6ZToxMi4wMDAwcHQ7Cm1zby1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij5BcHJpPC9zcGFu
-PjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk65a6L5L2TO21zby1h
-c2NpaS1mb250LWZhbWlseTpDYWxpYnJpOwptc28taGFuc2ktZm9udC1mYW1pbHk6Q2FsaWJyaTtt
-c28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlOwpm
-b250LXNpemU6MTIuMDAwMHB0O21zby1mb250LWtlcm5pbmc6MS4wMDAwcHQ7Ij48Zm9udCBmYWNl
-PSJDYWxpYnJpIj5sICg8L2ZvbnQ+PC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3ll
-cyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1z
-by1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9u
-dC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPlNhbGVzIE1hbmFn
-ZXI8L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1bjoneWVzJztmb250LWZhbWlseTrlrovk
-vZM7bXNvLWFzY2lpLWZvbnQtZmFtaWx5OkNhbGlicmk7Cm1zby1oYW5zaS1mb250LWZhbWlseTpD
-YWxpYnJpO21zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0
-OjE1MCU7CmZvbnQtc2l6ZToxMi4wMDAwcHQ7bXNvLWZvbnQta2VybmluZzoxLjAwMDBwdDsiPjxm
-b250IGZhY2U9IkNhbGlicmkiPik8L2ZvbnQ+PC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2Vy
-dW46J3llcyc7Zm9udC1mYW1pbHk65a6L5L2TO21zby1hc2NpaS1mb250LWZhbWlseTpDYWxpYnJp
-Owptc28taGFuc2ktZm9udC1mYW1pbHk6Q2FsaWJyaTttc28tYmlkaS1mb250LWZhbWlseTonVGlt
-ZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlOwpmb250LXNpemU6MTIuMDAwMHB0O21zby1m
-b250LWtlcm5pbmc6MS4wMDAwcHQ7Ij48bzpwPjwvbzpwPjwvc3Bhbj48L3A+PHAgY2xhc3M9Ik1z
-b05vcm1hbCIgc3R5bGU9ImxpbmUtaGVpZ2h0OjE1MCU7Ij48c3BhbiBzdHlsZT0ibXNvLXNwYWNl
-cnVuOid5ZXMnO2ZvbnQtZmFtaWx5OuWui+S9kzttc28tYXNjaWktZm9udC1mYW1pbHk6Q2FsaWJy
-aTsKbXNvLWhhbnNpLWZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWJpZGktZm9udC1mYW1pbHk6J1Rp
-bWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUwJTsKZm9udC1zaXplOjEyLjAwMDBwdDttc28t
-Zm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+PGZvbnQgZmFjZT0iQ2FsaWJyaSI+VDogPC9mb250Pjwv
-c3Bhbj48c3BhbiBzdHlsZT0ibXNvLXNwYWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OkNhbGlicmk7
-bXNvLWZhcmVhc3QtZm9udC1mYW1pbHk65a6L5L2TOwptc28tYmlkaS1mb250LWZhbWlseTonVGlt
-ZXMgTmV3IFJvbWFuJztsaW5lLWhlaWdodDoxNTAlO2ZvbnQtc2l6ZToxMi4wMDAwcHQ7Cm1zby1m
-b250LWtlcm5pbmc6MS4wMDAwcHQ7Ij4rODY8L3NwYW4+PHNwYW4gc3R5bGU9Im1zby1zcGFjZXJ1
-bjoneWVzJztmb250LWZhbWlseTpDYWxpYnJpO21zby1mYXJlYXN0LWZvbnQtZmFtaWx5OuWui+S9
-kzsKbXNvLWJpZGktZm9udC1mYW1pbHk6J1RpbWVzIE5ldyBSb21hbic7bGluZS1oZWlnaHQ6MTUw
-JTtmb250LXNpemU6MTIuMDAwMHB0Owptc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+Jm5ic3A7
-PC9zcGFuPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJy
-aTttc28tZmFyZWFzdC1mb250LWZhbWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidU
-aW1lcyBOZXcgUm9tYW4nO2xpbmUtaGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNv
-LWZvbnQta2VybmluZzoxLjAwMDBwdDsiPjE4ODIwMTgxNDE1PC9zcGFuPjxzcGFuIHN0eWxlPSJt
-c28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZh
-bWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUt
-aGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBw
-dDsiPjxvOnA+PC9vOnA+PC9zcGFuPjwvcD48cCBjbGFzcz0iTXNvTm9ybWFsIiBzdHlsZT0ibGlu
-ZS1oZWlnaHQ6MTUwJTsiPjxzcGFuIHN0eWxlPSJtc28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1p
-bHk65a6L5L2TO21zby1hc2NpaS1mb250LWZhbWlseTpDYWxpYnJpOwptc28taGFuc2ktZm9udC1m
-YW1pbHk6Q2FsaWJyaTttc28tYmlkaS1mb250LWZhbWlseTonVGltZXMgTmV3IFJvbWFuJztsaW5l
-LWhlaWdodDoxNTAlOwpmb250LXNpemU6MTIuMDAwMHB0O21zby1mb250LWtlcm5pbmc6MS4wMDAw
-cHQ7Ij48Zm9udCBmYWNlPSJDYWxpYnJpIj5FOiA8L2ZvbnQ+PC9zcGFuPjxzcGFuIHN0eWxlPSJt
-c28tc3BhY2VydW46J3llcyc7Zm9udC1mYW1pbHk6Q2FsaWJyaTttc28tZmFyZWFzdC1mb250LWZh
-bWlseTrlrovkvZM7Cm1zby1iaWRpLWZvbnQtZmFtaWx5OidUaW1lcyBOZXcgUm9tYW4nO2xpbmUt
-aGVpZ2h0OjE1MCU7Zm9udC1zaXplOjEyLjAwMDBwdDsKbXNvLWZvbnQta2VybmluZzoxLjAwMDBw
-dDsiPmFwcmlsQHZpY21hcmtldHJlc2VhcmNoLmNvbTwvc3Bhbj48c3BhbiBzdHlsZT0ibXNvLXNw
-YWNlcnVuOid5ZXMnO2ZvbnQtZmFtaWx5OkNhbGlicmk7bXNvLWZhcmVhc3QtZm9udC1mYW1pbHk6
-5b6u6L2v6ZuF6buROwptc28tYmlkaS1mb250LWZhbWlseTrlvq7ova/pm4Xpu5E7Zm9udC1zaXpl
-OjEwLjUwMDBwdDttc28tZm9udC1rZXJuaW5nOjEuMDAwMHB0OyI+PG86cD48L286cD48L3NwYW4+
-PC9wPjwvZGl2Pjxicj4=
---=_Part_546589_1490931485.1686737915814--
+These are the additions to the protocol:
+- New vhost-user protocol feature VHOST_USER_PROTOCOL_F_DEVICE_STATE
+- SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a file
+  descriptor over which to transfer the state.
+- CHECK_DEVICE_STATE: After the state has been transferred through the
+  file descriptor, the front-end invokes this function to verify
+  success.  There is no in-band way (through the file descriptor) to
+  indicate failure, so we need to check explicitly.
+
+Once the transfer FD has been established via SET_DEVICE_STATE_FD
+(which includes establishing the direction of transfer and migration
+phase), the sending side writes its data into it, and the reading side
+reads it until it sees an EOF.  Then, the front-end will check for
+success via CHECK_DEVICE_STATE, which on the destination side includes
+checking for integrity (i.e. errors during deserialization).
+
+Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+---
+ docs/interop/vhost-user.rst | 172 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 172 insertions(+)
+
+diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+index d282155562..aa91e2b34e 100644
+--- a/docs/interop/vhost-user.rst
++++ b/docs/interop/vhost-user.rst
+@@ -306,6 +306,32 @@ Inflight description
+ 
+ :queue size: a 16-bit size of virtqueues
+ 
++Device state transfer parameters
++^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++
+++--------------------+-----------------+
++| transfer direction | migration phase |
+++--------------------+-----------------+
++
++:transfer direction: a 32-bit enum, describing the direction in which
++  the state is transferred:
++
++  - 0: Save: Transfer the state from the back-end to the front-end,
++    which happens on the source side of migration
++  - 1: Load: Transfer the state from the front-end to the back-end,
++    which happens on the destination side of migration
++
++:migration phase: a 32-bit enum, describing the state in which the VM
++  guest and devices are:
++
++  - 0: Stopped (in the period after the transfer of memory-mapped
++    regions before switch-over to the destination): The VM guest is
++    stopped, and the vhost-user device is suspended (see
++    :ref:`Suspended device state <suspended_device_state>`).
++
++  In the future, additional phases might be added e.g. to allow
++  iterative migration while the device is running.
++
+ C structure
+ -----------
+ 
+@@ -365,6 +391,7 @@ in the ancillary data:
+ * ``VHOST_USER_SET_VRING_ERR``
+ * ``VHOST_USER_SET_BACKEND_REQ_FD`` (previous name ``VHOST_USER_SET_SLAVE_REQ_FD``)
+ * ``VHOST_USER_SET_INFLIGHT_FD`` (if ``VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD``)
++* ``VHOST_USER_SET_DEVICE_STATE_FD``
+ 
+ If *front-end* is unable to send the full message or receives a wrong
+ reply it will close the connection. An optional reconnection mechanism
+@@ -539,6 +566,80 @@ it performs WAKE ioctl's on the userfaultfd to wake the stalled
+ back-end.  The front-end indicates support for this via the
+ ``VHOST_USER_PROTOCOL_F_PAGEFAULT`` feature.
+ 
++.. _migrating_backend_state:
++
++Migrating back-end state
++^^^^^^^^^^^^^^^^^^^^^^^^
++
++Migrating device state involves transferring the state from one
++back-end, called the source, to another back-end, called the
++destination.  After migration, the destination transparently resumes
++operation without requiring the driver to re-initialize the device at
++the VIRTIO level.  If the migration fails, then the source can
++transparently resume operation until another migration attempt is made.
++
++Generally, the front-end is connected to a virtual machine guest (which
++contains the driver), which has its own state to transfer between source
++and destination, and therefore will have an implementation-specific
++mechanism to do so.  The ``VHOST_USER_PROTOCOL_F_DEVICE_STATE`` feature
++provides functionality to have the front-end include the back-end's
++state in this transfer operation so the back-end does not need to
++implement its own mechanism, and so the virtual machine may have its
++complete state, including vhost-user devices' states, contained within a
++single stream of data.
++
++To do this, the back-end state is transferred from back-end to front-end
++on the source side, and vice versa on the destination side.  This
++transfer happens over a channel that is negotiated using the
++``VHOST_USER_SET_DEVICE_STATE_FD`` message.  This message has two
++parameters:
++
++* Direction of transfer: On the source, the data is saved, transferring
++  it from the back-end to the front-end.  On the destination, the data
++  is loaded, transferring it from the front-end to the back-end.
++
++* Migration phase: Currently, the only supported phase is the period
++  after the transfer of memory-mapped regions before switch-over to the
++  destination, when both the source and destination devices are
++  suspended (:ref:`Suspended device state <suspended_device_state>`).
++  In the future, additional phases might be supported to allow iterative
++  migration while the device is running.
++
++The nature of the channel is implementation-defined, but it must
++generally behave like a pipe: The writing end will write all the data it
++has into it, signalling the end of data by closing its end.  The reading
++end must read all of this data (until encountering the end of file) and
++process it.
++
++* When saving, the writing end is the source back-end, and the reading
++  end is the source front-end.  After reading the state data from the
++  channel, the source front-end must transfer it to the destination
++  front-end through an implementation-defined mechanism.
++
++* When loading, the writing end is the destination front-end, and the
++  reading end is the destination back-end.  After reading the state data
++  from the channel, the destination back-end must deserialize its
++  internal state from that data and set itself up to allow the driver to
++  seamlessly resume operation on the VIRTIO level.
++
++Seamlessly resuming operation means that the migration must be
++transparent to the guest driver, which operates on the VIRTIO level.
++This driver will not perform any re-initialization steps, but continue
++to use the device as if no migration had occurred.  The vhost-user
++front-end, however, will re-initialize the vhost state on the
++destination, following the usual protocol for establishing a connection
++to a vhost-user back-end: This includes, for example, setting up memory
++mappings and kick and call FDs as necessary, negotiating protocol
++features, or setting the initial vring base indices (to the same value
++as on the source side, so that operation can resume).
++
++Both on the source and on the destination side, after the respective
++front-end has seen all data transferred (when the transfer FD has been
++closed), it sends the ``VHOST_USER_CHECK_DEVICE_STATE`` message to
++verify that data transfer was successful in the back-end, too.  The
++back-end responds once it knows whether the transfer and processing was
++successful or not.
++
+ Memory access
+ -------------
+ 
+@@ -932,6 +1033,7 @@ Protocol features
+   #define VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS  15
+   #define VHOST_USER_PROTOCOL_F_STATUS               16
+   #define VHOST_USER_PROTOCOL_F_XEN_MMAP             17
++  #define VHOST_USER_PROTOCOL_F_DEVICE_STATE         18
+ 
+ Front-end message types
+ -----------------------
+@@ -1532,6 +1634,76 @@ Front-end message types
+   back-end for its device status as defined in the Virtio specification.
+   Deprecated together with VHOST_USER_SET_STATUS.
+ 
++``VHOST_USER_SET_DEVICE_STATE_FD``
++  :id: 41
++  :equivalent ioctl: N/A
++  :request payload: device state transfer parameters
++  :reply payload: ``u64``
++
++  Front-end and back-end negotiate a channel over which to transfer the
++  back-end’s internal state during migration.  Either side (front-end or
++  back-end) may create the channel.  The nature of this channel is not
++  restricted or defined in this document, but whichever side creates it
++  must create a file descriptor that is provided to the respectively
++  other side, allowing access to the channel.  This FD must behave as
++  follows:
++
++  * For the writing end, it must allow writing the whole back-end state
++    sequentially.  Closing the file descriptor signals the end of
++    transfer.
++
++  * For the reading end, it must allow reading the whole back-end state
++    sequentially.  The end of file signals the end of the transfer.
++
++  For example, the channel may be a pipe, in which case the two ends of
++  the pipe fulfill these requirements respectively.
++
++  Initially, the front-end creates a channel along with such an FD.  It
++  passes the FD to the back-end as ancillary data of a
++  ``VHOST_USER_SET_DEVICE_STATE_FD`` message.  The back-end may create a
++  different transfer channel, passing the respective FD back to the
++  front-end as ancillary data of the reply.  If so, the front-end must
++  then discard its channel and use the one provided by the back-end.
++
++  Whether the back-end should decide to use its own channel is decided
++  based on efficiency: If the channel is a pipe, both ends will most
++  likely need to copy data into and out of it.  Any channel that allows
++  for more efficient processing on at least one end, e.g. through
++  zero-copy, is considered more efficient and thus preferred.  If the
++  back-end can provide such a channel, it should decide to use it.
++
++  The request payload contains parameters for the subsequent data
++  transfer, as described in the :ref:`Migrating back-end state
++  <migrating_backend_state>` section.
++
++  The value returned is both an indication for success, and whether a
++  file descriptor for a back-end-provided channel is returned: Bits 0–7
++  are 0 on success, and non-zero on error.  Bit 8 is the invalid FD
++  flag; this flag is set when there is no file descriptor returned.
++  When this flag is not set, the front-end must use the returned file
++  descriptor as its end of the transfer channel.  The back-end must not
++  both indicate an error and return a file descriptor.
++
++  Using this function requires prior negotiation of the
++  ``VHOST_USER_PROTOCOL_F_DEVICE_STATE`` feature.
++
++``VHOST_USER_CHECK_DEVICE_STATE``
++  :id: 42
++  :equivalent ioctl: N/A
++  :request payload: N/A
++  :reply payload: ``u64``
++
++  After transferring the back-end’s internal state during migration (see
++  the :ref:`Migrating back-end state <migrating_backend_state>`
++  section), check whether the back-end was able to successfully fully
++  process the state.
++
++  The value returned indicates success or error; 0 is success, any
++  non-zero value is an error.
++
++  Using this function requires prior negotiation of the
++  ``VHOST_USER_PROTOCOL_F_DEVICE_STATE`` feature.
++
+ 
+ Back-end message types
+ ----------------------
+-- 
+2.41.0
 

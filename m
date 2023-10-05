@@ -1,14 +1,10 @@
-Return-Path: <stefanha@redhat.com>
-Date: Thu, 5 Oct 2023 13:48:11 -0400
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20231005174811.GJ1342722@fedora>
-References: <20231004125904.110781-1-hreitz@redhat.com>
+Return-Path: <vgoyal@fedora.redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Thu,  5 Oct 2023 16:30:30 -0400
+Message-ID: <20231005203030.223489-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="mNw8fgYOgCi8R7Nz"
-Content-Disposition: inline
-In-Reply-To: <20231004125904.110781-1-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v4 0/8] vhost-user: Back-end state migration
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] virtiofs: Export filesystem tags through sysfs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,128 +13,104 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, German Maglione <gmaglione@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
+To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
+Cc: vgoyal@redhat.com, miklos@szeredi.hu, stefanha@redhat.com, mzxreary@0pointer.de, gmaglione@redhat.com
 
+virtiofs filesystem is mounted using a "tag" which is exported by the
+virtiofs device. virtiofs driver knows about all the available tags but
+these are not exported to user space.
 
---mNw8fgYOgCi8R7Nz
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+People have asked these tags to be exported to user space. Most recently
+Lennart Poettering has asked for it as he wants to scan the tags and mount
+virtiofs automatically in certain cases.
 
-On Wed, Oct 04, 2023 at 02:58:56PM +0200, Hanna Czenczek wrote:
-> RFC:
-> https://lists.nongnu.org/archive/html/qemu-devel/2023-03/msg04263.html
->=20
-> v1:
-> https://lists.nongnu.org/archive/html/qemu-devel/2023-04/msg01575.html
->=20
-> v2:
-> https://lists.nongnu.org/archive/html/qemu-devel/2023-07/msg02604.html
->=20
-> v3:
-> https://lists.nongnu.org/archive/html/qemu-devel/2023-09/msg03750.html
->=20
->=20
-> Based-on: <20231004014532.1228637-1-stefanha@redhat.com>
->           ([PATCH v2 0/3] vhost: clean up device reset)
->=20
->=20
-> Hi,
->=20
-> This v4 includes largely unchanged patches from v3.  The main
-> addition/change is what came out of the discussion between Stefan and me
-> around how to proceed without SUSPEND/RESUME, which is that this series
-> is now based on his reset fix, and it includes more documentation
-> changes.
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/128
 
-This looks good. I posted some minor comments on the new patches.
+This patch exports tags through sysfs. One tag is associated with each
+virtiofs device. A new "tag" file appears under virtiofs device dir.
+Actual filesystem tag can be obtained by reading this "tag" file.
 
-Stefan
+For example, if a virtiofs device exports tag "myfs", a new file "tag"
+will show up here.
 
->=20
-> Changes in detail:
->=20
-> - Patch 1: Fall-out from the reset fix: Currently, the status byte is
->   effectively unused (qemu only uses it for resetting, which all
->   back-ends ignore; DPDK uses it to announce potential feature
->   negotiation failure, which qemu ignores).  It is also not defined what
->   exactly front-end or back-end should do with this byte, except
->   pointing at the virtio spec, which however naturally does not say how
->   this integrates with vhost-user=E2=80=99s RESET_DEVICE or [GS]ET_FEATUR=
-ES.
->   Furthermore, there does not seem to be a use for this; we have
->   RESET_DEVICE for resetting, and we have [GS]ET_FEATURES (and
->   REPLY_ACK, which can be used on SET_FEATURES) for feature
->   negotation.
->   Therefore, deprecate the status byte, pointing to those other commands
->   instead.
->=20
-> - Patch 2: Patch 4 defines a suspended state for the whole back-end if
->   all vrings are stopped.  I think this should be mentioned in
->   GET_VRING_BASE, but upon trying to add it, I found that it does not
->   even mention that it stops the vring (mentioned only in the Ring
->   States section), and remembered that the whole description of both
->   GET_VRING_BASE and SET_VRING_BASE really was not helpful when trying
->   to implement a vhost-user back-end.  Took the opportunity to overhaul
->   both.
->=20
-> - Patch 3: This one=E2=80=99s from v3, but quite heavily modified.  Stefan
->   suggested consistently defining the started/stopped and
->   enabled/disabled states to be independent, and indeed doing so
->   simplifies a whole lot of stuff.  Specifically, it makes the magic
->   =E2=80=9Cenabled/disabled when started=E2=80=9D go away.  Basically, I =
-found this
->   change alone is enough to remove the confusion I had with the existing
->   documentation.
->=20
-> - Patch 4: As suggested by Stefan, just define a suspended state without
->   introducing SUSPEND.  vDPA needs SUSPEND because its GET_VRING_BASE
->   does not stop the vring, but vhost-user=E2=80=99s does, so we can defin=
-e the
->   suspended state to be when all vrings are stopped.
->=20
-> - Patch 5: Reference the suspended state.
->=20
-> - Patches 6 through 8: Unmodified, except for them being rebase on
->   Stefan=E2=80=99s series.
->=20
->=20
-> Hanna Czenczek (8):
->   vhost-user.rst: Deprecate [GS]ET_STATUS
->   vhost-user.rst: Improve [GS]ET_VRING_BASE doc
->   vhost-user.rst: Clarify enabling/disabling vrings
->   vhost-user.rst: Introduce suspended state
->   vhost-user.rst: Migrating back-end-internal state
->   vhost-user: Interface for migration state transfer
->   vhost: Add high-level state save/load functions
->   vhost-user-fs: Implement internal migration
->=20
->  docs/interop/vhost-user.rst       | 318 +++++++++++++++++++++++++++---
->  include/hw/virtio/vhost-backend.h |  24 +++
->  include/hw/virtio/vhost.h         | 113 +++++++++++
->  hw/virtio/vhost-user-fs.c         | 101 +++++++++-
->  hw/virtio/vhost-user.c            | 148 ++++++++++++++
->  hw/virtio/vhost.c                 | 241 ++++++++++++++++++++++
->  6 files changed, 917 insertions(+), 28 deletions(-)
->=20
-> --=20
-> 2.41.0
->=20
+/sys/bus/virtio/devices/virtio<N>/tag
 
---mNw8fgYOgCi8R7Nz
-Content-Type: application/pgp-signature; name="signature.asc"
+# cat /sys/bus/virtio/devices/virtio<N>/tag
+myfs
 
------BEGIN PGP SIGNATURE-----
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/virtio_fs.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUe9tsACgkQnKSrs4Gr
-c8iA0QgAgmWhPPx/hRn39Jsq3bGeI2mdhbYZbtTE18k2ZdrspkyKPMB45nc8Rj2t
-zWn/ifLC1tV2UhXYj494uHD4ACPCRv/4KqX16Su1TS3ARcOZcchc9rxmFDN+RrIl
-faoh+ybFvmDBFFjmbhP4mf/eQeWRttfWEYz9y2TJTOQKMEbpYy/c3PFX8FQrHaz6
-+xXW2UvjQ1S2A1zM7XSLWCiAIYO7cVtu5LNFmCkrUAh0fDzui891BteZZaVpYrqB
-3Kdee9cnFLhR4+KZRXTkmH7Q1VHZoJRxWhcyLURlx/9YZ5bkx/1wLUQYo8+m12Qm
-iuKHpsTjElpLmFqGG00n1C9uoOYEUQ==
-=TZJp
------END PGP SIGNATURE-----
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 5f1be1da92ce..a5b11e18f331 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -107,6 +107,21 @@ static const struct fs_parameter_spec virtio_fs_parameters[] = {
+ 	{}
+ };
+ 
++/* Forward Declarations */
++static void virtio_fs_stop_all_queues(struct virtio_fs *fs);
++
++/* sysfs related */
++static ssize_t tag_show(struct device *dev, struct device_attribute *attr,
++			char *buf)
++{
++	struct virtio_device *vdev = container_of(dev, struct virtio_device,
++						  dev);
++	struct virtio_fs *fs = vdev->priv;
++
++	return sysfs_emit(buf, "%s", fs->tag);
++}
++static DEVICE_ATTR_RO(tag);
++
+ static int virtio_fs_parse_param(struct fs_context *fsc,
+ 				 struct fs_parameter *param)
+ {
+@@ -265,6 +280,15 @@ static int virtio_fs_add_instance(struct virtio_fs *fs)
+ 	return 0;
+ }
+ 
++static void virtio_fs_remove_instance(struct virtio_fs *fs)
++{
++	mutex_lock(&virtio_fs_mutex);
++	list_del_init(&fs->list);
++	virtio_fs_stop_all_queues(fs);
++	virtio_fs_drain_all_queues_locked(fs);
++	mutex_unlock(&virtio_fs_mutex);
++}
++
+ /* Return the virtio_fs with a given tag, or NULL */
+ static struct virtio_fs *virtio_fs_find_instance(const char *tag)
+ {
+@@ -891,8 +915,15 @@ static int virtio_fs_probe(struct virtio_device *vdev)
+ 	if (ret < 0)
+ 		goto out_vqs;
+ 
++	/* Export tag through sysfs */
++	ret = device_create_file(&vdev->dev, &dev_attr_tag);
++	if (ret < 0)
++		goto out_sysfs_attr;
++
+ 	return 0;
+ 
++out_sysfs_attr:
++	virtio_fs_remove_instance(fs);
+ out_vqs:
+ 	virtio_reset_device(vdev);
+ 	virtio_fs_cleanup_vqs(vdev);
+@@ -922,6 +953,9 @@ static void virtio_fs_remove(struct virtio_device *vdev)
+ 	struct virtio_fs *fs = vdev->priv;
+ 
+ 	mutex_lock(&virtio_fs_mutex);
++	/* Remove tag attr from sysfs */
++	device_remove_file(&vdev->dev, &dev_attr_tag);
++
+ 	/* This device is going away. No one should get new reference */
+ 	list_del_init(&fs->list);
+ 	virtio_fs_stop_all_queues(fs);
+-- 
+2.41.0
 
---mNw8fgYOgCi8R7Nz--

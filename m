@@ -1,12 +1,16 @@
-Return-Path: <gmaglion@redhat.com>
+Return-Path: <stefanha@redhat.com>
+Date: Thu, 5 Oct 2023 13:38:59 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20231005173859.GC1342722@fedora>
+References: <20231004125904.110781-1-hreitz@redhat.com>
+ <20231004125904.110781-3-hreitz@redhat.com>
 MIME-Version: 1.0
-References: <trinity-69fb6e2a-760f-4a3b-9a40-c7472c34dab5-1684577428128@3c-app-mailcom-bs08>
-In-Reply-To: <trinity-69fb6e2a-760f-4a3b-9a40-c7472c34dab5-1684577428128@3c-app-mailcom-bs08>
-From: German Maglione <gmaglione@redhat.com>
-Date: Wed, 24 May 2023 16:47:28 +0200
-Message-ID: <CAJh=p+7CMxn8KWZUREtKt=asZSJu+8W=YA=tmQdObngJmp9RSQ@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="0000000000005db76205fc71971f"
-Subject: Re: [Virtio-fs] vm hangs when booting with virtiofs
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="3aeG8c6RWYFkvt5Y"
+Content-Disposition: inline
+In-Reply-To: <20231004125904.110781-3-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v4 2/8] vhost-user.rst: Improve
+ [GS]ET_VRING_BASE doc
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,215 +19,164 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: daggs <daggs@gmx.com>
-Cc: virtio-fs@redhat.com
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, German Maglione <gmaglione@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
---0000000000005db76205fc71971f
-Content-Type: text/plain; charset="UTF-8"
+
+--3aeG8c6RWYFkvt5Y
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-Hi,
+On Wed, Oct 04, 2023 at 02:58:58PM +0200, Hanna Czenczek wrote:
+> GET_VRING_BASE does not mention that it stops the respective ring.  Fix
+> that.
+>=20
+> Furthermore, it is not fully clear what the "base offset" these
+> commands' documentation refers to is; an offset could be many things.
+> Be more precise and verbose about it, especially given that these
+> commands use different payload structures depending on whether the vring
+> is split or packed.
+>=20
+> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> ---
+>  docs/interop/vhost-user.rst | 66 ++++++++++++++++++++++++++++++++++---
+>  1 file changed, 62 insertions(+), 4 deletions(-)
+>=20
+> diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+> index 2f68e67a1a..50f5acebe5 100644
+> --- a/docs/interop/vhost-user.rst
+> +++ b/docs/interop/vhost-user.rst
+> @@ -108,6 +108,37 @@ A vring state description
+> =20
+>  :num: a 32-bit number
+> =20
+> +A vring descriptor index for split virtqueues
+> +^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> +
+> ++-------------+---------------------+
+> +| vring index | index in avail ring |
+> ++-------------+---------------------+
+> +
+> +:vring index: 32-bit index of the respective virtqueue
+> +
+> +:index in avail ring: 32-bit value, of which currently only the lower 16
+> +  bits are used:
+> +
+> +  - Bits 0=E2=80=9315: Next descriptor index in the *Available Ring*
 
-On Sat, May 20, 2023 at 12:15=E2=80=AFPM daggs <daggs@gmx.com> wrote:
+I think we need to say more to make this implementable just by reading
+the spec:
 
-> Greetings,
->
-> I'm trying to boot a win11 vm with a virtiofs fs and the system just hang=
-s
-> on boot, I'd like some incites on what is the issue.
-> here is what I'm using:
-> - kernel 6.3.3
-> - libvirt 9.3.0
-> - qemu 8.0.0
-> - virtiofsd 1.5.1
->
+  Index of the next *Available Ring* descriptor that the back-end will
+  process. This is a free-running index that is not wrapped by the ring
+  size.
 
-If you swap your win11 for a linux guest (using the same libvirt xml) are
-you able to reproduce the error?
+Feel free to rephrase.
 
+> +  - Bits 16=E2=80=9331: Reserved (set to zero)
+> +
+> +Vring descriptor indices for packed virtqueues
+> +^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> +
+> ++-------------+--------------------+
+> +| vring index | descriptor indices |
+> ++-------------+--------------------+
+> +
+> +:vring index: 32-bit index of the respective virtqueue
+> +
+> +:descriptor indices: 32-bit value:
+> +
+> +  - Bits 0=E2=80=9314: Index in the *Available Ring*
 
->
-> I'm using the following cmd to run virtiofsd using socket: virtiofsd
-> --socket-path=3D/var/lib/libvirt/helpers_state/windows/linux_home.socket
-> --shared-dir /home/daggs --cache auto
-> where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 16K
-> (tried with 1M too, same behavior)
-> the virtiofsd invocation is issued inside the prepare and begin qemu hook
-> on libvirt.
-> I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO
-> virtiofsd] Waiting for vhost-user socket connection...
-> and I call it like this: nohup <virtiofsd cmd> &
->
-> the vm's relevant config is this:
-> <domain type=3D'kvm'>
-> ...
-> <memory unit=3D'KiB'>24582144</memory>
-> <currentMemory unit=3D'KiB'>24582144</currentMemory>
-> <memoryBacking>
-> <source type=3D'memfd'/>
-> <access mode=3D'shared'/>
-> </memoryBacking>
-> <vcpu placement=3D'static'>12</vcpu>
-> <cputune>
-> <vcpupin vcpu=3D'0' cpuset=3D'4'/>
-> <vcpupin vcpu=3D'1' cpuset=3D'5'/>
-> <vcpupin vcpu=3D'2' cpuset=3D'6'/>
-> <vcpupin vcpu=3D'3' cpuset=3D'7'/>
-> <vcpupin vcpu=3D'4' cpuset=3D'8'/>
-> <vcpupin vcpu=3D'5' cpuset=3D'9'/>
-> <vcpupin vcpu=3D'6' cpuset=3D'10'/>
-> <vcpupin vcpu=3D'7' cpuset=3D'11'/>
-> <vcpupin vcpu=3D'8' cpuset=3D'12'/>
-> <vcpupin vcpu=3D'9' cpuset=3D'13'/>
-> <vcpupin vcpu=3D'10' cpuset=3D'14'/>
-> <vcpupin vcpu=3D'11' cpuset=3D'15'/>
-> <emulatorpin cpuset=3D'0-1'/>
-> </cputune>
->
-> ...
-> <cpu mode=3D'host-passthrough' check=3D'none' migratable=3D'on'>
-> <topology sockets=3D'1' dies=3D'1' cores=3D'6' threads=3D'2'/>
-> <cache mode=3D'passthrough'/>
-> <feature policy=3D'require' name=3D'topoext'/>
-> </cpu>
-> ...
-> <filesystem type=3D'mount' accessmode=3D'passthrough'>
-> <driver type=3D'virtiofs' queue=3D'1024'/>
-> <binary path=3D'/usr/bin/virtiofsd'/>
-> <source socket=3D'/var/lib/libvirt/helpers_state/windows/linux_home.socke=
-t'/>
-> <target dir=3D'linux_home'/>
-> <address type=3D'pci' domain=3D'0x0000' bus=3D'0x07' slot=3D'0x00' functi=
-on=3D'0x0'/>
-> </filesystem>
-> ...
-> </domain>
->
-> I'm running it via virsh, added -d 4, no errors in the log
-> when it is stuck, I get a black screen (using gpu pt to guest which work
-> without it), ps shows both virsh start cmd running and stuck, two virtiof=
-sd
-> instances are up.
-> any ideas how to solve this?
->
-> Thanks,
->
-> Dagg
->
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
->
->
+Same here.
 
---=20
-German
+> +  - Bit 15: Driver (Available) Ring Wrap Counter
+> +  - Bits 16=E2=80=9330: Index in the *Used Ring*
 
---0000000000005db76205fc71971f
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+Same here.
 
-<div dir=3D"ltr"><div dir=3D"ltr">Hi,<br></div><br><div class=3D"gmail_quot=
-e"><div dir=3D"ltr" class=3D"gmail_attr">On Sat, May 20, 2023 at 12:15=E2=
-=80=AFPM daggs &lt;<a href=3D"mailto:daggs@gmx.com">daggs@gmx.com</a>&gt; w=
-rote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0p=
-x 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">Greetings,=
-<br>
-<br>
-I&#39;m trying to boot a win11 vm with a virtiofs fs and the system just ha=
-ngs on boot, I&#39;d like some incites on what is the issue.<br>
-here is what I&#39;m using:<br>
-- kernel 6.3.3<br>
-- libvirt 9.3.0<br>
-- qemu 8.0.0<br>
-- virtiofsd 1.5.1<br></blockquote><div><br></div><div>If you swap your win1=
-1 for a linux guest (using the same libvirt xml) are you able to reproduce =
-the error?<br></div><div>=C2=A0</div><blockquote class=3D"gmail_quote" styl=
-e=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);paddin=
-g-left:1ex">
-<br>
-I&#39;m using the following cmd to run virtiofsd using socket: virtiofsd --=
-socket-path=3D/var/lib/libvirt/helpers_state/windows/linux_home.socket --sh=
-ared-dir /home/daggs --cache auto<br>
-where /var/lib/libvirt/helpers_state/windows/ is a tmpfs mount of 16K (trie=
-d with 1M too, same behavior)<br>
-the virtiofsd invocation is issued inside the prepare and begin qemu hook o=
-n libvirt.<br>
-I see this after virtiofsd is started: [2023-05-20T08:41:18Z INFO virtiofsd=
-] Waiting for vhost-user socket connection...<br>
-and I call it like this: nohup &lt;virtiofsd cmd&gt; &amp;<br>
-<br>
-the vm&#39;s relevant config is this:<br>
-&lt;domain type=3D&#39;kvm&#39;&gt;<br>
-...<br>
-&lt;memory unit=3D&#39;KiB&#39;&gt;24582144&lt;/memory&gt;<br>
-&lt;currentMemory unit=3D&#39;KiB&#39;&gt;24582144&lt;/currentMemory&gt;<br=
->
-&lt;memoryBacking&gt;<br>
-&lt;source type=3D&#39;memfd&#39;/&gt;<br>
-&lt;access mode=3D&#39;shared&#39;/&gt;<br>
-&lt;/memoryBacking&gt;<br>
-&lt;vcpu placement=3D&#39;static&#39;&gt;12&lt;/vcpu&gt;<br>
-&lt;cputune&gt;<br>
-&lt;vcpupin vcpu=3D&#39;0&#39; cpuset=3D&#39;4&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;1&#39; cpuset=3D&#39;5&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;2&#39; cpuset=3D&#39;6&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;3&#39; cpuset=3D&#39;7&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;4&#39; cpuset=3D&#39;8&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;5&#39; cpuset=3D&#39;9&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;6&#39; cpuset=3D&#39;10&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;7&#39; cpuset=3D&#39;11&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;8&#39; cpuset=3D&#39;12&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;9&#39; cpuset=3D&#39;13&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;10&#39; cpuset=3D&#39;14&#39;/&gt;<br>
-&lt;vcpupin vcpu=3D&#39;11&#39; cpuset=3D&#39;15&#39;/&gt;<br>
-&lt;emulatorpin cpuset=3D&#39;0-1&#39;/&gt;<br>
-&lt;/cputune&gt;<br>
-<br>
-...<br>
-&lt;cpu mode=3D&#39;host-passthrough&#39; check=3D&#39;none&#39; migratable=
-=3D&#39;on&#39;&gt;<br>
-&lt;topology sockets=3D&#39;1&#39; dies=3D&#39;1&#39; cores=3D&#39;6&#39; t=
-hreads=3D&#39;2&#39;/&gt;<br>
-&lt;cache mode=3D&#39;passthrough&#39;/&gt;<br>
-&lt;feature policy=3D&#39;require&#39; name=3D&#39;topoext&#39;/&gt;<br>
-&lt;/cpu&gt;<br>
-...<br>
-&lt;filesystem type=3D&#39;mount&#39; accessmode=3D&#39;passthrough&#39;&gt=
-;<br>
-&lt;driver type=3D&#39;virtiofs&#39; queue=3D&#39;1024&#39;/&gt;<br>
-&lt;binary path=3D&#39;/usr/bin/virtiofsd&#39;/&gt;<br>
-&lt;source socket=3D&#39;/var/lib/libvirt/helpers_state/windows/linux_home.=
-socket&#39;/&gt;<br>
-&lt;target dir=3D&#39;linux_home&#39;/&gt;<br>
-&lt;address type=3D&#39;pci&#39; domain=3D&#39;0x0000&#39; bus=3D&#39;0x07&=
-#39; slot=3D&#39;0x00&#39; function=3D&#39;0x0&#39;/&gt;<br>
-&lt;/filesystem&gt;<br>
-...<br>
-&lt;/domain&gt;<br>
-<br>
-I&#39;m running it via virsh, added -d 4, no errors in the log<br>
-when it is stuck, I get a black screen (using gpu pt to guest which work wi=
-thout it), ps shows both virsh start cmd running and stuck, two virtiofsd i=
-nstances are up.<br>
-any ideas how to solve this?<br>
-<br>
-Thanks,<br>
-<br>
-Dagg<br>
-<br>
-_______________________________________________<br>
-Virtio-fs mailing list<br>
-<a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_blank">Virtio-fs@redhat.=
-com</a><br>
-<a href=3D"https://listman.redhat.com/mailman/listinfo/virtio-fs" rel=3D"no=
-referrer" target=3D"_blank">https://listman.redhat.com/mailman/listinfo/vir=
-tio-fs</a><br>
-<br>
-</blockquote></div><br clear=3D"all"><br><span class=3D"gmail_signature_pre=
-fix">-- </span><br><div dir=3D"ltr" class=3D"gmail_signature"><div dir=3D"l=
-tr">German<br></div></div></div>
+> +  - Bit 31: Device (Used) Ring Wrap Counter
+> +
+>  A vring address description
+>  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> =20
+> @@ -1031,18 +1062,45 @@ Front-end message types
+>  ``VHOST_USER_SET_VRING_BASE``
+>    :id: 10
+>    :equivalent ioctl: ``VHOST_SET_VRING_BASE``
+> -  :request payload: vring state description
+> +  :request payload: vring descriptor index/indices
+>    :reply payload: N/A
+> =20
+> -  Sets the base offset in the available vring.
+> +  Sets the next index to use for descriptors in this vring:
+> +
+> +  * For a split virtqueue, sets only the next descriptor index in the
+> +    *Available Ring*.  The device is supposed to read the next index in
+> +    the *Used Ring* from the respective vring structure in guest memory.
+> +
+> +  * For a packed virtqueue, both indices are supplied, as they are not
+> +    explicitly available in memory.
+> +
+> +  Consequently, the payload type is specific to the type of virt queue
+> +  (*a vring descriptor index for split virtqueues* vs. *vring descriptor
+> +  indices for packed virtqueues*).
+> =20
+>  ``VHOST_USER_GET_VRING_BASE``
+>    :id: 11
+>    :equivalent ioctl: ``VHOST_USER_GET_VRING_BASE``
+>    :request payload: vring state description
+> -  :reply payload: vring state description
+> +  :reply payload: vring descriptor index/indices
+> +
+> +  Stops the vring and returns the current descriptor index or indices:
+> +
+> +    * For a split virtqueue, returns only the 16-bit next descriptor
+> +      index in the *Available Ring*.  The index in the *Used Ring* is
+> +      controlled by the guest driver and can be read from the vring
 
---0000000000005db76205fc71971f--
+I find "is controlled by the guest driver" confusing. The device writes
+the Used Ring index. The driver only reads it. The device is the active
+party here.
 
+The sentence can be shortened to omit the "controlled by the guest
+driver" part.
+
+> +      structure in memory, so is not covered.
+> +
+> +    * For a packed virtqueue, neither index is explicitly available to
+> +      read from memory, so both indices (as maintained by the device) are
+> +      returned.
+> +
+> +  Consequently, the payload type is specific to the type of virt queue
+> +  (*a vring descriptor index for split virtqueues* vs. *vring descriptor
+> +  indices for packed virtqueues*).
+> =20
+> -  Get the available vring base offset.
+> +  The request payload=E2=80=99s *num* field is currently reserved and mu=
+st be
+> +  set to 0.
+> =20
+>  ``VHOST_USER_SET_VRING_KICK``
+>    :id: 12
+> --=20
+> 2.41.0
+>=20
+
+--3aeG8c6RWYFkvt5Y
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUe9LMACgkQnKSrs4Gr
+c8j5sAgAx70mqH6wDD8GaWjcjyhDVPb1Svcp9dAx4Ns/Z+AmMgzOI1fZw6BVOXiO
+dtWTEbRlpSqd5Tc50DMnZSVFpVWakVWOOkKzLZlUmghjsKlPQgEKWBhniUhUycUF
+XQMASuUbMkib8ecIFwHhbjpTABgD0RKk7leKNpiXPtF7HoGewXhGbEdk3DwD3UDL
+aCKYqH/3LGmbQI9mGwmyjK01b4SRJ5sWg5hzMDHF9WkUX/Yr6CWJisctFaVwEQ+5
+IY3NpPkSfO5+TwpNk7WTXrxKE/4eYbZN71ct0kfG9ntUxfUpYwmWItEmTyc2u93c
+l/jBNW3fG4MJ7Tyo+oAGDDzvaEiDSg==
+=tg6b
+-----END PGP SIGNATURE-----
+
+--3aeG8c6RWYFkvt5Y--

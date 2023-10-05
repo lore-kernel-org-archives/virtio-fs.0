@@ -1,26 +1,14 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1689003324; x=1691595324;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=2VTCVQrd6KCn5j7u4ggdRsXsalHDUZEasAWYhlhI0Zk=;
- b=j+WDoZ1iK16umdVplpNjyby+C0HXEitODI37kGwJGXP8HLOVKe7rt/a/fw7jXjba2v
- zs1wAHlxk/Q0gaA1/EiJk1gIej/DaDqErNIuRsyn+V1aYx2zPQYHF82wztebpRwOgDdR
- wDqaRu8ZbrT7AmcnqHRt5hh/t3t9ctn/KE0KuSYJ1MRNrZYGPsAaBSC6EWxhxA/ELSah
- ssLutXIIMBRxXlihjutw4bgwVOv+fE2at4V0BKhYv7N3unwblarbHdJ1Zs11Q/JzVm2K
- nGkk3S7WpCKhBVvOhtq0iL4/XKlTn9C4IYBO7y1oNaY9ibZp27R/VNPsJVXR0gDmkWip
- wm2A==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Mon, 10 Jul 2023 16:35:03 +0100
-Message-Id: <20230710153522.3469097-2-alex.bennee@linaro.org>
-In-Reply-To: <20230710153522.3469097-1-alex.bennee@linaro.org>
-References: <20230710153522.3469097-1-alex.bennee@linaro.org>
+Return-Path: <stefanha@redhat.com>
+Date: Thu, 5 Oct 2023 13:48:11 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20231005174811.GJ1342722@fedora>
+References: <20231004125904.110781-1-hreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 01/20] include: attempt to document
- device_class_set_props
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="mNw8fgYOgCi8R7Nz"
+Content-Disposition: inline
+In-Reply-To: <20231004125904.110781-1-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v4 0/8] vhost-user: Back-end state migration
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,55 +17,128 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S . Tsirkin" <mst@redhat.com>, German Maglione <gmaglione@redhat.com>, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
-I'm still not sure how I achieve by use case of the parent class
-defining the following properties:
 
-  static Property vud_properties[] = {
-      DEFINE_PROP_CHR("chardev", VHostUserDevice, chardev),
-      DEFINE_PROP_UINT16("id", VHostUserDevice, id, 0),
-      DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
-      DEFINE_PROP_END_OF_LIST(),
-  };
+--mNw8fgYOgCi8R7Nz
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-But for the specialisation of the class I want the id to default to
-the actual device id, e.g.:
+On Wed, Oct 04, 2023 at 02:58:56PM +0200, Hanna Czenczek wrote:
+> RFC:
+> https://lists.nongnu.org/archive/html/qemu-devel/2023-03/msg04263.html
+>=20
+> v1:
+> https://lists.nongnu.org/archive/html/qemu-devel/2023-04/msg01575.html
+>=20
+> v2:
+> https://lists.nongnu.org/archive/html/qemu-devel/2023-07/msg02604.html
+>=20
+> v3:
+> https://lists.nongnu.org/archive/html/qemu-devel/2023-09/msg03750.html
+>=20
+>=20
+> Based-on: <20231004014532.1228637-1-stefanha@redhat.com>
+>           ([PATCH v2 0/3] vhost: clean up device reset)
+>=20
+>=20
+> Hi,
+>=20
+> This v4 includes largely unchanged patches from v3.  The main
+> addition/change is what came out of the discussion between Stefan and me
+> around how to proceed without SUSPEND/RESUME, which is that this series
+> is now based on his reset fix, and it includes more documentation
+> changes.
 
-  static Property vu_rng_properties[] = {
-      DEFINE_PROP_UINT16("id", VHostUserDevice, id, VIRTIO_ID_RNG),
-      DEFINE_PROP_UINT32("num_vqs", VHostUserDevice, num_vqs, 1),
-      DEFINE_PROP_END_OF_LIST(),
-  };
+This looks good. I posted some minor comments on the new patches.
 
-And so far the API for doing that isn't super clear.
+Stefan
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
----
- include/hw/qdev-core.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+>=20
+> Changes in detail:
+>=20
+> - Patch 1: Fall-out from the reset fix: Currently, the status byte is
+>   effectively unused (qemu only uses it for resetting, which all
+>   back-ends ignore; DPDK uses it to announce potential feature
+>   negotiation failure, which qemu ignores).  It is also not defined what
+>   exactly front-end or back-end should do with this byte, except
+>   pointing at the virtio spec, which however naturally does not say how
+>   this integrates with vhost-user=E2=80=99s RESET_DEVICE or [GS]ET_FEATUR=
+ES.
+>   Furthermore, there does not seem to be a use for this; we have
+>   RESET_DEVICE for resetting, and we have [GS]ET_FEATURES (and
+>   REPLY_ACK, which can be used on SET_FEATURES) for feature
+>   negotation.
+>   Therefore, deprecate the status byte, pointing to those other commands
+>   instead.
+>=20
+> - Patch 2: Patch 4 defines a suspended state for the whole back-end if
+>   all vrings are stopped.  I think this should be mentioned in
+>   GET_VRING_BASE, but upon trying to add it, I found that it does not
+>   even mention that it stops the vring (mentioned only in the Ring
+>   States section), and remembered that the whole description of both
+>   GET_VRING_BASE and SET_VRING_BASE really was not helpful when trying
+>   to implement a vhost-user back-end.  Took the opportunity to overhaul
+>   both.
+>=20
+> - Patch 3: This one=E2=80=99s from v3, but quite heavily modified.  Stefan
+>   suggested consistently defining the started/stopped and
+>   enabled/disabled states to be independent, and indeed doing so
+>   simplifies a whole lot of stuff.  Specifically, it makes the magic
+>   =E2=80=9Cenabled/disabled when started=E2=80=9D go away.  Basically, I =
+found this
+>   change alone is enough to remove the confusion I had with the existing
+>   documentation.
+>=20
+> - Patch 4: As suggested by Stefan, just define a suspended state without
+>   introducing SUSPEND.  vDPA needs SUSPEND because its GET_VRING_BASE
+>   does not stop the vring, but vhost-user=E2=80=99s does, so we can defin=
+e the
+>   suspended state to be when all vrings are stopped.
+>=20
+> - Patch 5: Reference the suspended state.
+>=20
+> - Patches 6 through 8: Unmodified, except for them being rebase on
+>   Stefan=E2=80=99s series.
+>=20
+>=20
+> Hanna Czenczek (8):
+>   vhost-user.rst: Deprecate [GS]ET_STATUS
+>   vhost-user.rst: Improve [GS]ET_VRING_BASE doc
+>   vhost-user.rst: Clarify enabling/disabling vrings
+>   vhost-user.rst: Introduce suspended state
+>   vhost-user.rst: Migrating back-end-internal state
+>   vhost-user: Interface for migration state transfer
+>   vhost: Add high-level state save/load functions
+>   vhost-user-fs: Implement internal migration
+>=20
+>  docs/interop/vhost-user.rst       | 318 +++++++++++++++++++++++++++---
+>  include/hw/virtio/vhost-backend.h |  24 +++
+>  include/hw/virtio/vhost.h         | 113 +++++++++++
+>  hw/virtio/vhost-user-fs.c         | 101 +++++++++-
+>  hw/virtio/vhost-user.c            | 148 ++++++++++++++
+>  hw/virtio/vhost.c                 | 241 ++++++++++++++++++++++
+>  6 files changed, 917 insertions(+), 28 deletions(-)
+>=20
+> --=20
+> 2.41.0
+>=20
 
-diff --git a/include/hw/qdev-core.h b/include/hw/qdev-core.h
-index 06cadfc492..196ebf6d91 100644
---- a/include/hw/qdev-core.h
-+++ b/include/hw/qdev-core.h
-@@ -926,6 +926,15 @@ BusState *sysbus_get_default(void);
- char *qdev_get_fw_dev_path(DeviceState *dev);
- char *qdev_get_own_fw_dev_path_from_handler(BusState *bus, DeviceState *dev);
- 
-+/**
-+ * device_class_set_props(): add a set of properties to an device
-+ * @dc: the parent DeviceClass all devices inherit
-+ * @props: an array of properties, terminate by DEFINE_PROP_END_OF_LIST()
-+ *
-+ * This will add a set of properties to the object. It will fault if
-+ * you attempt to add an existing property defined by a parent class.
-+ * To modify an inherited property you need to use????
-+ */
- void device_class_set_props(DeviceClass *dc, Property *props);
- 
- /**
--- 
-2.39.2
+--mNw8fgYOgCi8R7Nz
+Content-Type: application/pgp-signature; name="signature.asc"
 
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmUe9tsACgkQnKSrs4Gr
+c8iA0QgAgmWhPPx/hRn39Jsq3bGeI2mdhbYZbtTE18k2ZdrspkyKPMB45nc8Rj2t
+zWn/ifLC1tV2UhXYj494uHD4ACPCRv/4KqX16Su1TS3ARcOZcchc9rxmFDN+RrIl
+faoh+ybFvmDBFFjmbhP4mf/eQeWRttfWEYz9y2TJTOQKMEbpYy/c3PFX8FQrHaz6
++xXW2UvjQ1S2A1zM7XSLWCiAIYO7cVtu5LNFmCkrUAh0fDzui891BteZZaVpYrqB
+3Kdee9cnFLhR4+KZRXTkmH7Q1VHZoJRxWhcyLURlx/9YZ5bkx/1wLUQYo8+m12Qm
+iuKHpsTjElpLmFqGG00n1C9uoOYEUQ==
+=TZJp
+-----END PGP SIGNATURE-----
+
+--mNw8fgYOgCi8R7Nz--

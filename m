@@ -1,18 +1,18 @@
 Return-Path: <mst@redhat.com>
-Date: Fri, 6 Oct 2023 04:45:46 -0400
+Date: Fri, 6 Oct 2023 04:49:40 -0400
 From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20231006043518-mutt-send-email-mst@kernel.org>
+Message-ID: <20231006044753-mutt-send-email-mst@kernel.org>
 References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-2-hreitz@redhat.com>
- <20231005170852.GB1342722@fedora>
- <20231005131352-mutt-send-email-mst@kernel.org>
- <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
+ <20231004125904.110781-3-hreitz@redhat.com>
+ <20231005173859.GC1342722@fedora>
+ <851b7629-2302-5624-eb81-6839e250991e@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
+In-Reply-To: <851b7629-2302-5624-eb81-6839e250991e@redhat.com>
 Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] (no subject)
+Subject: Re: [Virtio-fs] [PATCH v4 2/8] vhost-user.rst: Improve
+ [GS]ET_VRING_BASE doc
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,81 +22,152 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Yajun Wu <yajunw@nvidia.com>
+Cc: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
-On Fri, Oct 06, 2023 at 09:48:14AM +0200, Hanna Czenczek wrote:
-> On 05.10.23 19:15, Michael S. Tsirkin wrote:
-> > On Thu, Oct 05, 2023 at 01:08:52PM -0400, Stefan Hajnoczi wrote:
-> > > On Wed, Oct 04, 2023 at 02:58:57PM +0200, Hanna Czenczek wrote:
-> > > > There is no clearly defined purpose for the virtio status byte in
-> > > > vhost-user: For resetting, we already have RESET_DEVICE; and for virtio
-> > > > feature negotiation, we have [GS]ET_FEATURES.  With the REPLY_ACK
-> > > > protocol extension, it is possible for SET_FEATURES to return errors
-> > > > (SET_PROTOCOL_FEATURES may be called before SET_FEATURES).
-> > > > 
-> > > > As for implementations, SET_STATUS is not widely implemented.  dpdk does
-> > > > implement it, but only uses it to signal feature negotiation failure.
-> > > > While it does log reset requests (SET_STATUS 0) as such, it effectively
-> > > > ignores them, in contrast to RESET_OWNER (which is deprecated, and today
-> > > > means the same thing as RESET_DEVICE).
-> > > > 
-> > > > While qemu superficially has support for [GS]ET_STATUS, it does not
-> > > > forward the guest-set status byte, but instead just makes it up
-> > > > internally, and actually completely ignores what the back-end returns,
-> > > > only using it as the template for a subsequent SET_STATUS to add single
-> > > > bits to it.  Notably, after setting FEATURES_OK, it never reads it back
-> > > > to see whether the flag is still set, which is the only way in which
-> > > > dpdk uses the status byte.
-> > > > 
-> > > > As-is, no front-end or back-end can rely on the other side handling this
-> > > > field in a useful manner, and it also provides no practical use over
-> > > > other mechanisms the vhost-user protocol has, which are more clearly
-> > > > defined.  Deprecate it.
-> > > > 
-> > > > Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > > > Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
-> > > > ---
-> > > >   docs/interop/vhost-user.rst | 28 +++++++++++++++++++++-------
-> > > >   1 file changed, 21 insertions(+), 7 deletions(-)
-> > > Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+On Fri, Oct 06, 2023 at 09:53:53AM +0200, Hanna Czenczek wrote:
+> On 05.10.23 19:38, Stefan Hajnoczi wrote:
+> > On Wed, Oct 04, 2023 at 02:58:58PM +0200, Hanna Czenczek wrote:
+> > > GET_VRING_BASE does not mention that it stops the respective ring.  Fix
+> > > that.
+> > > 
+> > > Furthermore, it is not fully clear what the "base offset" these
+> > > commands' documentation refers to is; an offset could be many things.
+> > > Be more precise and verbose about it, especially given that these
+> > > commands use different payload structures depending on whether the vring
+> > > is split or packed.
+> > > 
+> > > Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> > > ---
+> > >   docs/interop/vhost-user.rst | 66 ++++++++++++++++++++++++++++++++++---
+> > >   1 file changed, 62 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+> > > index 2f68e67a1a..50f5acebe5 100644
+> > > --- a/docs/interop/vhost-user.rst
+> > > +++ b/docs/interop/vhost-user.rst
+> > > @@ -108,6 +108,37 @@ A vring state description
+> > >   :num: a 32-bit number
+> > > +A vring descriptor index for split virtqueues
+> > > +^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > > +
+> > > ++-------------+---------------------+
+> > > +| vring index | index in avail ring |
+> > > ++-------------+---------------------+
+> > > +
+> > > +:vring index: 32-bit index of the respective virtqueue
+> > > +
+> > > +:index in avail ring: 32-bit value, of which currently only the lower 16
+> > > +  bits are used:
+> > > +
+> > > +  - Bits 0–15: Next descriptor index in the *Available Ring*
+> > I think we need to say more to make this implementable just by reading
+> > the spec:
 > > 
-> > SET_STATUS is the only way to signal failure to acknowledge FEATURES_OK.
-> > The fact current backends never check errors does not mean they never
-> > will. So no, not applying this.
+> >    Index of the next *Available Ring* descriptor that the back-end will
+> >    process. This is a free-running index that is not wrapped by the ring
+> >    size.
 > 
-> Can this not be done with REPLY_ACK?  I.e., with the following message
-> order:
+> Sure, thanks.
 > 
-> 1. GET_FEATURES to find out whether VHOST_USER_F_PROTOCOL_FEATURES is
-> present
-> 2. GET_PROTOCOL_FEATURES to hopefully get VHOST_USER_PROTOCOL_F_REPLY_ACK
-> 3. SET_PROTOCOL_FEATURES to set VHOST_USER_PROTOCOL_F_REPLY_ACK
-> 4. SET_FEATURES with need_reply
+> > Feel free to rephrase.
+> > 
+> > > +  - Bits 16–31: Reserved (set to zero)
+> > > +
+> > > +Vring descriptor indices for packed virtqueues
+> > > +^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > > +
+> > > ++-------------+--------------------+
+> > > +| vring index | descriptor indices |
+> > > ++-------------+--------------------+
+> > > +
+> > > +:vring index: 32-bit index of the respective virtqueue
+> > > +
+> > > +:descriptor indices: 32-bit value:
+> > > +
+> > > +  - Bits 0–14: Index in the *Available Ring*
+> > Same here.
+> > 
+> > > +  - Bit 15: Driver (Available) Ring Wrap Counter
+> > > +  - Bits 16–30: Index in the *Used Ring*
+> > Same here.
+> > 
+> > > +  - Bit 31: Device (Used) Ring Wrap Counter
+> > > +
+> > >   A vring address description
+> > >   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > > @@ -1031,18 +1062,45 @@ Front-end message types
+> > >   ``VHOST_USER_SET_VRING_BASE``
+> > >     :id: 10
+> > >     :equivalent ioctl: ``VHOST_SET_VRING_BASE``
+> > > -  :request payload: vring state description
+> > > +  :request payload: vring descriptor index/indices
+> > >     :reply payload: N/A
+> > > -  Sets the base offset in the available vring.
+> > > +  Sets the next index to use for descriptors in this vring:
+> > > +
+> > > +  * For a split virtqueue, sets only the next descriptor index in the
+> > > +    *Available Ring*.  The device is supposed to read the next index in
+> > > +    the *Used Ring* from the respective vring structure in guest memory.
+> > > +
+> > > +  * For a packed virtqueue, both indices are supplied, as they are not
+> > > +    explicitly available in memory.
+> > > +
+> > > +  Consequently, the payload type is specific to the type of virt queue
+> > > +  (*a vring descriptor index for split virtqueues* vs. *vring descriptor
+> > > +  indices for packed virtqueues*).
+> > >   ``VHOST_USER_GET_VRING_BASE``
+> > >     :id: 11
+> > >     :equivalent ioctl: ``VHOST_USER_GET_VRING_BASE``
+> > >     :request payload: vring state description
+> > > -  :reply payload: vring state description
+> > > +  :reply payload: vring descriptor index/indices
+> > > +
+> > > +  Stops the vring and returns the current descriptor index or indices:
+> > > +
+> > > +    * For a split virtqueue, returns only the 16-bit next descriptor
+> > > +      index in the *Available Ring*.  The index in the *Used Ring* is
+> > > +      controlled by the guest driver and can be read from the vring
+> > I find "is controlled by the guest driver" confusing. The device writes
+> > the Used Ring index. The driver only reads it. The device is the active
+> > party here.
 > 
-> If not, the problem is that qemu has sent SET_STATUS 0 for a while when the
-> vCPUs are stopped, which generally seems to request a device reset.  If we
-> don’t state at least that SET_STATUS 0 is to be ignored, back-ends that will
-> implement SET_STATUS later may break with at least these qemu versions.  But
-> documenting that a particular use of the status byte is to be ignored would
-> be really strange.
+> Er, good point.  That breaks the whole reasoning.  Then I don’t understand
+> why we do get/set the available ring index and not the used ring index.  Do
+> you know why?
+
+It's simple. used ring index in memory is controlled by the device and
+reflects device state. device can just read it back to restore.
+available ring index in memory is controlled by driver and does
+not reflect device state.
+
+> > The sentence can be shortened to omit the "controlled by the guest
+> > driver" part.
+> 
+> I don’t want to shorten it, because I would like to know why we don’t
+> get/set both indices for split virtqueues, too.
 > 
 > Hanna
-
-Hmm I guess. Though just following virtio spec seems cleaner to me...
-vhost-user reconfigures the state fully on start. I guess symmetry was the
-point. So I don't see why SET_STATUS 0 has to be ignored.
-
-
-SET_STATUS was introduced by:
-
-commit 923b8921d210763359e96246a58658ac0db6c645
-Author: Yajun Wu <yajunw@nvidia.com>
-Date:   Mon Oct 17 14:44:52 2022 +0800
-
-    vhost-user: Support vhost_dev_start
-
-CC the author.
-
--- 
-MST
+> 
+> > > +      structure in memory, so is not covered.
+> > > +
+> > > +    * For a packed virtqueue, neither index is explicitly available to
+> > > +      read from memory, so both indices (as maintained by the device) are
+> > > +      returned.
+> > > +
+> > > +  Consequently, the payload type is specific to the type of virt queue
+> > > +  (*a vring descriptor index for split virtqueues* vs. *vring descriptor
+> > > +  indices for packed virtqueues*).
+> > > -  Get the available vring base offset.
+> > > +  The request payload’s *num* field is currently reserved and must be
+> > > +  set to 0.
+> > >   ``VHOST_USER_SET_VRING_KICK``
+> > >     :id: 12
+> > > -- 
+> > > 2.41.0
+> > > 
+> > > 
+> > > _______________________________________________
+> > > Virtio-fs mailing list
+> > > Virtio-fs@redhat.com
+> > > https://listman.redhat.com/mailman/listinfo/virtio-fs
 

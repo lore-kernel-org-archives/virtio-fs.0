@@ -1,19 +1,9 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1696605522; x=1697210322; darn=redhat.com;
- h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
- :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
- :message-id:reply-to;
- bh=2hJEOZpwkHmVtNYt07ls/jHKrkkiG4vDwfVuupARRP8=;
- b=MmcbhVN8STU9hZsTZulutJlZC2ScyHD0vGxFqsbQ4vdegzLgY6g/G0YmS9BAS/7VH2
- Hz7J8dBXmuJ9OhwQcFuTHQHN+s9ldlJIhx8cUZmenvfY3n6WGsH3jpDJ/Yh7IcZcsfSA
- ttK3YaviKmsFmJxtjtKQkfer/2BG5r8GzXMo0gO5bvUXrxlw6+1O6xklt7fra7yPKx9b
- O/5frdMFzyO31VR7aAr87fXq1ROfdXklerkQ/hWjT3A9vAmDHQw99UPtAWtAGV5sFaz3
- L2b6xJQJBCGtngpfX2S/tNEMpgsVG70cO6un2OVLEHz9jLYScM3Qgvl1lei3WAhb77PJ
- sSfg==
+Return-Path: <hreitz@redhat.com>
+Message-ID: <2ba3ef6b-4af1-9c65-f542-bfcc8412e99c@redhat.com>
+Date: Fri, 6 Oct 2023 17:47:26 +0200
+MIME-Version: 1.0
 References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-2-hreitz@redhat.com>
- <20231005170852.GB1342722@fedora>
+ <20231004125904.110781-2-hreitz@redhat.com> <20231005170852.GB1342722@fedora>
  <20231005131352-mutt-send-email-mst@kernel.org>
  <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
  <20231006043518-mutt-send-email-mst@kernel.org>
@@ -21,14 +11,12 @@ References: <20231004125904.110781-1-hreitz@redhat.com>
  <20231006051802-mutt-send-email-mst@kernel.org>
  <a4af0357-12ee-fc7f-e249-239da34409b0@redhat.com>
  <20231006055229-mutt-send-email-mst@kernel.org>
- <d9c2d2c4-5ab3-a3f3-8925-155e1c4ff73a@redhat.com>
-From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Fri, 06 Oct 2023 16:17:34 +0100
-In-reply-to: <d9c2d2c4-5ab3-a3f3-8925-155e1c4ff73a@redhat.com>
-Message-ID: <87il7jg4oe.fsf@linaro.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: quoted-printable
+ <d9c2d2c4-5ab3-a3f3-8925-155e1c4ff73a@redhat.com> <87il7jg4oe.fsf@linaro.org>
+From: Hanna Czenczek <hreitz@redhat.com>
+In-Reply-To: <87il7jg4oe.fsf@linaro.org>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] (no subject)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -38,66 +26,58 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Eugenio =?utf-8?Q?P=C3=A9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Yajun Wu <yajunw@nvidia.com>, qemu-devel@nongnu.org
+To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>
+Cc: "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Yajun Wu <yajunw@nvidia.com>, qemu-devel@nongnu.org
 
-
-Hanna Czenczek <hreitz@redhat.com> writes:
-
-> On 06.10.23 12:34, Michael S. Tsirkin wrote:
->> On Fri, Oct 06, 2023 at 11:47:55AM +0200, Hanna Czenczek wrote:
->>> On 06.10.23 11:26, Michael S. Tsirkin wrote:
->>>> On Fri, Oct 06, 2023 at 11:15:55AM +0200, Hanna Czenczek wrote:
->>>>> On 06.10.23 10:45, Michael S. Tsirkin wrote:
->>>>>> On Fri, Oct 06, 2023 at 09:48:14AM +0200, Hanna Czenczek wrote:
->>>>>>> On 05.10.23 19:15, Michael S. Tsirkin wrote:
->>>>>>>> On Thu, Oct 05, 2023 at 01:08:52PM -0400, Stefan Hajnoczi wrote:
->>>>>>>>> On Wed, Oct 04, 2023 at 02:58:57PM +0200, Hanna Czenczek wrote:
-<snip>
->>> What I=E2=80=99m saying is, 923b8921d21 introduced SET_STATUS calls tha=
-t broke all
->>> devices that would implement them as per virtio spec, and even today it=
-=E2=80=99s
->>> broken for stateful devices.=C2=A0 The mentioned performance issue is l=
-ikely
->>> real, but we can=E2=80=99t address it by making up SET_STATUS calls tha=
-t are wrong.
->>>
->>> I concede that I didn=E2=80=99t think about DRIVER_OK.=C2=A0 Personally=
-, I would do all
->>> final configuration that would happen upon a DRIVER_OK once the first v=
-ring
->>> is started (i.e. receives a kick).=C2=A0 That has the added benefit of =
-being
->>> asynchronous because it doesn=E2=80=99t block any vhost-user messages (=
-which are
->>> synchronous, and thus block downtime).
->>>
->>> Hanna
+On 06.10.23 17:17, Alex Bennée wrote:
+> Hanna Czenczek <hreitz@redhat.com> writes:
+>
+>> On 06.10.23 12:34, Michael S. Tsirkin wrote:
+>>> On Fri, Oct 06, 2023 at 11:47:55AM +0200, Hanna Czenczek wrote:
+>>>> On 06.10.23 11:26, Michael S. Tsirkin wrote:
+>>>>> On Fri, Oct 06, 2023 at 11:15:55AM +0200, Hanna Czenczek wrote:
+>>>>>> On 06.10.23 10:45, Michael S. Tsirkin wrote:
+>>>>>>> On Fri, Oct 06, 2023 at 09:48:14AM +0200, Hanna Czenczek wrote:
+>>>>>>>> On 05.10.23 19:15, Michael S. Tsirkin wrote:
+>>>>>>>>> On Thu, Oct 05, 2023 at 01:08:52PM -0400, Stefan Hajnoczi wrote:
+>>>>>>>>>> On Wed, Oct 04, 2023 at 02:58:57PM +0200, Hanna Czenczek wrote:
+> <snip>
+>>>> What I’m saying is, 923b8921d21 introduced SET_STATUS calls that broke all
+>>>> devices that would implement them as per virtio spec, and even today it’s
+>>>> broken for stateful devices.  The mentioned performance issue is likely
+>>>> real, but we can’t address it by making up SET_STATUS calls that are wrong.
+>>>>
+>>>> I concede that I didn’t think about DRIVER_OK.  Personally, I would do all
+>>>> final configuration that would happen upon a DRIVER_OK once the first vring
+>>>> is started (i.e. receives a kick).  That has the added benefit of being
+>>>> asynchronous because it doesn’t block any vhost-user messages (which are
+>>>> synchronous, and thus block downtime).
+>>>>
+>>>> Hanna
+>>> For better or worse kick is per ring. It's out of spec to start rings
+>>> that were not kicked but I guess you could do configuration ...
+>>> Seems somewhat asymmetrical though.
+>> I meant to take the first ring being started as the signal to do the
+>> global configuration, i.e. not do this once per vring, but once
+>> globally.
 >>
->> For better or worse kick is per ring. It's out of spec to start rings
->> that were not kicked but I guess you could do configuration ...
->> Seems somewhat asymmetrical though.
->
-> I meant to take the first ring being started as the signal to do the
-> global configuration, i.e. not do this once per vring, but once
-> globally.
->
->> Let's wait until next week, hopefully Yajun Wu will answer.
->
-> I mean, personally I don=E2=80=99t really care about the whole SET_STATUS
-> thing.=C2=A0 It=E2=80=99s clear that it=E2=80=99s broken for stateful dev=
-ices.=C2=A0 The fact
-> that it took until 6f8be29ec17d to fix it for just any device that
-> would implement it according to spec to me is a strong indication that
-> nobody does implement it according to spec, and is currently only used
-> to signal to some specific back-end that all rings have been set up
-> and should be configured in a single block.
+>>> Let's wait until next week, hopefully Yajun Wu will answer.
+>> I mean, personally I don’t really care about the whole SET_STATUS
+>> thing.  It’s clear that it’s broken for stateful devices.  The fact
+>> that it took until 6f8be29ec17d to fix it for just any device that
+>> would implement it according to spec to me is a strong indication that
+>> nobody does implement it according to spec, and is currently only used
+>> to signal to some specific back-end that all rings have been set up
+>> and should be configured in a single block.
+> I'm certainly using [GS]ET_STATUS for the proposed F_TRANSPORT
+> extensions where everything is off-loaded to the vhost-user backend.
 
-I'm certainly using [GS]ET_STATUS for the proposed F_TRANSPORT
-extensions where everything is off-loaded to the vhost-user backend.
+How do these back-ends work with the fact that qemu uses SET_STATUS 
+incorrectly when not offloading?  Do you plan on fixing that?
 
---=20
-Alex Benn=C3=A9e
-Virtualisation Tech Lead @ Linaro
+(I.e. that we send SET_STATUS 0 when the VM is paused, potentially 
+resetting state that is not recoverable, and that we set DRIVER and 
+DRIVER_OK simultaneously.)
+
+Hanna
 

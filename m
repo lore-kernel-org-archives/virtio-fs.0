@@ -1,10 +1,16 @@
-Return-Path: <vgoyal@fedora.redhat.com>
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu,  5 Oct 2023 16:30:30 -0400
-Message-ID: <20231005203030.223489-1-vgoyal@redhat.com>
+Return-Path: <hreitz@redhat.com>
+Message-ID: <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
+Date: Fri, 6 Oct 2023 09:48:14 +0200
 MIME-Version: 1.0
+References: <20231004125904.110781-1-hreitz@redhat.com>
+ <20231004125904.110781-2-hreitz@redhat.com> <20231005170852.GB1342722@fedora>
+ <20231005131352-mutt-send-email-mst@kernel.org>
+From: Hanna Czenczek <hreitz@redhat.com>
+In-Reply-To: <20231005131352-mutt-send-email-mst@kernel.org>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofs: Export filesystem tags through sysfs
+Subject: Re: [Virtio-fs] (no subject)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,104 +19,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu, stefanha@redhat.com, mzxreary@0pointer.de, gmaglione@redhat.com
+To: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
-virtiofs filesystem is mounted using a "tag" which is exported by the
-virtiofs device. virtiofs driver knows about all the available tags but
-these are not exported to user space.
+On 05.10.23 19:15, Michael S. Tsirkin wrote:
+> On Thu, Oct 05, 2023 at 01:08:52PM -0400, Stefan Hajnoczi wrote:
+>> On Wed, Oct 04, 2023 at 02:58:57PM +0200, Hanna Czenczek wrote:
+>>> There is no clearly defined purpose for the virtio status byte in
+>>> vhost-user: For resetting, we already have RESET_DEVICE; and for virtio
+>>> feature negotiation, we have [GS]ET_FEATURES.  With the REPLY_ACK
+>>> protocol extension, it is possible for SET_FEATURES to return errors
+>>> (SET_PROTOCOL_FEATURES may be called before SET_FEATURES).
+>>>
+>>> As for implementations, SET_STATUS is not widely implemented.  dpdk does
+>>> implement it, but only uses it to signal feature negotiation failure.
+>>> While it does log reset requests (SET_STATUS 0) as such, it effectively
+>>> ignores them, in contrast to RESET_OWNER (which is deprecated, and today
+>>> means the same thing as RESET_DEVICE).
+>>>
+>>> While qemu superficially has support for [GS]ET_STATUS, it does not
+>>> forward the guest-set status byte, but instead just makes it up
+>>> internally, and actually completely ignores what the back-end returns,
+>>> only using it as the template for a subsequent SET_STATUS to add single
+>>> bits to it.  Notably, after setting FEATURES_OK, it never reads it back
+>>> to see whether the flag is still set, which is the only way in which
+>>> dpdk uses the status byte.
+>>>
+>>> As-is, no front-end or back-end can rely on the other side handling this
+>>> field in a useful manner, and it also provides no practical use over
+>>> other mechanisms the vhost-user protocol has, which are more clearly
+>>> defined.  Deprecate it.
+>>>
+>>> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+>>> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+>>> ---
+>>>   docs/interop/vhost-user.rst | 28 +++++++++++++++++++++-------
+>>>   1 file changed, 21 insertions(+), 7 deletions(-)
+>> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+>
+> SET_STATUS is the only way to signal failure to acknowledge FEATURES_OK.
+> The fact current backends never check errors does not mean they never
+> will. So no, not applying this.
 
-People have asked these tags to be exported to user space. Most recently
-Lennart Poettering has asked for it as he wants to scan the tags and mount
-virtiofs automatically in certain cases.
+Can this not be done with REPLY_ACK?  I.e., with the following message 
+order:
 
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/128
+1. GET_FEATURES to find out whether VHOST_USER_F_PROTOCOL_FEATURES is 
+present
+2. GET_PROTOCOL_FEATURES to hopefully get VHOST_USER_PROTOCOL_F_REPLY_ACK
+3. SET_PROTOCOL_FEATURES to set VHOST_USER_PROTOCOL_F_REPLY_ACK
+4. SET_FEATURES with need_reply
 
-This patch exports tags through sysfs. One tag is associated with each
-virtiofs device. A new "tag" file appears under virtiofs device dir.
-Actual filesystem tag can be obtained by reading this "tag" file.
+If not, the problem is that qemu has sent SET_STATUS 0 for a while when 
+the vCPUs are stopped, which generally seems to request a device reset.  
+If we don’t state at least that SET_STATUS 0 is to be ignored, back-ends 
+that will implement SET_STATUS later may break with at least these qemu 
+versions.  But documenting that a particular use of the status byte is 
+to be ignored would be really strange.
 
-For example, if a virtiofs device exports tag "myfs", a new file "tag"
-will show up here.
-
-/sys/bus/virtio/devices/virtio<N>/tag
-
-# cat /sys/bus/virtio/devices/virtio<N>/tag
-myfs
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
-
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 5f1be1da92ce..a5b11e18f331 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -107,6 +107,21 @@ static const struct fs_parameter_spec virtio_fs_parameters[] = {
- 	{}
- };
- 
-+/* Forward Declarations */
-+static void virtio_fs_stop_all_queues(struct virtio_fs *fs);
-+
-+/* sysfs related */
-+static ssize_t tag_show(struct device *dev, struct device_attribute *attr,
-+			char *buf)
-+{
-+	struct virtio_device *vdev = container_of(dev, struct virtio_device,
-+						  dev);
-+	struct virtio_fs *fs = vdev->priv;
-+
-+	return sysfs_emit(buf, "%s", fs->tag);
-+}
-+static DEVICE_ATTR_RO(tag);
-+
- static int virtio_fs_parse_param(struct fs_context *fsc,
- 				 struct fs_parameter *param)
- {
-@@ -265,6 +280,15 @@ static int virtio_fs_add_instance(struct virtio_fs *fs)
- 	return 0;
- }
- 
-+static void virtio_fs_remove_instance(struct virtio_fs *fs)
-+{
-+	mutex_lock(&virtio_fs_mutex);
-+	list_del_init(&fs->list);
-+	virtio_fs_stop_all_queues(fs);
-+	virtio_fs_drain_all_queues_locked(fs);
-+	mutex_unlock(&virtio_fs_mutex);
-+}
-+
- /* Return the virtio_fs with a given tag, or NULL */
- static struct virtio_fs *virtio_fs_find_instance(const char *tag)
- {
-@@ -891,8 +915,15 @@ static int virtio_fs_probe(struct virtio_device *vdev)
- 	if (ret < 0)
- 		goto out_vqs;
- 
-+	/* Export tag through sysfs */
-+	ret = device_create_file(&vdev->dev, &dev_attr_tag);
-+	if (ret < 0)
-+		goto out_sysfs_attr;
-+
- 	return 0;
- 
-+out_sysfs_attr:
-+	virtio_fs_remove_instance(fs);
- out_vqs:
- 	virtio_reset_device(vdev);
- 	virtio_fs_cleanup_vqs(vdev);
-@@ -922,6 +953,9 @@ static void virtio_fs_remove(struct virtio_device *vdev)
- 	struct virtio_fs *fs = vdev->priv;
- 
- 	mutex_lock(&virtio_fs_mutex);
-+	/* Remove tag attr from sysfs */
-+	device_remove_file(&vdev->dev, &dev_attr_tag);
-+
- 	/* This device is going away. No one should get new reference */
- 	list_del_init(&fs->list);
- 	virtio_fs_stop_all_queues(fs);
--- 
-2.41.0
+Hanna
 

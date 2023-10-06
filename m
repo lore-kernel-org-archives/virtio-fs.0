@@ -1,19 +1,35 @@
-Return-Path: <hreitz@redhat.com>
-Message-ID: <3523c3c6-cd0c-947d-cf84-d648ef813f66@redhat.com>
-Date: Fri, 6 Oct 2023 15:58:44 +0200
-MIME-Version: 1.0
-From: Hanna Czenczek <hreitz@redhat.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1696605522; x=1697210322; darn=redhat.com;
+ h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
+ :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=2hJEOZpwkHmVtNYt07ls/jHKrkkiG4vDwfVuupARRP8=;
+ b=MmcbhVN8STU9hZsTZulutJlZC2ScyHD0vGxFqsbQ4vdegzLgY6g/G0YmS9BAS/7VH2
+ Hz7J8dBXmuJ9OhwQcFuTHQHN+s9ldlJIhx8cUZmenvfY3n6WGsH3jpDJ/Yh7IcZcsfSA
+ ttK3YaviKmsFmJxtjtKQkfer/2BG5r8GzXMo0gO5bvUXrxlw6+1O6xklt7fra7yPKx9b
+ O/5frdMFzyO31VR7aAr87fXq1ROfdXklerkQ/hWjT3A9vAmDHQw99UPtAWtAGV5sFaz3
+ L2b6xJQJBCGtngpfX2S/tNEMpgsVG70cO6un2OVLEHz9jLYScM3Qgvl1lei3WAhb77PJ
+ sSfg==
 References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-3-hreitz@redhat.com> <20231005173859.GC1342722@fedora>
- <851b7629-2302-5624-eb81-6839e250991e@redhat.com>
- <20231006044753-mutt-send-email-mst@kernel.org>
- <483bedcf-9c55-6977-f82c-5ce611ca5769@redhat.com>
-In-Reply-To: <483bedcf-9c55-6977-f82c-5ce611ca5769@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v4 2/8] vhost-user.rst: Improve
- [GS]ET_VRING_BASE doc
+ <20231004125904.110781-2-hreitz@redhat.com>
+ <20231005170852.GB1342722@fedora>
+ <20231005131352-mutt-send-email-mst@kernel.org>
+ <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
+ <20231006043518-mutt-send-email-mst@kernel.org>
+ <a8b9d842-0925-38d0-2f0d-f2560bab251b@redhat.com>
+ <20231006051802-mutt-send-email-mst@kernel.org>
+ <a4af0357-12ee-fc7f-e249-239da34409b0@redhat.com>
+ <20231006055229-mutt-send-email-mst@kernel.org>
+ <d9c2d2c4-5ab3-a3f3-8925-155e1c4ff73a@redhat.com>
+From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Fri, 06 Oct 2023 16:17:34 +0100
+In-reply-to: <d9c2d2c4-5ab3-a3f3-8925-155e1c4ff73a@redhat.com>
+Message-ID: <87il7jg4oe.fsf@linaro.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] (no subject)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,65 +38,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: virtio-fs@redhat.com, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, qemu-devel@nongnu.org, Stefan Hajnoczi <stefanha@redhat.com>
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Eugenio =?utf-8?Q?P=C3=A9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Yajun Wu <yajunw@nvidia.com>, qemu-devel@nongnu.org
 
-On 06.10.23 15:55, Hanna Czenczek wrote:
-> On 06.10.23 10:49, Michael S. Tsirkin wrote:
->> On Fri, Oct 06, 2023 at 09:53:53AM +0200, Hanna Czenczek wrote:
->>> On 05.10.23 19:38, Stefan Hajnoczi wrote:
->>>> On Wed, Oct 04, 2023 at 02:58:58PM +0200, Hanna Czenczek wrote:
 
-[...]
+Hanna Czenczek <hreitz@redhat.com> writes:
 
->>>>    ``VHOST_USER_GET_VRING_BASE``
->>>>      :id: 11
->>>>      :equivalent ioctl: ``VHOST_USER_GET_VRING_BASE``
->>>>      :request payload: vring state description
->>>> -  :reply payload: vring state description
->>>> +  :reply payload: vring descriptor index/indices
->>>> +
->>>> +  Stops the vring and returns the current descriptor index or 
->>>> indices:
->>>> +
->>>> +    * For a split virtqueue, returns only the 16-bit next descriptor
->>>> +      index in the *Available Ring*.  The index in the *Used Ring* is
->>>> +      controlled by the guest driver and can be read from the vring
->>>> I find "is controlled by the guest driver" confusing. The device 
->>>> writes
->>>> the Used Ring index. The driver only reads it. The device is the 
->>>> active
->>>> party here.
->>> Er, good point.  That breaks the whole reasoning.  Then I don’t 
->>> understand
->>> why we do get/set the available ring index and not the used ring 
->>> index.  Do
->>> you know why?
->> It's simple. used ring index in memory is controlled by the device and
->> reflects device state.
+> On 06.10.23 12:34, Michael S. Tsirkin wrote:
+>> On Fri, Oct 06, 2023 at 11:47:55AM +0200, Hanna Czenczek wrote:
+>>> On 06.10.23 11:26, Michael S. Tsirkin wrote:
+>>>> On Fri, Oct 06, 2023 at 11:15:55AM +0200, Hanna Czenczek wrote:
+>>>>> On 06.10.23 10:45, Michael S. Tsirkin wrote:
+>>>>>> On Fri, Oct 06, 2023 at 09:48:14AM +0200, Hanna Czenczek wrote:
+>>>>>>> On 05.10.23 19:15, Michael S. Tsirkin wrote:
+>>>>>>>> On Thu, Oct 05, 2023 at 01:08:52PM -0400, Stefan Hajnoczi wrote:
+>>>>>>>>> On Wed, Oct 04, 2023 at 02:58:57PM +0200, Hanna Czenczek wrote:
+<snip>
+>>> What I=E2=80=99m saying is, 923b8921d21 introduced SET_STATUS calls tha=
+t broke all
+>>> devices that would implement them as per virtio spec, and even today it=
+=E2=80=99s
+>>> broken for stateful devices.=C2=A0 The mentioned performance issue is l=
+ikely
+>>> real, but we can=E2=80=99t address it by making up SET_STATUS calls tha=
+t are wrong.
+>>>
+>>> I concede that I didn=E2=80=99t think about DRIVER_OK.=C2=A0 Personally=
+, I would do all
+>>> final configuration that would happen upon a DRIVER_OK once the first v=
+ring
+>>> is started (i.e. receives a kick).=C2=A0 That has the added benefit of =
+being
+>>> asynchronous because it doesn=E2=80=99t block any vhost-user messages (=
+which are
+>>> synchronous, and thus block downtime).
+>>>
+>>> Hanna
+>>
+>> For better or worse kick is per ring. It's out of spec to start rings
+>> that were not kicked but I guess you could do configuration ...
+>> Seems somewhat asymmetrical though.
 >
-> Exactly, it’s device state, that’s why I thought the front-end needs 
-> to ensure its read and restored around the reset we currently have in 
-> vhost_dev_stop()/start().
+> I meant to take the first ring being started as the signal to do the
+> global configuration, i.e. not do this once per vring, but once
+> globally.
 >
->> device can just read it back to restore.
+>> Let's wait until next week, hopefully Yajun Wu will answer.
 >
-> I find it strange that the device is supposed to read its own state 
-> from memory.
->
->> available ring index in memory is controlled by driver and does
->> not reflect device state.
->
-> Why can’t the device read the available index from memory?  That value 
-> is put into memory by the driver precisely so the device can read it 
-> from there.
+> I mean, personally I don=E2=80=99t really care about the whole SET_STATUS
+> thing.=C2=A0 It=E2=80=99s clear that it=E2=80=99s broken for stateful dev=
+ices.=C2=A0 The fact
+> that it took until 6f8be29ec17d to fix it for just any device that
+> would implement it according to spec to me is a strong indication that
+> nobody does implement it according to spec, and is currently only used
+> to signal to some specific back-end that all rings have been set up
+> and should be configured in a single block.
 
-Ah, wait, is the idea that the device may have an internal available 
-index counter that reflects what descriptor it has already fetched? I.e. 
-this index will lag behind the one in memory, and the difference are new 
-descriptors that the device still needs to read? If that internal 
-counter is the index that’s get/set here, then yes, that makes a lot of 
-sense.
+I'm certainly using [GS]ET_STATUS for the proposed F_TRANSPORT
+extensions where everything is off-loaded to the vhost-user backend.
 
-Hanna
+--=20
+Alex Benn=C3=A9e
+Virtualisation Tech Lead @ Linaro
 

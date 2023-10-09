@@ -1,42 +1,26 @@
 Return-Path: <alex.bennee@linaro.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1697211566; x=1697816366; darn=redhat.com;
- h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
- :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
+ d=linaro.org; s=google; t=1696845580; x=1697450380; darn=redhat.com;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=cQIxvvIWlTQ0TufsfbYrkO0pdzMtxEVo3MShesomyWA=;
- b=UV36niJdaFdajJmuU+In83QLd6gFfvJMP6pnpjK7xPTv3qBKhyGnCv2NvFfGwdUrX/
- Q7Ad6AL4UPVGy2VmssLnnkqRUxziGs1ni5IIrYqGEHyN5ww9U0roSvb6+lvLUjAn8hhG
- aoMGdQrEwJgNGiKeqy/u+j0l1JG1GFwEriHnEMAyRrlUGWl0rMeuBwPJLrRWtPNnHeMY
- sWF2Y8PMe1LpXwkoVNmc9S7QttWf0SCimwa5tjKOydwVfI3TDklFoA8v2YpXDp/BvaZr
- g0P1bNeeJ6H1jsMZxJGzxUNoTHpCTIqghe5gDF1OPlOgyLHMRzjCl/TPo4DXYMks6Nsy
- 907Q==
-References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-2-hreitz@redhat.com>
- <20231005170852.GB1342722@fedora>
- <20231005131352-mutt-send-email-mst@kernel.org>
- <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
- <20231006043518-mutt-send-email-mst@kernel.org>
- <a8b9d842-0925-38d0-2f0d-f2560bab251b@redhat.com>
- <20231006051802-mutt-send-email-mst@kernel.org>
- <a4af0357-12ee-fc7f-e249-239da34409b0@redhat.com>
- <20231006055229-mutt-send-email-mst@kernel.org>
- <e35f9f71-8d9d-6250-cbaa-70412b5a1149@nvidia.com>
- <3f28b1a4-d618-39df-57e6-6152f61cac6e@redhat.com>
- <8f3694c1-48d4-f34b-8f91-3bc217182ffa@redhat.com>
- <e19eb113-89b1-92ed-3375-8bc93c1ff39c@redhat.com>
- <8f51f02b-4676-c566-7304-f63e76df74ba@nvidia.com>
- <9a36a319-4567-f297-f14a-2025792ae93f@redhat.com>
- <87lecapxi4.fsf@linaro.org>
- <fbe05651-a65a-23d0-52be-2d611cc5740d@redhat.com>
-From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Tue, 10 Oct 2023 15:35:28 +0100
-In-reply-to: <fbe05651-a65a-23d0-52be-2d611cc5740d@redhat.com>
-Message-ID: <87lec6mt03.fsf@linaro.org>
+ bh=MAOTvrkuk/whNarnOdZYYg+eWVAwA62Yy6MyVjRBok8=;
+ b=skRQJ00DWrD/xJewaJubZLbG9ulPEdfyhmrpAHjg4zWnX4+xcyjfBdYPXyhABvgUTG
+ PeTqjrgc4LXGKtw7QVmOyEjjznQQpIdCpLuyj21FeSmXdjQGKSqE4dtadyd2SHdnS2db
+ AHVXEQyYNqYP5wRl6H57DjVQlk2N+2/kZBQdtpZR+rFwZfwjMxQhbb99MWVloY/hFZZq
+ 06WN1KwvSKU4X/b5Q3i3H6fXKDJw4BIB3xBV/l58/JrLX6h5CwCYWLsUWjeoYkGSigjP
+ ccMgGDTauHO1iaQHQ2kEo1AdKrVW/0Fi/ZjZaxM41lavYZvnXCSwgSIK7Tbc25lE9VAW
+ 5SbA==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Mon,  9 Oct 2023 10:59:33 +0100
+Message-Id: <20231009095937.195728-3-alex.bennee@linaro.org>
+In-Reply-To: <20231009095937.195728-1-alex.bennee@linaro.org>
+References: <20231009095937.195728-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] (no subject)
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v4 2/6] hw/virtio: derive vhost-user-rng from
+ vhost-user-base
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -45,231 +29,421 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Eugenio =?utf-8?Q?P=C3=A9rez?= <eperezma@redhat.com>, "maxime.coquelin@redhat.com" <maxime.coquelin@redhat.com>, Parav Pandit <parav@nvidia.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Yajun Wu <yajunw@nvidia.com>, Viresh Kumar <viresh.kumar@linaro.org>
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Kevin Wolf <kwolf@redhat.com>, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-block@nongnu.org, Eduardo Habkost <eduardo@habkost.net>, Paolo Bonzini <pbonzini@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Viresh Kumar <viresh.kumar@linaro.org>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
 
+Now we can take advantage of our new base class and make
+vhost-user-rng a much simpler boilerplate wrapper. Also as this
+doesn't require any target specific hacks we only need to build the
+stubs once.
 
-Hanna Czenczek <hreitz@redhat.com> writes:
+Message-Id: <20230418162140.373219-10-alex.bennee@linaro.org>
+Acked-by: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 
-(adding Viresh to CC for Xen Vhost questions)
+---
+v2
+  - new derivation layout
+  - move directly to softmmu_virtio_ss
+v3
+  - use vqsize
+---
+ include/hw/virtio/vhost-user-rng.h |  11 +-
+ hw/virtio/vhost-user-rng.c         | 278 +++--------------------------
+ hw/virtio/meson.build              |  11 +-
+ 3 files changed, 31 insertions(+), 269 deletions(-)
 
-> On 10.10.23 12:36, Alex Benn=C3=A9e wrote:
->> Hanna Czenczek <hreitz@redhat.com> writes:
->>
->>> On 10.10.23 06:00, Yajun Wu wrote:
->>>> On 10/9/2023 5:13 PM, Hanna Czenczek wrote:
->>>>> External email: Use caution opening links or attachments
->>>>>
->>>>>
->>>>> On 09.10.23 11:07, Hanna Czenczek wrote:
->>>>>> On 09.10.23 10:21, Hanna Czenczek wrote:
->>>>>>> On 07.10.23 04:22, Yajun Wu wrote:
->>>>>> [...]
->>>>>>
->> <snip>
->>> So as far as I understand, the feature is supposed to rely on
->>> implementation-specific behavior between specifically qemu as a
->>> front-end and dpdk as a back-end, nothing else.=C2=A0 Honestly, that to=
- me
->>> is a very good reason to deprecate it.=C2=A0 That would make it clear t=
-hat
->>> any implementation that implements it does so because it relies on
->>> implementation-specific behavior from other implementations.
->>>
->>> Option 2 is to fix it.=C2=A0 It is not right to use this broadly define=
-d
->>> feature with its clear protocol as given in the virtio specification
->>> just to set and clear a single bit (DRIVER_OK).=C2=A0 The vhost-user
->>> specification points to that virtio protocol.=C2=A0 We must adhere to t=
-he
->>> protocol.=C2=A0 And note that we must not reset devices just because th=
-e VM
->>> is paused/resumed.=C2=A0 (That is why I wanted to deprecate SET_STATUS,=
- so
->>> that Stefan=E2=80=99s series would introduce RESET_DEVICE where we need=
- it,
->>> and we can (for now) ignore the SET_STATUS 0 in vhost_dev_stop().)
->>>
->>> Option 3 would be to just be honest in the specification, and limit
->>> the scope of F_STATUS to say the only bit that matters is DRIVER_OK.
->>> I would say this is not really different from deprecating, though it
->>> wouldn=E2=80=99t affect your case.=C2=A0 However, I understand Alex rel=
-ies on a
->>> full status byte.=C2=A0 I=E2=80=99m still interested to know why that i=
-s.
->> For an F_TRANSPORT backend (or whatever the final name ends up being) we
->> need the backend to have full control of the status byte because all the
->> handling of VirtIO is deferred to it. Therefor it has to handle all the
->> feature negotiation and indicate when the device needs resetting.
->>
->> (side note: feature negotiation is another slippery area when QEMU gets
->> involved in gating which feature bits may or may not be exposed to the
->> backend. The only one it should ever mask is F_UNUSED which is used
->> (sic) to trigger the vhost protocol negotiation)
->
-> That=E2=80=99s the thing, feature negotiation is done with GET_FEATURES a=
-nd
-> SET_FEATURES.=C2=A0 Configuring F_REPLY_ACK lets SET_FEATURES return
-> errors.
-
-OK but then what - QEMU fakes up FEATURES_OK in the Device Status field
-on the behalf of the backend?
-
-I should point out QEMU doesn't exist in some of these use case. When
-using the rust-vmm backends with Xen for example there is no VMM to talk
-to so we have a Xen Vhost Frontend which is entirely concerned with
-setup and then once connected up leaves the backend to do its thing. I'd
-rather leave the frontend as dumb as possible rather than splitting
-logic between the two.
-
-> Indicating that the device needs reset is a good point, there is no
-> other feature to do that.=C2=A0 (And something qemu currently ignores, ju=
-st
-> like any value the device returns through GET_STATUS, but that=E2=80=99s
-> besides the point.)
->
->>> Option 4 is of course not to do anything, and leave everything as-is,
->>> waiting for the next person to stir the hornet=E2=80=99s nest.
->>>
->>>>>> Cc-ing Alex on this mail, because to me, this seems like an importan=
-t
->>>>>> detail when he plans on using the byte in the future. If we need a
->>>>>> virtio status byte, I can=E2=80=99t see how we could use the existin=
-g F_STATUS
->>>>>> for it.
->> What would we use instead of F_STATUS to query the Device Status field?
->
-> We would emulate it in the front-end, just like we need to do for
-> back-ends without F_STATUS.=C2=A0 We can=E2=80=99t emulate the DEVICE_NEE=
-DS_RESET
-> bit, though, that=E2=80=99s correct.
->
-> Given that qemu currently ignores DEVICE_NEEDS_RESET, I=E2=80=99m not 100=
- %
-> convinced that your use case has a hard dependency on F_STATUS.
-> However, this still does make a fair point in general that it would be
-> useful to keep it.
-
-OK/
-
-> That still leaves us with the situation that currently, the only
-> implementations with F_STATUS support are qemu and dpdk, which both
-> handle it incorrectly.=C2=A0
-
-I was going to say there is also the rust-vmm vhost-user-master crates
-which we've imported:
-
-  https://github.com/vireshk/vhost
-
-for the Xen Vhost Frontend:
-
-  https://github.com/vireshk/xen-vhost-frontend
-
-but I can't actually see any handling for GET/SET_STATUS at all which
-makes me wonder how we actually work. Viresh?
-
-> Furthermore, the specification leaves much to
-> be desired, specifically in how F_STATUS interacts with other
-> vhost-user commands (which is something I cited as a reason for my
-> original patch), i.e. whether RESET_DEVICE and SET_STATUS 0 are
-> equivalent, and whether failures in feature negotiation must result in
-> both SET_FEATURES returning an error (with F_REPLY_ACK), and
-> FEATURES_OK being reset in the status byte, or whether either is
-> sufficient.=C2=A0 What happens when DEVICE_NEEDS_RESET is set, i.e. do we
-> just need RESET_DEVICE / SET_STATUS 0, or do we also need to reset
-> some protocol state?=C2=A0 (This is also connected to the fact that what
-> happens on RESET_DEVICE is largely undefined, which I said on Stefan=E2=
-=80=99s
-> series.)
-
-I'm all for strengthening the vhost-user protocol definitions. I'm just
-wary of encoding QEMU<->backend implementation details.
-
-> In general, because we have our own transport, we should make a note
-> how it interacts with the status negotiation phases, i.e. that
-> GET_FEATURES must not be called before S_ACKNOWLEDGE | S_DRIVER are
-> set, that FEATURES_OK must be set after the SET_FEATURES call, and
-> that DRIVER_OK must not be set without FEATURES_OK set / SET_FEATURES
-> having returned success.=C2=A0 Here we would also answer the question abo=
-ut
-> the interaction of F_REPLY_ACK+SET_FEATURES with F_STATUS,
-> specifically whether an implementation with F_REPLY_ACK even needs to
-> read back the status byte after setting FEATURES_OK because it could
-> have got the feature negotiation result already as a result of the
-> SET_FEATURES call.
-
-Some sequence diagrams would remove a lot of the ambiguity from parsing
-the words. I wonder if there is a pretty way to do that to render nicely
-in our published docs?
-
-> After migration, can you just set all flags immediately or do we need
-> to follow this step-by-step protocol?=C2=A0 I think we do need to do it
-> step-by-step, mostly for simplicity in the back-end, i.e. that it just
-> sees a normal device start-up.
-
-Makes sense.
-
-> We should also clarify whether SET_STATUS can fail, i.e. whether
-> setting an invalid status (is setting FEATURES_OK when the device
-> doesn=E2=80=99t think so invalid?) has SET_STATUS fail (with F_REPLY_ACK)
-> and/or immediately gets the device into DEVICE_NEEDS_RESET.
->
-> We should clarify whether SET_STATUS can block.=C2=A0 The current use of
-> DRIVER_OK seems to indicate to me that dpdk does do time-consuming
-> operations when it sees DRIVER_OK (code looks like it, too) and only
-> returns when that=E2=80=99s done, but na=C3=AFvely, I would expect SET_ST=
-ATUS to be
-> just setting some value and doing whatever needs to be done in the
-> background, not actually launching and blocking on an operation.
-
-Shouldn't the guest driver be reading the status bit until it flips? So
-potentially there could be multiple GET_STATUS calls.
-
-> I think it is dangerous to just push ahead with using F_STATUS without
-> acknowledging that its implementation is broken right now, and that it
-> is so *on purpose* because the DRIVER_OK bit is the only thing that it
-> was supposed to be used for.=C2=A0 Using it for its purported original us=
-e
-> (actually the virtio status byte) is contradictory to that.=C2=A0 It=E2=
-=80=99s
-> probably fixable, but I think it requires taking a step back and
-> seeing what needs to be done to remedy the conflict.=C2=A0 If you rip out
-> all the existing STATUS code and replace it such that qemu will let
-> the guest have full control over the status byte (except for
-> migration, where we restore it on the destination, which will result
-> in DRIVER_OK being set at the end, fulfilling that requirement), that
-> will fix the implementation in qemu.=C2=A0 I think.=C2=A0 But the specifi=
-cation
-> should be amended to think about all these corner cases, not least
-> because I think they will also affect your implementation.
->
-> (The answers to many of the questions I raise for documentation may be
-> obvious to you, based on =E2=80=9Cin virtio, it=E2=80=99s just an MMIO by=
-te that=E2=80=99s
-> written and read, so the rest follows from there=E2=80=9D.=C2=A0 But evid=
-ently the
-> implementation we have kind of ignores that e.g. SET_STATUS 0 is a
-> reset (6f8be29ec17d44496b9ed67599bceaaba72d1864 is a work-around, not
-> much more) or that there is actually a protocol to setting the status
-> flags and you can=E2=80=99t just set them all at once, so I don=E2=80=99t=
- think the
-> answers are immediately obvious, and should be documented.)
->
-> As for me and the original patch: I claimed nobody really needs
-> F_STATUS, you say you do, so plainly, I assumed wrong and will
-> naturally take my hands off of F_STATUS and just ensure not to
-> implement it in any back-end until you=E2=80=99ve fixed it, as Yajun has
-> advised.=C2=A0 I=E2=80=99d still prefer mentioning this advice in the doc=
-umentation
-> until it=E2=80=99s fixed, but, you know, I wouldn=E2=80=99t be the first =
-one to say =E2=80=9CI
-> now know about the quirk, so I can work around it, no need to tell
-> anyone else as long as my stuff works=E2=80=9D.
->
-> Hanna
-
-
---=20
-Alex Benn=C3=A9e
-Virtualisation Tech Lead @ Linaro
+diff --git a/include/hw/virtio/vhost-user-rng.h b/include/hw/virtio/vhost-user-rng.h
+index ddd9f01eea..6cffe28807 100644
+--- a/include/hw/virtio/vhost-user-rng.h
++++ b/include/hw/virtio/vhost-user-rng.h
+@@ -12,21 +12,14 @@
+ #include "hw/virtio/virtio.h"
+ #include "hw/virtio/vhost.h"
+ #include "hw/virtio/vhost-user.h"
+-#include "chardev/char-fe.h"
++#include "hw/virtio/vhost-user-base.h"
+ 
+ #define TYPE_VHOST_USER_RNG "vhost-user-rng"
+ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserRNG, VHOST_USER_RNG)
+ 
+ struct VHostUserRNG {
+     /*< private >*/
+-    VirtIODevice parent;
+-    CharBackend chardev;
+-    struct vhost_virtqueue *vhost_vq;
+-    struct vhost_dev vhost_dev;
+-    VhostUserState vhost_user;
+-    VirtQueue *req_vq;
+-    bool connected;
+-
++    VHostUserBase parent;
+     /*< public >*/
+ };
+ 
+diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
+index efc54cd3fb..01879c863d 100644
+--- a/hw/virtio/vhost-user-rng.c
++++ b/hw/virtio/vhost-user-rng.c
+@@ -3,7 +3,7 @@
+  *
+  * Copyright (c) 2021 Mathieu Poirier <mathieu.poirier@linaro.org>
+  *
+- * Implementation seriously tailored on vhost-user-i2c.c
++ * Simple wrapper of the generic vhost-user-device.
+  *
+  * SPDX-License-Identifier: GPL-2.0-or-later
+  */
+@@ -13,281 +13,47 @@
+ #include "hw/qdev-properties.h"
+ #include "hw/virtio/virtio-bus.h"
+ #include "hw/virtio/vhost-user-rng.h"
+-#include "qemu/error-report.h"
+ #include "standard-headers/linux/virtio_ids.h"
+ 
+-static const int feature_bits[] = {
+-    VIRTIO_F_RING_RESET,
+-    VHOST_INVALID_FEATURE_BIT
+-};
+-
+-static void vu_rng_start(VirtIODevice *vdev)
+-{
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
+-    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
+-    int ret;
+-    int i;
+-
+-    if (!k->set_guest_notifiers) {
+-        error_report("binding does not support guest notifiers");
+-        return;
+-    }
+-
+-    ret = vhost_dev_enable_notifiers(&rng->vhost_dev, vdev);
+-    if (ret < 0) {
+-        error_report("Error enabling host notifiers: %d", -ret);
+-        return;
+-    }
+-
+-    ret = k->set_guest_notifiers(qbus->parent, rng->vhost_dev.nvqs, true);
+-    if (ret < 0) {
+-        error_report("Error binding guest notifier: %d", -ret);
+-        goto err_host_notifiers;
+-    }
+-
+-    rng->vhost_dev.acked_features = vdev->guest_features;
+-    ret = vhost_dev_start(&rng->vhost_dev, vdev, true);
+-    if (ret < 0) {
+-        error_report("Error starting vhost-user-rng: %d", -ret);
+-        goto err_guest_notifiers;
+-    }
+-
+-    /*
+-     * guest_notifier_mask/pending not used yet, so just unmask
+-     * everything here. virtio-pci will do the right thing by
+-     * enabling/disabling irqfd.
+-     */
+-    for (i = 0; i < rng->vhost_dev.nvqs; i++) {
+-        vhost_virtqueue_mask(&rng->vhost_dev, vdev, i, false);
+-    }
+-
+-    return;
+-
+-err_guest_notifiers:
+-    k->set_guest_notifiers(qbus->parent, rng->vhost_dev.nvqs, false);
+-err_host_notifiers:
+-    vhost_dev_disable_notifiers(&rng->vhost_dev, vdev);
+-}
+-
+-static void vu_rng_stop(VirtIODevice *vdev)
+-{
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-    BusState *qbus = BUS(qdev_get_parent_bus(DEVICE(vdev)));
+-    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
+-    int ret;
+-
+-    if (!k->set_guest_notifiers) {
+-        return;
+-    }
+-
+-    vhost_dev_stop(&rng->vhost_dev, vdev, true);
+-
+-    ret = k->set_guest_notifiers(qbus->parent, rng->vhost_dev.nvqs, false);
+-    if (ret < 0) {
+-        error_report("vhost guest notifier cleanup failed: %d", ret);
+-        return;
+-    }
+-
+-    vhost_dev_disable_notifiers(&rng->vhost_dev, vdev);
+-}
+-
+-static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
+-{
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-    bool should_start = virtio_device_should_start(vdev, status);
+-
+-    if (vhost_dev_is_started(&rng->vhost_dev) == should_start) {
+-        return;
+-    }
+-
+-    if (should_start) {
+-        vu_rng_start(vdev);
+-    } else {
+-        vu_rng_stop(vdev);
+-    }
+-}
+-
+-static uint64_t vu_rng_get_features(VirtIODevice *vdev,
+-                                    uint64_t requested_features, Error **errp)
+-{
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-
+-    return vhost_get_features(&rng->vhost_dev, feature_bits,
+-                              requested_features);
+-}
+-
+-static void vu_rng_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+-{
+-    /*
+-     * Not normally called; it's the daemon that handles the queue;
+-     * however virtio's cleanup path can call this.
+-     */
+-}
+-
+-static void vu_rng_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+-{
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-
+-    vhost_virtqueue_mask(&rng->vhost_dev, vdev, idx, mask);
+-}
+-
+-static bool vu_rng_guest_notifier_pending(VirtIODevice *vdev, int idx)
+-{
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-
+-    return vhost_virtqueue_pending(&rng->vhost_dev, idx);
+-}
+-
+-static void vu_rng_connect(DeviceState *dev)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-
+-    if (rng->connected) {
+-        return;
+-    }
+-
+-    rng->connected = true;
+-
+-    /* restore vhost state */
+-    if (virtio_device_started(vdev, vdev->status)) {
+-        vu_rng_start(vdev);
+-    }
+-}
+-
+-static void vu_rng_disconnect(DeviceState *dev)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-
+-    if (!rng->connected) {
+-        return;
+-    }
+-
+-    rng->connected = false;
+-
+-    if (vhost_dev_is_started(&rng->vhost_dev)) {
+-        vu_rng_stop(vdev);
+-    }
+-}
+-
+-static void vu_rng_event(void *opaque, QEMUChrEvent event)
+-{
+-    DeviceState *dev = opaque;
+-
+-    switch (event) {
+-    case CHR_EVENT_OPENED:
+-        vu_rng_connect(dev);
+-        break;
+-    case CHR_EVENT_CLOSED:
+-        vu_rng_disconnect(dev);
+-        break;
+-    case CHR_EVENT_BREAK:
+-    case CHR_EVENT_MUX_IN:
+-    case CHR_EVENT_MUX_OUT:
+-        /* Ignore */
+-        break;
+-    }
+-}
+-
+-static void vu_rng_device_realize(DeviceState *dev, Error **errp)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserRNG *rng = VHOST_USER_RNG(dev);
+-    int ret;
+-
+-    if (!rng->chardev.chr) {
+-        error_setg(errp, "missing chardev");
+-        return;
+-    }
+-
+-    if (!vhost_user_init(&rng->vhost_user, &rng->chardev, errp)) {
+-        return;
+-    }
+-
+-    virtio_init(vdev, VIRTIO_ID_RNG, 0);
+-
+-    rng->req_vq = virtio_add_queue(vdev, 4, vu_rng_handle_output);
+-    if (!rng->req_vq) {
+-        error_setg_errno(errp, -1, "virtio_add_queue() failed");
+-        goto virtio_add_queue_failed;
+-    }
+-
+-    rng->vhost_dev.nvqs = 1;
+-    rng->vhost_dev.vqs = g_new0(struct vhost_virtqueue, rng->vhost_dev.nvqs);
+-    ret = vhost_dev_init(&rng->vhost_dev, &rng->vhost_user,
+-                         VHOST_BACKEND_TYPE_USER, 0, errp);
+-    if (ret < 0) {
+-        error_setg_errno(errp, -ret, "vhost_dev_init() failed");
+-        goto vhost_dev_init_failed;
+-    }
+-
+-    qemu_chr_fe_set_handlers(&rng->chardev, NULL, NULL, vu_rng_event, NULL,
+-                             dev, NULL, true);
+-
+-    return;
+-
+-vhost_dev_init_failed:
+-    g_free(rng->vhost_dev.vqs);
+-    virtio_delete_queue(rng->req_vq);
+-virtio_add_queue_failed:
+-    virtio_cleanup(vdev);
+-    vhost_user_cleanup(&rng->vhost_user);
+-}
+-
+-static void vu_rng_device_unrealize(DeviceState *dev)
+-{
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserRNG *rng = VHOST_USER_RNG(dev);
+-    struct vhost_virtqueue *vhost_vqs = rng->vhost_dev.vqs;
+-
+-    vu_rng_set_status(vdev, 0);
+-
+-    vhost_dev_cleanup(&rng->vhost_dev);
+-    g_free(vhost_vqs);
+-    virtio_delete_queue(rng->req_vq);
+-    virtio_cleanup(vdev);
+-    vhost_user_cleanup(&rng->vhost_user);
+-}
+-
+-static struct vhost_dev *vu_rng_get_vhost(VirtIODevice *vdev)
+-{
+-    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+-    return &rng->vhost_dev;
+-}
+-
+ static const VMStateDescription vu_rng_vmstate = {
+     .name = "vhost-user-rng",
+     .unmigratable = 1,
+ };
+ 
+-static Property vu_rng_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserRNG, chardev),
++static Property vrng_properties[] = {
++    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
++static void vu_rng_base_realize(DeviceState *dev, Error **errp)
++{
++    VHostUserBase *vub = VHOST_USER_BASE(dev);
++    VHostUserBaseClass *vubs = VHOST_USER_BASE_GET_CLASS(dev);
++
++    /* Fixed for RNG */
++    vub->virtio_id = VIRTIO_ID_RNG;
++    vub->num_vqs = 1;
++    vub->vq_size = 4;
++
++    vubs->parent_realize(dev, errp);
++}
++
+ static void vu_rng_class_init(ObjectClass *klass, void *data)
+ {
+     DeviceClass *dc = DEVICE_CLASS(klass);
+-    VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
++    VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
+ 
+-    device_class_set_props(dc, vu_rng_properties);
+     dc->vmsd = &vu_rng_vmstate;
+-    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
++    device_class_set_props(dc, vrng_properties);
++    device_class_set_parent_realize(dc, vu_rng_base_realize,
++                                    &vubc->parent_realize);
+ 
+-    vdc->realize = vu_rng_device_realize;
+-    vdc->unrealize = vu_rng_device_unrealize;
+-    vdc->get_features = vu_rng_get_features;
+-    vdc->set_status = vu_rng_set_status;
+-    vdc->guest_notifier_mask = vu_rng_guest_notifier_mask;
+-    vdc->guest_notifier_pending = vu_rng_guest_notifier_pending;
+-    vdc->get_vhost = vu_rng_get_vhost;
++    set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
+ }
+ 
+ static const TypeInfo vu_rng_info = {
+     .name = TYPE_VHOST_USER_RNG,
+-    .parent = TYPE_VIRTIO_DEVICE,
++    .parent = TYPE_VHOST_USER_BASE,
+     .instance_size = sizeof(VHostUserRNG),
+     .class_init = vu_rng_class_init,
+ };
+diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
+index 51c3f97c2d..d0b963199c 100644
+--- a/hw/virtio/meson.build
++++ b/hw/virtio/meson.build
+@@ -18,8 +18,15 @@ if have_vhost
+     # fixme - this really should be generic
+     specific_virtio_ss.add(files('vhost-user.c'))
+     system_virtio_ss.add(files('vhost-user-base.c'))
++
++    # MMIO Stubs
+     system_virtio_ss.add(files('vhost-user-device.c'))
++    system_virtio_ss.add(when: 'CONFIG_VHOST_USER_RNG', if_true: files('vhost-user-rng.c'))
++
++    # PCI Stubs
+     system_virtio_ss.add(when: 'CONFIG_VIRTIO_PCI', if_true: files('vhost-user-device-pci.c'))
++    system_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_RNG'],
++                         if_true: files('vhost-user-rng-pci.c'))
+   endif
+   if have_vhost_vdpa
+     system_virtio_ss.add(files('vhost-vdpa.c'))
+@@ -34,10 +41,8 @@ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: files('vhost-user-
+ specific_virtio_ss.add(when: 'CONFIG_VIRTIO_PMEM', if_true: files('virtio-pmem.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VHOST_VSOCK', if_true: files('vhost-vsock.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-user-vsock.c'))
+-specific_virtio_ss.add(when: 'CONFIG_VIRTIO_RNG', if_true: files('virtio-rng.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VIRTIO_MEM', if_true: files('virtio-mem.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c.c'))
+-specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_RNG', if_true: files('vhost-user-rng.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_GPIO', if_true: files('vhost-user-gpio.c'))
+ specific_virtio_ss.add(when: ['CONFIG_VIRTIO_PCI', 'CONFIG_VHOST_USER_GPIO'], if_true: files('vhost-user-gpio-pci.c'))
+ specific_virtio_ss.add(when: 'CONFIG_VHOST_USER_SCMI', if_true: files('vhost-user-scmi.c'))
+@@ -49,7 +54,6 @@ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_VSOCK', if_true: files('vhost-user-vs
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_BLK', if_true: files('vhost-user-blk-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_I2C', if_true: files('vhost-user-i2c-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_INPUT', if_true: files('vhost-user-input-pci.c'))
+-virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_RNG', if_true: files('vhost-user-rng-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_SCSI', if_true: files('vhost-user-scsi-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_SCSI', if_true: files('vhost-scsi-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: files('vhost-user-fs-pci.c'))
+@@ -57,7 +61,6 @@ virtio_pci_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: files('vhost-user-fs-pc
+ virtio_pci_ss.add(when: 'CONFIG_VIRTIO_CRYPTO', if_true: files('virtio-crypto-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VIRTIO_INPUT_HOST', if_true: files('virtio-input-host-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VIRTIO_INPUT', if_true: files('virtio-input-pci.c'))
+-virtio_pci_ss.add(when: 'CONFIG_VIRTIO_RNG', if_true: files('virtio-rng-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VIRTIO_BALLOON', if_true: files('virtio-balloon-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VIRTIO_9P', if_true: files('virtio-9p-pci.c'))
+ virtio_pci_ss.add(when: 'CONFIG_VIRTIO_SCSI', if_true: files('virtio-scsi-pci.c'))
+-- 
+2.39.2
 

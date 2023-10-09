@@ -1,23 +1,28 @@
-Return-Path: <gmaglion@redhat.com>
+Return-Path: <viresh.kumar@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linaro.org; s=google; t=1696849144; x=1697453944; darn=redhat.com;
+ h=in-reply-to:content-transfer-encoding:content-disposition
+ :mime-version:references:message-id:subject:cc:to:from:date:from:to
+ :cc:subject:date:message-id:reply-to;
+ bh=yd5kWI84EmbioTxJcr7Sa3qdzXv/L7GnZ6Yf4TmaOis=;
+ b=yuWwfr1pkZNyQhrcsABr2y3K4IM5n/kEwMUj8aQs5zjyfyi7lM8yJag0w7H1cvshMZ
+ A/GwYmVd9jGbhhN/60UYOCs+cjHa2x6Lm1LtCLO8Ybvlu9CcaGmrqMeaR3F3tGzoLtF2
+ IDZMI/1FxQQKa8qUp72No/pX+8Hx/G4UsTHc01reSMy0S70tKdHDftZzCcJCZ0H05JvC
+ CFvQxnxpwZgcLJ+O8ytXoFfSjXnVDnVsSqTDsF0Myk1Z1xLPW1SyFpkrOkRPTIoEcH0p
+ HdXWvy6fuOZkn+ijkOxFOIWv6QTihSXl8YIQpiddVbsX8Zc80U2YAHseKi2BlsyS35sN
+ wtOA==
+Date: Mon, 9 Oct 2023 16:29:01 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Message-ID: <20231009105901.lmtexbfbcf5rnvch@vireshk-i7>
+References: <20231009095937.195728-1-alex.bennee@linaro.org>
+ <20231009095937.195728-4-alex.bennee@linaro.org>
 MIME-Version: 1.0
-References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-2-hreitz@redhat.com>
- <20231005170852.GB1342722@fedora>
- <20231005131352-mutt-send-email-mst@kernel.org>
- <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
- <20231006043518-mutt-send-email-mst@kernel.org>
- <a8b9d842-0925-38d0-2f0d-f2560bab251b@redhat.com>
- <20231006051802-mutt-send-email-mst@kernel.org>
- <a4af0357-12ee-fc7f-e249-239da34409b0@redhat.com>
- <20231006055229-mutt-send-email-mst@kernel.org>
- <e35f9f71-8d9d-6250-cbaa-70412b5a1149@nvidia.com>
-In-Reply-To: <e35f9f71-8d9d-6250-cbaa-70412b5a1149@nvidia.com>
-From: German Maglione <gmaglione@redhat.com>
-Date: Mon, 9 Oct 2023 12:28:56 +0200
-Message-ID: <CAJh=p+5OFrx4nP5rYKrgZ_y02n358wy70c4L0L4fHKQUo9fU5Q@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+In-Reply-To: <20231009095937.195728-4-alex.bennee@linaro.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] (no subject)
+Subject: Re: [Virtio-fs] [PATCH v4 3/6] hw/virtio: derive vhost-user-gpio
+ from vhost-user-base
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,267 +31,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Yajun Wu <yajunw@nvidia.com>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, maxime.coquelin@redhat.com, parav@nvidia.com, Anton Kuchin <antonkuchin@yandex-team.ru>
+To: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Cc: qemu-devel@nongnu.org, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Kevin Wolf <kwolf@redhat.com>, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-block@nongnu.org, Eduardo Habkost <eduardo@habkost.net>, Paolo Bonzini <pbonzini@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 
-On Sat, Oct 7, 2023 at 4:23=E2=80=AFAM Yajun Wu <yajunw@nvidia.com> wrote:
->
->
-> On 10/6/2023 6:34 PM, Michael S. Tsirkin wrote:
-> > External email: Use caution opening links or attachments
-> >
-> >
-> > On Fri, Oct 06, 2023 at 11:47:55AM +0200, Hanna Czenczek wrote:
-> >> On 06.10.23 11:26, Michael S. Tsirkin wrote:
-> >>> On Fri, Oct 06, 2023 at 11:15:55AM +0200, Hanna Czenczek wrote:
-> >>>> On 06.10.23 10:45, Michael S. Tsirkin wrote:
-> >>>>> On Fri, Oct 06, 2023 at 09:48:14AM +0200, Hanna Czenczek wrote:
-> >>>>>> On 05.10.23 19:15, Michael S. Tsirkin wrote:
-> >>>>>>> On Thu, Oct 05, 2023 at 01:08:52PM -0400, Stefan Hajnoczi wrote:
-> >>>>>>>> On Wed, Oct 04, 2023 at 02:58:57PM +0200, Hanna Czenczek wrote:
-> >>>>>>>>> There is no clearly defined purpose for the virtio status byte =
-in
-> >>>>>>>>> vhost-user: For resetting, we already have RESET_DEVICE; and fo=
-r virtio
-> >>>>>>>>> feature negotiation, we have [GS]ET_FEATURES.  With the REPLY_A=
-CK
-> >>>>>>>>> protocol extension, it is possible for SET_FEATURES to return e=
-rrors
-> >>>>>>>>> (SET_PROTOCOL_FEATURES may be called before SET_FEATURES).
-> >>>>>>>>>
-> >>>>>>>>> As for implementations, SET_STATUS is not widely implemented.  =
-dpdk does
-> >>>>>>>>> implement it, but only uses it to signal feature negotiation fa=
-ilure.
-> >>>>>>>>> While it does log reset requests (SET_STATUS 0) as such, it eff=
-ectively
-> >>>>>>>>> ignores them, in contrast to RESET_OWNER (which is deprecated, =
-and today
-> >>>>>>>>> means the same thing as RESET_DEVICE).
-> >>>>>>>>>
-> >>>>>>>>> While qemu superficially has support for [GS]ET_STATUS, it does=
- not
-> >>>>>>>>> forward the guest-set status byte, but instead just makes it up
-> >>>>>>>>> internally, and actually completely ignores what the back-end r=
-eturns,
-> >>>>>>>>> only using it as the template for a subsequent SET_STATUS to ad=
-d single
-> >>>>>>>>> bits to it.  Notably, after setting FEATURES_OK, it never reads=
- it back
-> >>>>>>>>> to see whether the flag is still set, which is the only way in =
-which
-> >>>>>>>>> dpdk uses the status byte.
-> >>>>>>>>>
-> >>>>>>>>> As-is, no front-end or back-end can rely on the other side hand=
-ling this
-> >>>>>>>>> field in a useful manner, and it also provides no practical use=
- over
-> >>>>>>>>> other mechanisms the vhost-user protocol has, which are more cl=
-early
-> >>>>>>>>> defined.  Deprecate it.
-> >>>>>>>>>
-> >>>>>>>>> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
-> >>>>>>>>> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
-> >>>>>>>>> ---
-> >>>>>>>>>      docs/interop/vhost-user.rst | 28 +++++++++++++++++++++----=
----
-> >>>>>>>>>      1 file changed, 21 insertions(+), 7 deletions(-)
-> >>>>>>>> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> >>>>>>> SET_STATUS is the only way to signal failure to acknowledge FEATU=
-RES_OK.
-> >>>>>>> The fact current backends never check errors does not mean they n=
-ever
-> >>>>>>> will. So no, not applying this.
-> >>>>>> Can this not be done with REPLY_ACK?  I.e., with the following mes=
-sage
-> >>>>>> order:
-> >>>>>>
-> >>>>>> 1. GET_FEATURES to find out whether VHOST_USER_F_PROTOCOL_FEATURES=
- is
-> >>>>>> present
-> >>>>>> 2. GET_PROTOCOL_FEATURES to hopefully get VHOST_USER_PROTOCOL_F_RE=
-PLY_ACK
-> >>>>>> 3. SET_PROTOCOL_FEATURES to set VHOST_USER_PROTOCOL_F_REPLY_ACK
-> >>>>>> 4. SET_FEATURES with need_reply
-> >>>>>>
-> >>>>>> If not, the problem is that qemu has sent SET_STATUS 0 for a while=
- when the
-> >>>>>> vCPUs are stopped, which generally seems to request a device reset=
-.  If we
-> >>>>>> don=E2=80=99t state at least that SET_STATUS 0 is to be ignored, b=
-ack-ends that will
-> >>>>>> implement SET_STATUS later may break with at least these qemu vers=
-ions.  But
-> >>>>>> documenting that a particular use of the status byte is to be igno=
-red would
-> >>>>>> be really strange.
-> >>>>>>
-> >>>>>> Hanna
-> >>>>> Hmm I guess. Though just following virtio spec seems cleaner to me.=
-..
-> >>>>> vhost-user reconfigures the state fully on start.
-> >>>> Not the internal device state, though.  virtiofsd has internal state=
-, and
-> >>>> other devices like vhost-gpu back-ends would probably, too.
-> >>>>
-> >>>> Stefan has recently sent a series
-> >>>> (https://lists.nongnu.org/archive/html/qemu-devel/2023-10/msg00709.h=
-tml) to
-> >>>> put the reset (RESET_DEVICE) into virtio_reset() (when we really nee=
-d a
-> >>>> reset).
-> >>>>
-> >>>> I really don=E2=80=99t like our current approach with the status byt=
-e. Following the
-> >>>> virtio specification to me would mean that the guest directly contro=
-ls this
-> >>>> byte, which it does not.  qemu makes up values as it deems appropria=
-te, and
-> >>>> this includes sending a SET_STATUS 0 when the guest is just paused, =
-i.e.
-> >>>> when the guest really doesn=E2=80=99t want a device reset.
-> >>>>
-> >>>> That means that qemu does not treat this as a virtio device field (b=
-ecause
-> >>>> that would mean exposing it to the guest driver), but instead treats=
- it as
-> >>>> part of the vhost(-user) protocol.  It doesn=E2=80=99t feel right to=
- me that we use
-> >>>> a virtio-defined feature for communication on the vhost level, i.e. =
-between
-> >>>> front-end and back-end, and not between guest driver and device.  I =
-think
-> >>>> all vhost-level protocol features should be fully defined in the vho=
-st-user
-> >>>> specification, which REPLY_ACK is.
-> >>> Hmm that makes sense. Maybe we should have done what stefan's patch
-> >>> is doing.
-> >>>
-> >>> Do look at the original commit that introduced it to understand why
-> >>> it was added.
-> >> I don=E2=80=99t understand why this was added to the stop/cont code, t=
-hough.  If it
-> >> is time consuming to make these changes, why are they done every time =
-the VM
-> >> is paused
-> >> and resumed?  It makes sense that this would be done for the initial
-> >> configuration (where a reset also wouldn=E2=80=99t hurt), but here it =
-seems wrong.
-> >>
-> >> (To be clear, a reset in the stop/cont code is wrong, because it break=
-s
-> >> stateful devices.)
-> >>
-> >> Also, note the newer commits 6f8be29ec17 and c3716f260bf.  The reset a=
-s
-> >> originally introduced was wrong even for non-stateful devices, because=
- it
-> >> occurred before we fetched the state (vring indices) so we could resto=
-re it
-> >> later.  I don=E2=80=99t know how 923b8921d21 was tested, but if the ba=
-ck-end used
-> >> for testing implemented SET_STATUS 0 as a reset, it could not have sur=
-vived
-> >> either migration or a stop/cont in general, because the vring indices =
-would
-> >> have been reset to 0.
-> >>
-> >> What I=E2=80=99m saying is, 923b8921d21 introduced SET_STATUS calls th=
-at broke all
-> >> devices that would implement them as per virtio spec, and even today i=
-t=E2=80=99s
-> >> broken for stateful devices.  The mentioned performance issue is likel=
-y
-> >> real, but we can=E2=80=99t address it by making up SET_STATUS calls th=
-at are wrong.
-> >>
-> >> I concede that I didn=E2=80=99t think about DRIVER_OK.  Personally, I =
-would do all
-> >> final configuration that would happen upon a DRIVER_OK once the first =
-vring
-> >> is started (i.e. receives a kick).  That has the added benefit of bein=
-g
-> >> asynchronous because it doesn=E2=80=99t block any vhost-user messages =
-(which are
-> >> synchronous, and thus block downtime).
-> >>
-> >> Hanna
-> >
-> > For better or worse kick is per ring. It's out of spec to start rings
-> > that were not kicked but I guess you could do configuration ...
-> > Seems somewhat asymmetrical though.
-> >
-> > Let's wait until next week, hopefully Yajun Wu will answer.
-> The main motivation of adding VHOST_USER_SET_STATUS is to let backend
-> DPDK know
-> when DRIVER_OK bit is valid. It's an indication of all VQ configuration
-> has sent,
-> otherwise DPDK has to rely on first queue pair is ready, then
-> receiving/applying
-> VQ configuration one by one.
->
-> During live migration, configuring VQ one by one is very time consuming.
-> For VIRTIO
-> net vDPA, HW needs to know how many VQs are enabled to set
-> RSS(Receive-Side Scaling).
->
-> If you don=E2=80=99t want SET_STATUS message, backend can remove protocol
-> feature bit
-> VHOST_USER_PROTOCOL_F_STATUS.
-> DPDK is ignoring SET_STATUS 0, but using GET_VRING_BASE to do device
-> close/reset.
+On 09-10-23, 10:59, Alex Benn=E9e wrote:
+> Now the new base class supports config handling we can take advantage
+> and make vhost-user-gpio a much simpler boilerplate wrapper. Also as
+> this doesn't require any target specific hacks we only need to build
+> the stubs once.
+>=20
+> Message-Id: <20230418162140.373219-12-alex.bennee@linaro.org>
+> Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
+> Acked-by: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
+>=20
+> ---
+> v2
+>   - use new vhost-user-base
+>   - move build to common code
+> v3
+>   - fix inadvertent double link
+> v4
+>   - merge conflict
+>   - update includes
+> ---
+>  include/hw/virtio/vhost-user-gpio.h |  23 +-
+>  hw/virtio/vhost-user-gpio.c         | 407 ++--------------------------
+>  hw/virtio/meson.build               |   5 +-
+>  3 files changed, 22 insertions(+), 413 deletions(-)
 
-This is incorrect, resetting the device on GET_VRING_BASE breaks
-the stop/cont. Since you don't want to reset the VQs on stop/cont.
+Looks nice. Thanks.
 
->
-> I'm not involved in discussion about adding SET_STATUS in Vhost
-> protocol. This feature
-> is essential for vDPA(same as vhost-vdpa implements VHOST_VDPA_SET_STATUS=
-).
->
-> Thanks,
-> Yajun
-> >
-> >>>> Now, we could hand full control of the status byte to the guest, and=
- that
-> >>>> would make me content.  But I feel like that doesn=E2=80=99t really =
-work, because
-> >>>> qemu needs to intercept the status byte anyway (it needs to know whe=
-n there
-> >>>> is a reset, probably wants to know when the device is configured, et=
-c.), so
-> >>>> I don=E2=80=99t think having the status byte in vhost-user really ga=
-ins us much when
-> >>>> qemu could translate status byte changes to/from other vhost-user co=
-mmands.
-> >>>>
-> >>>> Hanna
-> >>> well it intercepts it but I think it could pass it on unchanged.
-> >>>
-> >>>
-> >>>>> I guess symmetry was the
-> >>>>> point. So I don't see why SET_STATUS 0 has to be ignored.
-> >>>>>
-> >>>>>
-> >>>>> SET_STATUS was introduced by:
-> >>>>>
-> >>>>> commit 923b8921d210763359e96246a58658ac0db6c645
-> >>>>> Author: Yajun Wu <yajunw@nvidia.com>
-> >>>>> Date:   Mon Oct 17 14:44:52 2022 +0800
-> >>>>>
-> >>>>>        vhost-user: Support vhost_dev_start
-> >>>>>
-> >>>>> CC the author.
-> >>>>>
->
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
-
-
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 --=20
-German
+viresh
 

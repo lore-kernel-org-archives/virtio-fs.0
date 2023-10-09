@@ -1,23 +1,15 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1696845579; x=1697450379; darn=redhat.com;
- h=content-transfer-encoding:mime-version:message-id:date:subject:cc
- :to:from:from:to:cc:subject:date:message-id:reply-to;
- bh=1XLFDaMHZCEg2LGyweqzWt7sDWsIdqiMwYyFkHjOtX4=;
- b=BH10Q1P4j1Qv0ShmjZj0ctFYiFnuAzgLQmWANpa+mcwKEX1yc0Z/2NOXqkOsDbb7NT
- z8L6aY9S8h2U8QkCOB0aC8eXxALnvNQyun33SHWuNcaHCjFNl8O4XgUmLMdxS8q3TLZL
- apFmO9JraV/9QgNAhN+8wR9quRN5E0MYr6oliMQWJpgImx+ODuzz13vMWdTwviOWv/2a
- Yhw6lK7zO8gLAzdEmy2nmrK+BODUHd0SUO51LDfIeIQLKj26VSC6ILzOZeVgfCS2+Dl6
- 2N0AqCua0J6fK+bOmyW5tQHq8NEyXeLx8xh7NrwPuC6HgxfAcG5RWztDqKdFMIqQlTbN
- 3QYQ==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Mon,  9 Oct 2023 10:59:31 +0100
-Message-Id: <20231009095937.195728-1-alex.bennee@linaro.org>
+Return-Path: <vgoyal@redhat.com>
+Date: Mon, 9 Oct 2023 16:21:46 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <ZSRg2uiBNmY4mKHr@redhat.com>
+References: <20231005203030.223489-1-vgoyal@redhat.com>
+ <CAJfpegspVnkXAa5xfvjEQ9r5__vXpcgR4qubdG8=p=aiS2goRg@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 0/6] virtio: cleanup vhost-user-generic and
- reduce c&p
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpegspVnkXAa5xfvjEQ9r5__vXpcgR4qubdG8=p=aiS2goRg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Export filesystem tags through
+ sysfs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,60 +18,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Kevin Wolf <kwolf@redhat.com>, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-block@nongnu.org, Eduardo Habkost <eduardo@habkost.net>, Paolo Bonzini <pbonzini@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Viresh Kumar <viresh.kumar@linaro.org>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, mzxreary@0pointer.de, stefanha@redhat.com
 
-A lot of our vhost-user stubs are large chunks of boilerplate that do
-(mostly) the same thing. This series continues the cleanups by
-splitting the vhost-user-base and vhost-user-generic implementations.
-After adding a new vq_size property the rng, gpio and i2c vhost-user
-devices become simple specialisations of the common base defining the
-ID, number of queues and potentially the config handling.
+On Mon, Oct 09, 2023 at 11:53:42AM +0200, Miklos Szeredi wrote:
+> On Thu, 5 Oct 2023 at 22:30, Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > virtiofs filesystem is mounted using a "tag" which is exported by the
+> > virtiofs device. virtiofs driver knows about all the available tags but
+> > these are not exported to user space.
+> >
+> > People have asked these tags to be exported to user space. Most recently
+> > Lennart Poettering has asked for it as he wants to scan the tags and mount
+> > virtiofs automatically in certain cases.
+> >
+> > https://gitlab.com/virtio-fs/virtiofsd/-/issues/128
+> >
+> > This patch exports tags through sysfs. One tag is associated with each
+> > virtiofs device. A new "tag" file appears under virtiofs device dir.
+> > Actual filesystem tag can be obtained by reading this "tag" file.
+> >
+> > For example, if a virtiofs device exports tag "myfs", a new file "tag"
+> > will show up here.
+> >
+> > /sys/bus/virtio/devices/virtio<N>/tag
+> >
+> > # cat /sys/bus/virtio/devices/virtio<N>/tag
+> > myfs
+> >
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> 
+> Hi Vivek,
+> 
+> This needs something under Documentation/.
 
-I've also added Manos' vhost-user-sound while I was at it.
+Hi Miklos,
 
-Changes
--------
+Hmm.., I can easily update the virtiofs documentation.
 
-I've dropped the F_TRANSPORT work from this series to keep this small
-and ready to merge. The changes for F_TRANSPORT are a bit more
-invasive and still need a bit of debugging but I wanted to get this
-stuff merged now.
+Initially I was thinking to put something in Documentation/ABI/testing/
+as well. But I don't see any virtio related. In fact can't find any
+files related to "virtio" at all.
 
-Alex Bennée (5):
-  virtio: split into vhost-user-base and vhost-user-device
-  hw/virtio: derive vhost-user-rng from vhost-user-base
-  hw/virtio: derive vhost-user-gpio from vhost-user-base
-  hw/virtio: derive vhost-user-i2c from vhost-user-base
-  docs/system: add a basic enumeration of vhost-user devices
+So I will just update the Documentation/filesystems/virtiofs.rst for now.
 
-Manos Pitsidianakis (1):
-  hw/virtio: add vhost-user-snd and virtio-snd-pci devices
+> 
+> While the interface looks good to me, I think we need an ack on that
+> from the virtio maintainer.
 
- docs/system/devices/vhost-user-rng.rst |   2 +
- docs/system/devices/vhost-user.rst     |  41 +++
- include/hw/virtio/vhost-user-base.h    |  49 +++
- include/hw/virtio/vhost-user-gpio.h    |  23 +-
- include/hw/virtio/vhost-user-i2c.h     |  14 +-
- include/hw/virtio/vhost-user-rng.h     |  11 +-
- include/hw/virtio/vhost-user-snd.h     |  26 ++
- hw/virtio/vhost-user-base.c            | 348 +++++++++++++++++++++
- hw/virtio/vhost-user-device-pci.c      |  10 +-
- hw/virtio/vhost-user-device.c          | 335 +-------------------
- hw/virtio/vhost-user-gpio.c            | 407 ++-----------------------
- hw/virtio/vhost-user-i2c.c             | 272 +----------------
- hw/virtio/vhost-user-rng.c             | 278 ++---------------
- hw/virtio/vhost-user-snd-pci.c         |  75 +++++
- hw/virtio/vhost-user-snd.c             |  67 ++++
- hw/virtio/Kconfig                      |   5 +
- hw/virtio/meson.build                  |  25 +-
- 17 files changed, 705 insertions(+), 1283 deletions(-)
- create mode 100644 include/hw/virtio/vhost-user-base.h
- create mode 100644 include/hw/virtio/vhost-user-snd.h
- create mode 100644 hw/virtio/vhost-user-base.c
- create mode 100644 hw/virtio/vhost-user-snd-pci.c
- create mode 100644 hw/virtio/vhost-user-snd.c
+I am assuming Stefan should be able to provide an ACK. But I will also
+add Michael and Paolo in the V2 of the patch and hoping we should be
+able to get atleast 1 ACK.
 
--- 
-2.39.2
-
+Thanks
+Vivek

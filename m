@@ -1,26 +1,25 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linaro.org; s=google; t=1689003329; x=1691595329;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=y4Dz/cKQcjk2Q/25bTqazNT9L0/TcrBA5Nkd7fUVra8=;
- b=IQ6KxQRuWoZTFUkZL8wqDIz4YT5YYYlpRTK64s4+asCrYQkq5sXvq0jbS4LgRX+juo
- FtY4+9d3ucFJRqycocNYzmkhe4UgUBGlsz3IrUIOp0FByx1E9dRL0/zMBv+TcbnnJReW
- tQjCnWQqFqJR2PF0iIBVAb7oWo9T8iWebaIaek0j3O3PolB/hK7o0uSDLJk5cX1Hd9Ui
- wjUTkyz46AX11puBd1fk3BeKwLDm8YLQLeSp7imUg4gwcmcCan+Ke0NUqy19t5G1D/7Q
- TG73nLUjtZpcj4x+O2BS3mK1qixN6ydz9YwDwJ8lWw9nC7Bp8SUjREKhknKybzAN/DNp
- 9uMg==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Mon, 10 Jul 2023 16:35:06 +0100
-Message-Id: <20230710153522.3469097-5-alex.bennee@linaro.org>
-In-Reply-To: <20230710153522.3469097-1-alex.bennee@linaro.org>
-References: <20230710153522.3469097-1-alex.bennee@linaro.org>
+Return-Path: <hreitz@redhat.com>
+Message-ID: <e19eb113-89b1-92ed-3375-8bc93c1ff39c@redhat.com>
+Date: Mon, 9 Oct 2023 11:13:33 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+From: Hanna Czenczek <hreitz@redhat.com>
+References: <20231004125904.110781-1-hreitz@redhat.com>
+ <20231004125904.110781-2-hreitz@redhat.com> <20231005170852.GB1342722@fedora>
+ <20231005131352-mutt-send-email-mst@kernel.org>
+ <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
+ <20231006043518-mutt-send-email-mst@kernel.org>
+ <a8b9d842-0925-38d0-2f0d-f2560bab251b@redhat.com>
+ <20231006051802-mutt-send-email-mst@kernel.org>
+ <a4af0357-12ee-fc7f-e249-239da34409b0@redhat.com>
+ <20231006055229-mutt-send-email-mst@kernel.org>
+ <e35f9f71-8d9d-6250-cbaa-70412b5a1149@nvidia.com>
+ <3f28b1a4-d618-39df-57e6-6152f61cac6e@redhat.com>
+ <8f3694c1-48d4-f34b-8f91-3bc217182ffa@redhat.com>
+In-Reply-To: <8f3694c1-48d4-f34b-8f91-3bc217182ffa@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 04/20] include/hw/virtio: document
- virtio_notify_config
+Subject: Re: [Virtio-fs] (no subject)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,32 +28,91 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Jason Wang <jasowang@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, qemu-block@nongnu.org, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>, Kevin Wolf <kwolf@redhat.com>, Markus Armbruster <armbru@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Hanna Reitz <hreitz@redhat.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Erik Schilling <erik.schilling@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Eduardo Habkost <eduardo@habkost.net>, Fam Zheng <fam@euphon.net>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
+To: Yajun Wu <yajunw@nvidia.com>, "Michael S. Tsirkin" <mst@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, parav@nvidia.com, maxime.coquelin@redhat.com, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
----
- include/hw/virtio/virtio.h | 7 +++++++
- 1 file changed, 7 insertions(+)
+On 09.10.23 11:07, Hanna Czenczek wrote:
+> On 09.10.23 10:21, Hanna Czenczek wrote:
+>> On 07.10.23 04:22, Yajun Wu wrote:
+>
+> [...]
+>
+>>> The main motivation of adding VHOST_USER_SET_STATUS is to let 
+>>> backend DPDK know
+>>> when DRIVER_OK bit is valid. It's an indication of all VQ 
+>>> configuration has sent,
+>>> otherwise DPDK has to rely on first queue pair is ready, then 
+>>> receiving/applying
+>>> VQ configuration one by one.
+>>>
+>>> During live migration, configuring VQ one by one is very time 
+>>> consuming.
+>>
+>> One question I have here is why it wasn’t then introduced in the live 
+>> migration code, but in the general VM stop/cont code instead. It does 
+>> seem time-consuming to do this every time the VM is paused and resumed.
+>>
+>>> For VIRTIO
+>>> net vDPA, HW needs to know how many VQs are enabled to set 
+>>> RSS(Receive-Side Scaling).
+>>>
+>>> If you don’t want SET_STATUS message, backend can remove protocol 
+>>> feature bit
+>>> VHOST_USER_PROTOCOL_F_STATUS.
+>>
+>> The problem isn’t back-ends that don’t want the message, the problem 
+>> is that qemu uses the message wrongly, which prevents well-behaving 
+>> back-ends from implementing the message.
+>>
+>>> DPDK is ignoring SET_STATUS 0, but using GET_VRING_BASE to do device 
+>>> close/reset.
+>>
+>> So the right thing to do for back-ends is to announce STATUS support 
+>> and then not implement it correctly?
+>>
+>> GET_VRING_BASE should not reset the close or reset the device, by the 
+>> way.  It should stop that one vring, not more.  We have a 
+>> RESET_DEVICE command for resetting.
+>>
+>>> I'm not involved in discussion about adding SET_STATUS in Vhost 
+>>> protocol. This feature
+>>> is essential for vDPA(same as vhost-vdpa implements 
+>>> VHOST_VDPA_SET_STATUS).
+>>
+>> So from what I gather from your response is that there is only a 
+>> single use for SET_STATUS, which is the DRIVER_OK bit.  If so, 
+>> documenting that all other bits are to be ignored by both back-end 
+>> and front-end would be fine by me.
+>>
+>> I’m not fully serious about that suggestion, but I hear the strong 
+>> implication that nothing but DRIVER_OK was of any concern, and this 
+>> is really important to note when we talk about the status of the 
+>> STATUS feature in vhost today.  It seems to me now that it was not 
+>> intended to be the virtio-level status byte, but just a DRIVER_OK 
+>> signalling path from front-end to back-end.  That makes it a 
+>> vhost-level protocol feature to me.
+>
+> On second thought, it just is a pure vhost-level protocol feature, and 
+> has nothing to do with the virtio status byte as-is.  The only stated 
+> purpose is for the front-end to send DRIVER_OK after migration, but 
+> migration is transparent to the guest, so the guest would never change 
+> the status byte during migration.  Therefore, if this feature is 
+> essential, we will never be able to have a status byte that is 
+> transparently shared between guest and back-end device, i.e. the 
+> virtio status byte.
 
-diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
-index 0492d26900..0671989383 100644
---- a/include/hw/virtio/virtio.h
-+++ b/include/hw/virtio/virtio.h
-@@ -276,6 +276,13 @@ extern const VMStateInfo virtio_vmstate_info;
- 
- int virtio_load(VirtIODevice *vdev, QEMUFile *f, int version_id);
- 
-+/**
-+ * virtio_notify_config() - signal a change to device config
-+ * @vdev: the virtio device
-+ *
-+ * Assuming the virtio device is up (VIRTIO_CONFIG_S_DRIVER_OK) this
-+ * will trigger a guest interrupt and update the config version.
-+ */
- void virtio_notify_config(VirtIODevice *vdev);
- 
- bool virtio_queue_get_notification(VirtQueue *vq);
--- 
-2.39.2
+On third thought, scratch that.  The guest wouldn’t set it, but 
+naturally, after migration, the front-end will need to restore the 
+status byte from the source, so the front-end will always need to set 
+it, even if it were otherwise used controlled only by the guest and the 
+back-end device.  So technically, this doesn’t prevent such a use case.  
+(In practice, it isn’t controlled by the guest right now, but that could 
+be fixed.)
+
+> Cc-ing Alex on this mail, because to me, this seems like an important 
+> detail when he plans on using the byte in the future. If we need a 
+> virtio status byte, I can’t see how we could use the existing F_STATUS 
+> for it.
+>
+> Hanna
 

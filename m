@@ -1,9 +1,8 @@
-Return-Path: <hreitz@redhat.com>
-Message-ID: <9a36a319-4567-f297-f14a-2025792ae93f@redhat.com>
-Date: Tue, 10 Oct 2023 10:18:29 +0200
+Return-Path: <gmaglion@redhat.com>
 MIME-Version: 1.0
 References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-2-hreitz@redhat.com> <20231005170852.GB1342722@fedora>
+ <20231004125904.110781-2-hreitz@redhat.com>
+ <20231005170852.GB1342722@fedora>
  <20231005131352-mutt-send-email-mst@kernel.org>
  <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
  <20231006043518-mutt-send-email-mst@kernel.org>
@@ -12,15 +11,14 @@ References: <20231004125904.110781-1-hreitz@redhat.com>
  <a4af0357-12ee-fc7f-e249-239da34409b0@redhat.com>
  <20231006055229-mutt-send-email-mst@kernel.org>
  <e35f9f71-8d9d-6250-cbaa-70412b5a1149@nvidia.com>
- <3f28b1a4-d618-39df-57e6-6152f61cac6e@redhat.com>
- <8f3694c1-48d4-f34b-8f91-3bc217182ffa@redhat.com>
- <e19eb113-89b1-92ed-3375-8bc93c1ff39c@redhat.com>
- <8f51f02b-4676-c566-7304-f63e76df74ba@nvidia.com>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <8f51f02b-4676-c566-7304-f63e76df74ba@nvidia.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
+ <CAJh=p+5OFrx4nP5rYKrgZ_y02n358wy70c4L0L4fHKQUo9fU5Q@mail.gmail.com>
+ <ccfb153c-0e2e-15dd-b543-5b5a8bebbff4@nvidia.com>
+In-Reply-To: <ccfb153c-0e2e-15dd-b543-5b5a8bebbff4@nvidia.com>
+From: German Maglione <gmaglione@redhat.com>
+Date: Tue, 10 Oct 2023 12:04:18 +0200
+Message-ID: <CAJh=p+7XjQdwHFjpm5Oi-Y64MEtUhkpF0Q=RWMKqfg5bypF8iQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 Subject: Re: [Virtio-fs] (no subject)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -30,158 +28,297 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Yajun Wu <yajunw@nvidia.com>, "Michael S. Tsirkin" <mst@redhat.com>
-Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Parav Pandit <parav@nvidia.com>, "maxime.coquelin@redhat.com" <maxime.coquelin@redhat.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>
+To: Yajun Wu <yajunw@nvidia.com>
+Cc: "Michael S. Tsirkin" <mst@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, "maxime.coquelin@redhat.com" <maxime.coquelin@redhat.com>, Parav Pandit <parav@nvidia.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
-On 10.10.23 06:00, Yajun Wu wrote:
+On Tue, Oct 10, 2023 at 4:57=E2=80=AFAM Yajun Wu <yajunw@nvidia.com> wrote:
 >
-> On 10/9/2023 5:13 PM, Hanna Czenczek wrote:
->> External email: Use caution opening links or attachments
->>
->>
->> On 09.10.23 11:07, Hanna Czenczek wrote:
->>> On 09.10.23 10:21, Hanna Czenczek wrote:
->>>> On 07.10.23 04:22, Yajun Wu wrote:
->>> [...]
->>>
->>>>> The main motivation of adding VHOST_USER_SET_STATUS is to let
->>>>> backend DPDK know
->>>>> when DRIVER_OK bit is valid. It's an indication of all VQ
->>>>> configuration has sent,
->>>>> otherwise DPDK has to rely on first queue pair is ready, then
->>>>> receiving/applying
->>>>> VQ configuration one by one.
->>>>>
->>>>> During live migration, configuring VQ one by one is very time
->>>>> consuming.
->>>> One question I have here is why it wasn’t then introduced in the live
->>>> migration code, but in the general VM stop/cont code instead. It does
->>>> seem time-consuming to do this every time the VM is paused and 
->>>> resumed.
 >
-> Yes, VM stop/cont will call vhost_net_stop/vhost_net_start. Maybe 
-> because there's no device level stop/cont vhost message?
+> On 10/9/2023 6:28 PM, German Maglione wrote:
+> > External email: Use caution opening links or attachments
+> >
+> >
+> > On Sat, Oct 7, 2023 at 4:23=E2=80=AFAM Yajun Wu <yajunw@nvidia.com> wro=
+te:
+> >>
+> >> On 10/6/2023 6:34 PM, Michael S. Tsirkin wrote:
+> >>> External email: Use caution opening links or attachments
+> >>>
+> >>>
+> >>> On Fri, Oct 06, 2023 at 11:47:55AM +0200, Hanna Czenczek wrote:
+> >>>> On 06.10.23 11:26, Michael S. Tsirkin wrote:
+> >>>>> On Fri, Oct 06, 2023 at 11:15:55AM +0200, Hanna Czenczek wrote:
+> >>>>>> On 06.10.23 10:45, Michael S. Tsirkin wrote:
+> >>>>>>> On Fri, Oct 06, 2023 at 09:48:14AM +0200, Hanna Czenczek wrote:
+> >>>>>>>> On 05.10.23 19:15, Michael S. Tsirkin wrote:
+> >>>>>>>>> On Thu, Oct 05, 2023 at 01:08:52PM -0400, Stefan Hajnoczi wrote=
+:
+> >>>>>>>>>> On Wed, Oct 04, 2023 at 02:58:57PM +0200, Hanna Czenczek wrote=
+:
+> >>>>>>>>>>> There is no clearly defined purpose for the virtio status byt=
+e in
+> >>>>>>>>>>> vhost-user: For resetting, we already have RESET_DEVICE; and =
+for virtio
+> >>>>>>>>>>> feature negotiation, we have [GS]ET_FEATURES.  With the REPLY=
+_ACK
+> >>>>>>>>>>> protocol extension, it is possible for SET_FEATURES to return=
+ errors
+> >>>>>>>>>>> (SET_PROTOCOL_FEATURES may be called before SET_FEATURES).
+> >>>>>>>>>>>
+> >>>>>>>>>>> As for implementations, SET_STATUS is not widely implemented.=
+  dpdk does
+> >>>>>>>>>>> implement it, but only uses it to signal feature negotiation =
+failure.
+> >>>>>>>>>>> While it does log reset requests (SET_STATUS 0) as such, it e=
+ffectively
+> >>>>>>>>>>> ignores them, in contrast to RESET_OWNER (which is deprecated=
+, and today
+> >>>>>>>>>>> means the same thing as RESET_DEVICE).
+> >>>>>>>>>>>
+> >>>>>>>>>>> While qemu superficially has support for [GS]ET_STATUS, it do=
+es not
+> >>>>>>>>>>> forward the guest-set status byte, but instead just makes it =
+up
+> >>>>>>>>>>> internally, and actually completely ignores what the back-end=
+ returns,
+> >>>>>>>>>>> only using it as the template for a subsequent SET_STATUS to =
+add single
+> >>>>>>>>>>> bits to it.  Notably, after setting FEATURES_OK, it never rea=
+ds it back
+> >>>>>>>>>>> to see whether the flag is still set, which is the only way i=
+n which
+> >>>>>>>>>>> dpdk uses the status byte.
+> >>>>>>>>>>>
+> >>>>>>>>>>> As-is, no front-end or back-end can rely on the other side ha=
+ndling this
+> >>>>>>>>>>> field in a useful manner, and it also provides no practical u=
+se over
+> >>>>>>>>>>> other mechanisms the vhost-user protocol has, which are more =
+clearly
+> >>>>>>>>>>> defined.  Deprecate it.
+> >>>>>>>>>>>
+> >>>>>>>>>>> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> >>>>>>>>>>> Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
+> >>>>>>>>>>> ---
+> >>>>>>>>>>>       docs/interop/vhost-user.rst | 28 +++++++++++++++++++++-=
+------
+> >>>>>>>>>>>       1 file changed, 21 insertions(+), 7 deletions(-)
+> >>>>>>>>>> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+> >>>>>>>>> SET_STATUS is the only way to signal failure to acknowledge FEA=
+TURES_OK.
+> >>>>>>>>> The fact current backends never check errors does not mean they=
+ never
+> >>>>>>>>> will. So no, not applying this.
+> >>>>>>>> Can this not be done with REPLY_ACK?  I.e., with the following m=
+essage
+> >>>>>>>> order:
+> >>>>>>>>
+> >>>>>>>> 1. GET_FEATURES to find out whether VHOST_USER_F_PROTOCOL_FEATUR=
+ES is
+> >>>>>>>> present
+> >>>>>>>> 2. GET_PROTOCOL_FEATURES to hopefully get VHOST_USER_PROTOCOL_F_=
+REPLY_ACK
+> >>>>>>>> 3. SET_PROTOCOL_FEATURES to set VHOST_USER_PROTOCOL_F_REPLY_ACK
+> >>>>>>>> 4. SET_FEATURES with need_reply
+> >>>>>>>>
+> >>>>>>>> If not, the problem is that qemu has sent SET_STATUS 0 for a whi=
+le when the
+> >>>>>>>> vCPUs are stopped, which generally seems to request a device res=
+et.  If we
+> >>>>>>>> don=E2=80=99t state at least that SET_STATUS 0 is to be ignored,=
+ back-ends that will
+> >>>>>>>> implement SET_STATUS later may break with at least these qemu ve=
+rsions.  But
+> >>>>>>>> documenting that a particular use of the status byte is to be ig=
+nored would
+> >>>>>>>> be really strange.
+> >>>>>>>>
+> >>>>>>>> Hanna
+> >>>>>>> Hmm I guess. Though just following virtio spec seems cleaner to m=
+e...
+> >>>>>>> vhost-user reconfigures the state fully on start.
+> >>>>>> Not the internal device state, though.  virtiofsd has internal sta=
+te, and
+> >>>>>> other devices like vhost-gpu back-ends would probably, too.
+> >>>>>>
+> >>>>>> Stefan has recently sent a series
+> >>>>>> (https://lists.nongnu.org/archive/html/qemu-devel/2023-10/msg00709=
+.html) to
+> >>>>>> put the reset (RESET_DEVICE) into virtio_reset() (when we really n=
+eed a
+> >>>>>> reset).
+> >>>>>>
+> >>>>>> I really don=E2=80=99t like our current approach with the status b=
+yte. Following the
+> >>>>>> virtio specification to me would mean that the guest directly cont=
+rols this
+> >>>>>> byte, which it does not.  qemu makes up values as it deems appropr=
+iate, and
+> >>>>>> this includes sending a SET_STATUS 0 when the guest is just paused=
+, i.e.
+> >>>>>> when the guest really doesn=E2=80=99t want a device reset.
+> >>>>>>
+> >>>>>> That means that qemu does not treat this as a virtio device field =
+(because
+> >>>>>> that would mean exposing it to the guest driver), but instead trea=
+ts it as
+> >>>>>> part of the vhost(-user) protocol.  It doesn=E2=80=99t feel right =
+to me that we use
+> >>>>>> a virtio-defined feature for communication on the vhost level, i.e=
+. between
+> >>>>>> front-end and back-end, and not between guest driver and device.  =
+I think
+> >>>>>> all vhost-level protocol features should be fully defined in the v=
+host-user
+> >>>>>> specification, which REPLY_ACK is.
+> >>>>> Hmm that makes sense. Maybe we should have done what stefan's patch
+> >>>>> is doing.
+> >>>>>
+> >>>>> Do look at the original commit that introduced it to understand why
+> >>>>> it was added.
+> >>>> I don=E2=80=99t understand why this was added to the stop/cont code,=
+ though.  If it
+> >>>> is time consuming to make these changes, why are they done every tim=
+e the VM
+> >>>> is paused
+> >>>> and resumed?  It makes sense that this would be done for the initial
+> >>>> configuration (where a reset also wouldn=E2=80=99t hurt), but here i=
+t seems wrong.
+> >>>>
+> >>>> (To be clear, a reset in the stop/cont code is wrong, because it bre=
+aks
+> >>>> stateful devices.)
+> >>>>
+> >>>> Also, note the newer commits 6f8be29ec17 and c3716f260bf.  The reset=
+ as
+> >>>> originally introduced was wrong even for non-stateful devices, becau=
+se it
+> >>>> occurred before we fetched the state (vring indices) so we could res=
+tore it
+> >>>> later.  I don=E2=80=99t know how 923b8921d21 was tested, but if the =
+back-end used
+> >>>> for testing implemented SET_STATUS 0 as a reset, it could not have s=
+urvived
+> >>>> either migration or a stop/cont in general, because the vring indice=
+s would
+> >>>> have been reset to 0.
+> >>>>
+> >>>> What I=E2=80=99m saying is, 923b8921d21 introduced SET_STATUS calls =
+that broke all
+> >>>> devices that would implement them as per virtio spec, and even today=
+ it=E2=80=99s
+> >>>> broken for stateful devices.  The mentioned performance issue is lik=
+ely
+> >>>> real, but we can=E2=80=99t address it by making up SET_STATUS calls =
+that are wrong.
+> >>>>
+> >>>> I concede that I didn=E2=80=99t think about DRIVER_OK.  Personally, =
+I would do all
+> >>>> final configuration that would happen upon a DRIVER_OK once the firs=
+t vring
+> >>>> is started (i.e. receives a kick).  That has the added benefit of be=
+ing
+> >>>> asynchronous because it doesn=E2=80=99t block any vhost-user message=
+s (which are
+> >>>> synchronous, and thus block downtime).
+> >>>>
+> >>>> Hanna
+> >>> For better or worse kick is per ring. It's out of spec to start rings
+> >>> that were not kicked but I guess you could do configuration ...
+> >>> Seems somewhat asymmetrical though.
+> >>>
+> >>> Let's wait until next week, hopefully Yajun Wu will answer.
+> >> The main motivation of adding VHOST_USER_SET_STATUS is to let backend
+> >> DPDK know
+> >> when DRIVER_OK bit is valid. It's an indication of all VQ configuratio=
+n
+> >> has sent,
+> >> otherwise DPDK has to rely on first queue pair is ready, then
+> >> receiving/applying
+> >> VQ configuration one by one.
+> >>
+> >> During live migration, configuring VQ one by one is very time consumin=
+g.
+> >> For VIRTIO
+> >> net vDPA, HW needs to know how many VQs are enabled to set
+> >> RSS(Receive-Side Scaling).
+> >>
+> >> If you don=E2=80=99t want SET_STATUS message, backend can remove proto=
+col
+> >> feature bit
+> >> VHOST_USER_PROTOCOL_F_STATUS.
+> >> DPDK is ignoring SET_STATUS 0, but using GET_VRING_BASE to do device
+> >> close/reset.
+> > This is incorrect, resetting the device on GET_VRING_BASE breaks
+> > the stop/cont. Since you don't want to reset the VQs on stop/cont.
+> Sorry for the misunderstanding, dpdk vhost backend framework doesn't
+> have RESET concept(only device level .dev_conf and .dev_close). On
+> receiving DRIVER_OK does dev_conf, on receiving GET_VRING_BASE does
+> dev_close. For every VM suspend/resume, dpdk issues dev_close then dev_co=
+nf.
 
-No, it is because qemu will reset the status in stop/cont*, which it 
-should not do.  Aside from guest-initiated resets, the only thing where 
-a reset comes into play is when the back-end is changed, e.g. during 
-migration.  In that case, the source back-end will see a disconnect on 
-the vhost-user socket and can then do whatever uninitialization it needs 
-to do, and the destination front-end will need to be reconfigured by 
-qemu anyway, because it’s just a case of the destination qemu initiating 
-a fresh connection to a new back-end (except that it will need to 
-restore the state from the source).
+(sorry I did not explain myself well)
+I meant that resetting the VQs upon receiveng GET_VRING_BASE makes the
+backend to fail if qemu continues after a "stop". I notice that in dpdk,
+when it receives a GET_VRING_BASE[0], it calls 'vring_invalidate(dev, vq);'=
+[1],
+resetting the VQ[2], doing that is incorrect.
 
-*Yes, technically, dpdk will ignore that reset, but it still stops the 
-device on a different message (when it should just pause processing 
-vrings), so the outcome is the same.
+[0] https://github.com/DPDK/dpdk/blob/main/lib/vhost/vhost_user.c#L2135
+[1] https://github.com/DPDK/dpdk/blob/main/lib/vhost/vhost_user.c#L2201
+[2] https://github.com/DPDK/dpdk/blob/main/lib/vhost/vhost.c#L580
 
->>>>
->>>>> For VIRTIO
->>>>> net vDPA, HW needs to know how many VQs are enabled to set
->>>>> RSS(Receive-Side Scaling).
->>>>>
->>>>> If you don’t want SET_STATUS message, backend can remove protocol
->>>>> feature bit
->>>>> VHOST_USER_PROTOCOL_F_STATUS.
->>>> The problem isn’t back-ends that don’t want the message, the problem
->>>> is that qemu uses the message wrongly, which prevents well-behaving
->>>> back-ends from implementing the message.
->>>>
->>>>> DPDK is ignoring SET_STATUS 0, but using GET_VRING_BASE to do device
->>>>> close/reset.
->>>> So the right thing to do for back-ends is to announce STATUS support
->>>> and then not implement it correctly?
->>>>
->>>> GET_VRING_BASE should not reset the close or reset the device, by the
->>>> way.  It should stop that one vring, not more.  We have a
->>>> RESET_DEVICE command for resetting.
-> I believe dpdk uses GET_VRING_BASE long before qemu has RESET_DEVICE? 
-
-I don’t think it matters who came first.  What matters is the 
-specification, and that dpdk decided to rely on implementation-specific 
-behavior without having all involved parties agree by matters of putting 
-that in the specification.  And now dpdk clearly deviates from the 
-specification as a result of that action, which can result in problems 
-if the front-end doesn’t do what qemu always used to do.  (E.g. the 
-front-end might just send GET_VRING_BASE for all vrings when suspending 
-the guest, and then only send kicks on resume to re-start the vrings.  
-dpdk would most likely be left in a state where the whole device is 
-stopped, expecting DRIVER_OK.  Same thing in general for front-ends that 
-don’t support F_STATUS.)
-
-> It's a compatible issue. For new backend implements, we can have 
-> better solution, right?
-
-The fact that dpdk and qemu deviate from the specification is a problem 
-as-is.
-
->>>>> I'm not involved in discussion about adding SET_STATUS in Vhost
->>>>> protocol. This feature
->>>>> is essential for vDPA(same as vhost-vdpa implements
->>>>> VHOST_VDPA_SET_STATUS).
->>>> So from what I gather from your response is that there is only a
->>>> single use for SET_STATUS, which is the DRIVER_OK bit.  If so,
->>>> documenting that all other bits are to be ignored by both back-end
->>>> and front-end would be fine by me.
->>>>
->>>> I’m not fully serious about that suggestion, but I hear the strong
->>>> implication that nothing but DRIVER_OK was of any concern, and this
->>>> is really important to note when we talk about the status of the
->>>> STATUS feature in vhost today.  It seems to me now that it was not
->>>> intended to be the virtio-level status byte, but just a DRIVER_OK
->>>> signalling path from front-end to back-end.  That makes it a
->>>> vhost-level protocol feature to me.
->>> On second thought, it just is a pure vhost-level protocol feature, and
->>> has nothing to do with the virtio status byte as-is.  The only stated
->>> purpose is for the front-end to send DRIVER_OK after migration, but
->>> migration is transparent to the guest, so the guest would never change
->>> the status byte during migration.  Therefore, if this feature is
->>> essential, we will never be able to have a status byte that is
->>> transparently shared between guest and back-end device, i.e. the
->>> virtio status byte.
->> On third thought, scratch that.  The guest wouldn’t set it, but
->> naturally, after migration, the front-end will need to restore the
->> status byte from the source, so the front-end will always need to set
->> it, even if it were otherwise used controlled only by the guest and the
->> back-end device.  So technically, this doesn’t prevent such a use case.
->> (In practice, it isn’t controlled by the guest right now, but that could
->> be fixed.)
-> I only tested the feature with DPDK(the only backend use it today?). 
-> Max defined the protocol and added the corresponding code in DPDK 
-> before I added QEMU support. If other backend or different device type 
-> want to use this, we can have further discussion?
-
-So as far as I understand, the feature is supposed to rely on 
-implementation-specific behavior between specifically qemu as a 
-front-end and dpdk as a back-end, nothing else.  Honestly, that to me is 
-a very good reason to deprecate it.  That would make it clear that any 
-implementation that implements it does so because it relies on 
-implementation-specific behavior from other implementations.
-
-Option 2 is to fix it.  It is not right to use this broadly defined 
-feature with its clear protocol as given in the virtio specification 
-just to set and clear a single bit (DRIVER_OK).  The vhost-user 
-specification points to that virtio protocol.  We must adhere to the 
-protocol.  And note that we must not reset devices just because the VM 
-is paused/resumed.  (That is why I wanted to deprecate SET_STATUS, so 
-that Stefan’s series would introduce RESET_DEVICE where we need it, and 
-we can (for now) ignore the SET_STATUS 0 in vhost_dev_stop().)
-
-Option 3 would be to just be honest in the specification, and limit the 
-scope of F_STATUS to say the only bit that matters is DRIVER_OK.  I 
-would say this is not really different from deprecating, though it 
-wouldn’t affect your case.  However, I understand Alex relies on a full 
-status byte.  I’m still interested to know why that is.
-
-Option 4 is of course not to do anything, and leave everything as-is, 
-waiting for the next person to stir the hornet’s nest.
-
->>> Cc-ing Alex on this mail, because to me, this seems like an important
->>> detail when he plans on using the byte in the future. If we need a
->>> virtio status byte, I can’t see how we could use the existing F_STATUS
->>> for it.
->>>
->>> Hanna
+> >
+> >> I'm not involved in discussion about adding SET_STATUS in Vhost
+> >> protocol. This feature
+> >> is essential for vDPA(same as vhost-vdpa implements VHOST_VDPA_SET_STA=
+TUS).
+> >>
+> >> Thanks,
+> >> Yajun
+> >>>>>> Now, we could hand full control of the status byte to the guest, a=
+nd that
+> >>>>>> would make me content.  But I feel like that doesn=E2=80=99t reall=
+y work, because
+> >>>>>> qemu needs to intercept the status byte anyway (it needs to know w=
+hen there
+> >>>>>> is a reset, probably wants to know when the device is configured, =
+etc.), so
+> >>>>>> I don=E2=80=99t think having the status byte in vhost-user really =
+gains us much when
+> >>>>>> qemu could translate status byte changes to/from other vhost-user =
+commands.
+> >>>>>>
+> >>>>>> Hanna
+> >>>>> well it intercepts it but I think it could pass it on unchanged.
+> >>>>>
+> >>>>>
+> >>>>>>> I guess symmetry was the
+> >>>>>>> point. So I don't see why SET_STATUS 0 has to be ignored.
+> >>>>>>>
+> >>>>>>>
+> >>>>>>> SET_STATUS was introduced by:
+> >>>>>>>
+> >>>>>>> commit 923b8921d210763359e96246a58658ac0db6c645
+> >>>>>>> Author: Yajun Wu <yajunw@nvidia.com>
+> >>>>>>> Date:   Mon Oct 17 14:44:52 2022 +0800
+> >>>>>>>
+> >>>>>>>         vhost-user: Support vhost_dev_start
+> >>>>>>>
+> >>>>>>> CC the author.
+> >>>>>>>
+> >> _______________________________________________
+> >> Virtio-fs mailing list
+> >> Virtio-fs@redhat.com
+> >> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> >
+> >
+> > --
+> > German
+> >
 >
+
+
+--=20
+German
 

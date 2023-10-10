@@ -1,28 +1,31 @@
-Return-Path: <hreitz@redhat.com>
-Message-ID: <fbe05651-a65a-23d0-52be-2d611cc5740d@redhat.com>
-Date: Tue, 10 Oct 2023 15:18:58 +0200
+Return-Path: <mark.cave-ayland@ilande.co.uk>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=ilande.co.uk; s=20220518; h=Subject:Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:From:References:Cc:To:MIME-Version:Date:Message-ID:Sender:
+ Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender
+ :Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=uEDLiVVrLktznZUIRCsVgnsCI5pxyytwgpqvchTpi78=; b=Qa20PfDB/6RuG2abzxzVt42zZB
+ d4NDQiQM2ujwrhec1kyahPg86O2eBM48hIuPeOIZ82NUj1fZjMTjWK50Sw8oe9z54TFl96PyqAE3U
+ WCY36cOPxNGWesyPZoPIBb1fzYFT5FRT9Lgi+dpVe7KbC5r0Citscq4tRJCZIY4H1i4K9gxN13H1q
+ C0q1kuEnFxcLBK5Y+o25a6FIAVkszRphGrctum5404MXh64hc2qtS5AgDoj9BHbYVIx9x1Pcf2E+O
+ O4VD/Z/vrW5Ynz92gJ6iyPF4WS+QbLLA+xEbA4OH042wd3sA3cmBnTLKzWff5Trqn7fW6pDEDc/26
+ OTMZmy72E0vV4sYP7TxyBDKFxHlh09PWkyKcpIeO6QuzUoVKMB+DjbIxgAW5O7CO9WFBpynA7Kz0X
+ Ee4De0KvrtYxx+I2nCSJbKEXhWmkK5iy7FPipPhb8Ok9Ob+bre6e8X1a8U3qjWSP+uX1hfbyomG+s
+ 4zjhM5QZ2INCCx18Mr8hpD2XD9h6R3J2U6Zcd7OxARA1Rt3qN0hzSEajwgE+gylBKxh+ZQ+oSwTfr
+ c2EcA4lDWfkq66HxT08zqJ0++WcXn5+79YGXAmrB+82NoNwmj9mHftray+4yugAkDcEQIWEcn4rZk
+ gElFEikc3Hx6nvJaM05rKnu5FjtuRz05eMH7dgqnY=
+Message-ID: <881062fe-b8c7-4437-92cf-0e9838f3708b@ilande.co.uk>
+Date: Tue, 10 Oct 2023 16:14:20 +0100
 MIME-Version: 1.0
-References: <20231004125904.110781-1-hreitz@redhat.com>
- <20231004125904.110781-2-hreitz@redhat.com> <20231005170852.GB1342722@fedora>
- <20231005131352-mutt-send-email-mst@kernel.org>
- <00272da3-0a48-5544-6ba8-5dfde00be241@redhat.com>
- <20231006043518-mutt-send-email-mst@kernel.org>
- <a8b9d842-0925-38d0-2f0d-f2560bab251b@redhat.com>
- <20231006051802-mutt-send-email-mst@kernel.org>
- <a4af0357-12ee-fc7f-e249-239da34409b0@redhat.com>
- <20231006055229-mutt-send-email-mst@kernel.org>
- <e35f9f71-8d9d-6250-cbaa-70412b5a1149@nvidia.com>
- <3f28b1a4-d618-39df-57e6-6152f61cac6e@redhat.com>
- <8f3694c1-48d4-f34b-8f91-3bc217182ffa@redhat.com>
- <e19eb113-89b1-92ed-3375-8bc93c1ff39c@redhat.com>
- <8f51f02b-4676-c566-7304-f63e76df74ba@nvidia.com>
- <9a36a319-4567-f297-f14a-2025792ae93f@redhat.com> <87lecapxi4.fsf@linaro.org>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <87lecapxi4.fsf@linaro.org>
+References: <20231009095937.195728-1-alex.bennee@linaro.org>
+From: Mark Cave-Ayland <mark.cave-ayland@ilande.co.uk>
+In-Reply-To: <20231009095937.195728-1-alex.bennee@linaro.org>
 Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] (no subject)
+Subject: Re: [Virtio-fs] [PATCH v4 0/6] virtio: cleanup vhost-user-generic
+ and reduce c&p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,154 +34,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, "maxime.coquelin@redhat.com" <maxime.coquelin@redhat.com>, Parav Pandit <parav@nvidia.com>, Anton Kuchin <antonkuchin@yandex-team.ru>, Yajun Wu <yajunw@nvidia.com>
+To: =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>, qemu-devel@nongnu.org
+Cc: =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>, Erik Schilling <erik.schilling@linaro.org>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Kevin Wolf <kwolf@redhat.com>, Eric Blake <eblake@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-block@nongnu.org, Eduardo Habkost <eduardo@habkost.net>, Paolo Bonzini <pbonzini@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>
 
-On 10.10.23 12:36, Alex Bennée wrote:
-> Hanna Czenczek <hreitz@redhat.com> writes:
->
->> On 10.10.23 06:00, Yajun Wu wrote:
->>> On 10/9/2023 5:13 PM, Hanna Czenczek wrote:
->>>> External email: Use caution opening links or attachments
->>>>
->>>>
->>>> On 09.10.23 11:07, Hanna Czenczek wrote:
->>>>> On 09.10.23 10:21, Hanna Czenczek wrote:
->>>>>> On 07.10.23 04:22, Yajun Wu wrote:
->>>>> [...]
->>>>>
-> <snip>
->> So as far as I understand, the feature is supposed to rely on
->> implementation-specific behavior between specifically qemu as a
->> front-end and dpdk as a back-end, nothing else.  Honestly, that to me
->> is a very good reason to deprecate it.  That would make it clear that
->> any implementation that implements it does so because it relies on
->> implementation-specific behavior from other implementations.
->>
->> Option 2 is to fix it.  It is not right to use this broadly defined
->> feature with its clear protocol as given in the virtio specification
->> just to set and clear a single bit (DRIVER_OK).  The vhost-user
->> specification points to that virtio protocol.  We must adhere to the
->> protocol.  And note that we must not reset devices just because the VM
->> is paused/resumed.  (That is why I wanted to deprecate SET_STATUS, so
->> that Stefan’s series would introduce RESET_DEVICE where we need it,
->> and we can (for now) ignore the SET_STATUS 0 in vhost_dev_stop().)
->>
->> Option 3 would be to just be honest in the specification, and limit
->> the scope of F_STATUS to say the only bit that matters is DRIVER_OK.
->> I would say this is not really different from deprecating, though it
->> wouldn’t affect your case.  However, I understand Alex relies on a
->> full status byte.  I’m still interested to know why that is.
-> For an F_TRANSPORT backend (or whatever the final name ends up being) we
-> need the backend to have full control of the status byte because all the
-> handling of VirtIO is deferred to it. Therefor it has to handle all the
-> feature negotiation and indicate when the device needs resetting.
->
-> (side note: feature negotiation is another slippery area when QEMU gets
-> involved in gating which feature bits may or may not be exposed to the
-> backend. The only one it should ever mask is F_UNUSED which is used
-> (sic) to trigger the vhost protocol negotiation)
+On 09/10/2023 10:59, Alex Bennée wrote:
 
-That’s the thing, feature negotiation is done with GET_FEATURES and 
-SET_FEATURES.  Configuring F_REPLY_ACK lets SET_FEATURES return errors.
+> A lot of our vhost-user stubs are large chunks of boilerplate that do
+> (mostly) the same thing. This series continues the cleanups by
+> splitting the vhost-user-base and vhost-user-generic implementations.
+> After adding a new vq_size property the rng, gpio and i2c vhost-user
+> devices become simple specialisations of the common base defining the
+> ID, number of queues and potentially the config handling.
+> 
+> I've also added Manos' vhost-user-sound while I was at it.
+> 
+> Changes
+> -------
+> 
+> I've dropped the F_TRANSPORT work from this series to keep this small
+> and ready to merge. The changes for F_TRANSPORT are a bit more
+> invasive and still need a bit of debugging but I wanted to get this
+> stuff merged now.
+> 
+> Alex Bennée (5):
+>    virtio: split into vhost-user-base and vhost-user-device
+>    hw/virtio: derive vhost-user-rng from vhost-user-base
+>    hw/virtio: derive vhost-user-gpio from vhost-user-base
+>    hw/virtio: derive vhost-user-i2c from vhost-user-base
+>    docs/system: add a basic enumeration of vhost-user devices
+> 
+> Manos Pitsidianakis (1):
+>    hw/virtio: add vhost-user-snd and virtio-snd-pci devices
+> 
+>   docs/system/devices/vhost-user-rng.rst |   2 +
+>   docs/system/devices/vhost-user.rst     |  41 +++
+>   include/hw/virtio/vhost-user-base.h    |  49 +++
+>   include/hw/virtio/vhost-user-gpio.h    |  23 +-
+>   include/hw/virtio/vhost-user-i2c.h     |  14 +-
+>   include/hw/virtio/vhost-user-rng.h     |  11 +-
+>   include/hw/virtio/vhost-user-snd.h     |  26 ++
+>   hw/virtio/vhost-user-base.c            | 348 +++++++++++++++++++++
+>   hw/virtio/vhost-user-device-pci.c      |  10 +-
+>   hw/virtio/vhost-user-device.c          | 335 +-------------------
+>   hw/virtio/vhost-user-gpio.c            | 407 ++-----------------------
+>   hw/virtio/vhost-user-i2c.c             | 272 +----------------
+>   hw/virtio/vhost-user-rng.c             | 278 ++---------------
+>   hw/virtio/vhost-user-snd-pci.c         |  75 +++++
+>   hw/virtio/vhost-user-snd.c             |  67 ++++
+>   hw/virtio/Kconfig                      |   5 +
+>   hw/virtio/meson.build                  |  25 +-
+>   17 files changed, 705 insertions(+), 1283 deletions(-)
+>   create mode 100644 include/hw/virtio/vhost-user-base.h
+>   create mode 100644 include/hw/virtio/vhost-user-snd.h
+>   create mode 100644 hw/virtio/vhost-user-base.c
+>   create mode 100644 hw/virtio/vhost-user-snd-pci.c
+>   create mode 100644 hw/virtio/vhost-user-snd.c
 
-Indicating that the device needs reset is a good point, there is no 
-other feature to do that.  (And something qemu currently ignores, just 
-like any value the device returns through GET_STATUS, but that’s besides 
-the point.)
+Hi Alex,
 
->> Option 4 is of course not to do anything, and leave everything as-is,
->> waiting for the next person to stir the hornet’s nest.
->>
->>>>> Cc-ing Alex on this mail, because to me, this seems like an important
->>>>> detail when he plans on using the byte in the future. If we need a
->>>>> virtio status byte, I can’t see how we could use the existing F_STATUS
->>>>> for it.
-> What would we use instead of F_STATUS to query the Device Status field?
+ From a quick skim the QOM modelling looks good to me. The only thing I've noticed is 
+that the parent object for VHostUserBase derived classes is sometimes named as 
+"VHostUserBase parent" instead of "VHostUserBase parent_obj" as per the QOM naming 
+guidelines.
 
-We would emulate it in the front-end, just like we need to do for 
-back-ends without F_STATUS.  We can’t emulate the DEVICE_NEEDS_RESET 
-bit, though, that’s correct.
 
-Given that qemu currently ignores DEVICE_NEEDS_RESET, I’m not 100 % 
-convinced that your use case has a hard dependency on F_STATUS. However, 
-this still does make a fair point in general that it would be useful to 
-keep it.
+ATB,
 
-That still leaves us with the situation that currently, the only 
-implementations with F_STATUS support are qemu and dpdk, which both 
-handle it incorrectly.  Furthermore, the specification leaves much to be 
-desired, specifically in how F_STATUS interacts with other vhost-user 
-commands (which is something I cited as a reason for my original patch), 
-i.e. whether RESET_DEVICE and SET_STATUS 0 are equivalent, and whether 
-failures in feature negotiation must result in both SET_FEATURES 
-returning an error (with F_REPLY_ACK), and FEATURES_OK being reset in 
-the status byte, or whether either is sufficient.  What happens when 
-DEVICE_NEEDS_RESET is set, i.e. do we just need RESET_DEVICE / 
-SET_STATUS 0, or do we also need to reset some protocol state?  (This is 
-also connected to the fact that what happens on RESET_DEVICE is largely 
-undefined, which I said on Stefan’s series.)
-
-In general, because we have our own transport, we should make a note how 
-it interacts with the status negotiation phases, i.e. that GET_FEATURES 
-must not be called before S_ACKNOWLEDGE | S_DRIVER are set, that 
-FEATURES_OK must be set after the SET_FEATURES call, and that DRIVER_OK 
-must not be set without FEATURES_OK set / SET_FEATURES having returned 
-success.  Here we would also answer the question about the interaction 
-of F_REPLY_ACK+SET_FEATURES with F_STATUS, specifically whether an 
-implementation with F_REPLY_ACK even needs to read back the status byte 
-after setting FEATURES_OK because it could have got the feature 
-negotiation result already as a result of the SET_FEATURES call.
-
-After migration, can you just set all flags immediately or do we need to 
-follow this step-by-step protocol?  I think we do need to do it 
-step-by-step, mostly for simplicity in the back-end, i.e. that it just 
-sees a normal device start-up.
-
-We should also clarify whether SET_STATUS can fail, i.e. whether setting 
-an invalid status (is setting FEATURES_OK when the device doesn’t think 
-so invalid?) has SET_STATUS fail (with F_REPLY_ACK) and/or immediately 
-gets the device into DEVICE_NEEDS_RESET.
-
-We should clarify whether SET_STATUS can block.  The current use of 
-DRIVER_OK seems to indicate to me that dpdk does do time-consuming 
-operations when it sees DRIVER_OK (code looks like it, too) and only 
-returns when that’s done, but naïvely, I would expect SET_STATUS to be 
-just setting some value and doing whatever needs to be done in the 
-background, not actually launching and blocking on an operation.
-
-I think it is dangerous to just push ahead with using F_STATUS without 
-acknowledging that its implementation is broken right now, and that it 
-is so *on purpose* because the DRIVER_OK bit is the only thing that it 
-was supposed to be used for.  Using it for its purported original use 
-(actually the virtio status byte) is contradictory to that.  It’s 
-probably fixable, but I think it requires taking a step back and seeing 
-what needs to be done to remedy the conflict.  If you rip out all the 
-existing STATUS code and replace it such that qemu will let the guest 
-have full control over the status byte (except for migration, where we 
-restore it on the destination, which will result in DRIVER_OK being set 
-at the end, fulfilling that requirement), that will fix the 
-implementation in qemu.  I think.  But the specification should be 
-amended to think about all these corner cases, not least because I think 
-they will also affect your implementation.
-
-(The answers to many of the questions I raise for documentation may be 
-obvious to you, based on “in virtio, it’s just an MMIO byte that’s 
-written and read, so the rest follows from there”.  But evidently the 
-implementation we have kind of ignores that e.g. SET_STATUS 0 is a reset 
-(6f8be29ec17d44496b9ed67599bceaaba72d1864 is a work-around, not much 
-more) or that there is actually a protocol to setting the status flags 
-and you can’t just set them all at once, so I don’t think the answers 
-are immediately obvious, and should be documented.)
-
-As for me and the original patch: I claimed nobody really needs 
-F_STATUS, you say you do, so plainly, I assumed wrong and will naturally 
-take my hands off of F_STATUS and just ensure not to implement it in any 
-back-end until you’ve fixed it, as Yajun has advised.  I’d still prefer 
-mentioning this advice in the documentation until it’s fixed, but, you 
-know, I wouldn’t be the first one to say “I now know about the quirk, so 
-I can work around it, no need to tell anyone else as long as my stuff 
-works”.
-
-Hanna
+Mark.
 

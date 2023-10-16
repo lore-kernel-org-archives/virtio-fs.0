@@ -1,14 +1,14 @@
 Return-Path: <hreitz@redhat.com>
 From: Hanna Czenczek <hreitz@redhat.com>
-Date: Mon, 16 Oct 2023 15:42:40 +0200
-Message-ID: <20231016134243.68248-5-hreitz@redhat.com>
+Date: Mon, 16 Oct 2023 15:42:42 +0200
+Message-ID: <20231016134243.68248-7-hreitz@redhat.com>
 In-Reply-To: <20231016134243.68248-1-hreitz@redhat.com>
 References: <20231016134243.68248-1-hreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v5 4/7] vhost-user.rst: Migrating
- back-end-internal state
+Subject: [Virtio-fs] [PATCH v5 6/7] vhost: Add high-level state save/load
+ functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,248 +20,278 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: Hanna Czenczek <hreitz@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, German Maglione <gmaglione@redhat.com>, =?UTF-8?q?Eugenio=20P=C3=A9rez?= <eperezma@redhat.com>, Anton Kuchin <antonkuchin@yandex-team.ru>
 
-For vhost-user devices, qemu can migrate the virtio state, but not the
-back-end's internal state.  To do so, we need to be able to transfer
-this internal state between front-end (qemu) and back-end.
+vhost_save_backend_state() and vhost_load_backend_state() can be used by
+vhost front-ends to easily save and load the back-end's state to/from
+the migration stream.
 
-At this point, this new feature is added for the purpose of virtio-fs
-migration.  Because virtiofsd's internal state will not be too large, we
-believe it is best to transfer it as a single binary blob after the
-streaming phase.
-
-These are the additions to the protocol:
-- New vhost-user protocol feature VHOST_USER_PROTOCOL_F_DEVICE_STATE
-- SET_DEVICE_STATE_FD function: Front-end and back-end negotiate a file
-  descriptor over which to transfer the state.
-- CHECK_DEVICE_STATE: After the state has been transferred through the
-  file descriptor, the front-end invokes this function to verify
-  success.  There is no in-band way (through the file descriptor) to
-  indicate failure, so we need to check explicitly.
-
-Once the transfer FD has been established via SET_DEVICE_STATE_FD
-(which includes establishing the direction of transfer and migration
-phase), the sending side writes its data into it, and the reading side
-reads it until it sees an EOF.  Then, the front-end will check for
-success via CHECK_DEVICE_STATE, which on the destination side includes
-checking for integrity (i.e. errors during deserialization).
+Because we do not know the full state size ahead of time,
+vhost_save_backend_state() simply reads the data in 1 MB chunks, and
+writes each chunk consecutively into the migration stream, prefixed by
+its length.  EOF is indicated by a 0-length chunk.
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 Signed-off-by: Hanna Czenczek <hreitz@redhat.com>
 ---
- docs/interop/vhost-user.rst | 172 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 172 insertions(+)
+ include/hw/virtio/vhost.h |  35 +++++++
+ hw/virtio/vhost.c         | 204 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 239 insertions(+)
 
-diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-index 035a23ed35..9f1103f85a 100644
---- a/docs/interop/vhost-user.rst
-+++ b/docs/interop/vhost-user.rst
-@@ -322,6 +322,32 @@ VhostUserShared
- :UUID: 16 bytes UUID, whose first three components (a 32-bit value, then
-   two 16-bit values) are stored in big endian.
+diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
+index a0d03c9fdf..100fcc874d 100644
+--- a/include/hw/virtio/vhost.h
++++ b/include/hw/virtio/vhost.h
+@@ -426,4 +426,39 @@ int vhost_set_device_state_fd(struct vhost_dev *dev,
+  */
+ int vhost_check_device_state(struct vhost_dev *dev, Error **errp);
  
-+Device state transfer parameters
-+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++/**
++ * vhost_save_backend_state(): High-level function to receive a vhost
++ * back-end's state, and save it in @f.  Uses
++ * `vhost_set_device_state_fd()` to get the data from the back-end, and
++ * stores it in consecutive chunks that are each prefixed by their
++ * respective length (be32).  The end is marked by a 0-length chunk.
++ *
++ * Must only be called while the device and all its vrings are stopped
++ * (`VHOST_TRANSFER_STATE_PHASE_STOPPED`).
++ *
++ * @dev: The vhost device from which to save the state
++ * @f: Migration stream in which to save the state
++ * @errp: Potential error message
++ *
++ * Returns 0 on success, and -errno otherwise.
++ */
++int vhost_save_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp);
 +
-++--------------------+-----------------+
-+| transfer direction | migration phase |
-++--------------------+-----------------+
++/**
++ * vhost_load_backend_state(): High-level function to load a vhost
++ * back-end's state from @f, and send it over to the back-end.  Reads
++ * the data from @f in the format used by `vhost_save_state()`, and uses
++ * `vhost_set_device_state_fd()` to transfer it to the back-end.
++ *
++ * Must only be called while the device and all its vrings are stopped
++ * (`VHOST_TRANSFER_STATE_PHASE_STOPPED`).
++ *
++ * @dev: The vhost device to which to send the sate
++ * @f: Migration stream from which to load the state
++ * @errp: Potential error message
++ *
++ * Returns 0 on success, and -errno otherwise.
++ */
++int vhost_load_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp);
 +
-+:transfer direction: a 32-bit enum, describing the direction in which
-+  the state is transferred:
+ #endif
+diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
+index ca4bdd9d66..643c1af5a0 100644
+--- a/hw/virtio/vhost.c
++++ b/hw/virtio/vhost.c
+@@ -2133,3 +2133,207 @@ int vhost_check_device_state(struct vhost_dev *dev, Error **errp)
+                "vhost transport does not support migration state transfer");
+     return -ENOSYS;
+ }
 +
-+  - 0: Save: Transfer the state from the back-end to the front-end,
-+    which happens on the source side of migration
-+  - 1: Load: Transfer the state from the front-end to the back-end,
-+    which happens on the destination side of migration
++int vhost_save_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp)
++{
++    /* Maximum chunk size in which to transfer the state */
++    const size_t chunk_size = 1 * 1024 * 1024;
++    g_autofree void *transfer_buf = NULL;
++    g_autoptr(GError) g_err = NULL;
++    int pipe_fds[2], read_fd = -1, write_fd = -1, reply_fd = -1;
++    int ret;
 +
-+:migration phase: a 32-bit enum, describing the state in which the VM
-+  guest and devices are:
++    /* [0] for reading (our end), [1] for writing (back-end's end) */
++    if (!g_unix_open_pipe(pipe_fds, FD_CLOEXEC, &g_err)) {
++        error_setg(errp, "Failed to set up state transfer pipe: %s",
++                   g_err->message);
++        ret = -EINVAL;
++        goto fail;
++    }
 +
-+  - 0: Stopped (in the period after the transfer of memory-mapped
-+    regions before switch-over to the destination): The VM guest is
-+    stopped, and the vhost-user device is suspended (see
-+    :ref:`Suspended device state <suspended_device_state>`).
++    read_fd = pipe_fds[0];
++    write_fd = pipe_fds[1];
 +
-+  In the future, additional phases might be added e.g. to allow
-+  iterative migration while the device is running.
++    /*
++     * VHOST_TRANSFER_STATE_PHASE_STOPPED means the device must be stopped.
++     * Ideally, it is suspended, but SUSPEND/RESUME currently do not exist for
++     * vhost-user, so just check that it is stopped at all.
++     */
++    assert(!dev->started);
 +
- C structure
- -----------
- 
-@@ -381,6 +407,7 @@ in the ancillary data:
- * ``VHOST_USER_SET_VRING_ERR``
- * ``VHOST_USER_SET_BACKEND_REQ_FD`` (previous name ``VHOST_USER_SET_SLAVE_REQ_FD``)
- * ``VHOST_USER_SET_INFLIGHT_FD`` (if ``VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD``)
-+* ``VHOST_USER_SET_DEVICE_STATE_FD``
- 
- If *front-end* is unable to send the full message or receives a wrong
- reply it will close the connection. An optional reconnection mechanism
-@@ -555,6 +582,80 @@ it performs WAKE ioctl's on the userfaultfd to wake the stalled
- back-end.  The front-end indicates support for this via the
- ``VHOST_USER_PROTOCOL_F_PAGEFAULT`` feature.
- 
-+.. _migrating_backend_state:
++    /* Transfer ownership of write_fd to the back-end */
++    ret = vhost_set_device_state_fd(dev,
++                                    VHOST_TRANSFER_STATE_DIRECTION_SAVE,
++                                    VHOST_TRANSFER_STATE_PHASE_STOPPED,
++                                    write_fd,
++                                    &reply_fd,
++                                    errp);
++    if (ret < 0) {
++        error_prepend(errp, "Failed to initiate state transfer: ");
++        goto fail;
++    }
 +
-+Migrating back-end state
-+^^^^^^^^^^^^^^^^^^^^^^^^
++    /* If the back-end wishes to use a different pipe, switch over */
++    if (reply_fd >= 0) {
++        close(read_fd);
++        read_fd = reply_fd;
++    }
 +
-+Migrating device state involves transferring the state from one
-+back-end, called the source, to another back-end, called the
-+destination.  After migration, the destination transparently resumes
-+operation without requiring the driver to re-initialize the device at
-+the VIRTIO level.  If the migration fails, then the source can
-+transparently resume operation until another migration attempt is made.
++    transfer_buf = g_malloc(chunk_size);
 +
-+Generally, the front-end is connected to a virtual machine guest (which
-+contains the driver), which has its own state to transfer between source
-+and destination, and therefore will have an implementation-specific
-+mechanism to do so.  The ``VHOST_USER_PROTOCOL_F_DEVICE_STATE`` feature
-+provides functionality to have the front-end include the back-end's
-+state in this transfer operation so the back-end does not need to
-+implement its own mechanism, and so the virtual machine may have its
-+complete state, including vhost-user devices' states, contained within a
-+single stream of data.
++    while (true) {
++        ssize_t read_ret;
 +
-+To do this, the back-end state is transferred from back-end to front-end
-+on the source side, and vice versa on the destination side.  This
-+transfer happens over a channel that is negotiated using the
-+``VHOST_USER_SET_DEVICE_STATE_FD`` message.  This message has two
-+parameters:
++        read_ret = RETRY_ON_EINTR(read(read_fd, transfer_buf, chunk_size));
++        if (read_ret < 0) {
++            ret = -errno;
++            error_setg_errno(errp, -ret, "Failed to receive state");
++            goto fail;
++        }
 +
-+* Direction of transfer: On the source, the data is saved, transferring
-+  it from the back-end to the front-end.  On the destination, the data
-+  is loaded, transferring it from the front-end to the back-end.
++        assert(read_ret <= chunk_size);
++        qemu_put_be32(f, read_ret);
 +
-+* Migration phase: Currently, the only supported phase is the period
-+  after the transfer of memory-mapped regions before switch-over to the
-+  destination, when both the source and destination devices are
-+  suspended (:ref:`Suspended device state <suspended_device_state>`).
-+  In the future, additional phases might be supported to allow iterative
-+  migration while the device is running.
++        if (read_ret == 0) {
++            /* EOF */
++            break;
++        }
 +
-+The nature of the channel is implementation-defined, but it must
-+generally behave like a pipe: The writing end will write all the data it
-+has into it, signalling the end of data by closing its end.  The reading
-+end must read all of this data (until encountering the end of file) and
-+process it.
++        qemu_put_buffer(f, transfer_buf, read_ret);
++    }
 +
-+* When saving, the writing end is the source back-end, and the reading
-+  end is the source front-end.  After reading the state data from the
-+  channel, the source front-end must transfer it to the destination
-+  front-end through an implementation-defined mechanism.
++    /*
++     * Back-end will not really care, but be clean and close our end of the pipe
++     * before inquiring the back-end about whether transfer was successful
++     */
++    close(read_fd);
++    read_fd = -1;
 +
-+* When loading, the writing end is the destination front-end, and the
-+  reading end is the destination back-end.  After reading the state data
-+  from the channel, the destination back-end must deserialize its
-+  internal state from that data and set itself up to allow the driver to
-+  seamlessly resume operation on the VIRTIO level.
++    /* Also, verify that the device is still stopped */
++    assert(!dev->started);
 +
-+Seamlessly resuming operation means that the migration must be
-+transparent to the guest driver, which operates on the VIRTIO level.
-+This driver will not perform any re-initialization steps, but continue
-+to use the device as if no migration had occurred.  The vhost-user
-+front-end, however, will re-initialize the vhost state on the
-+destination, following the usual protocol for establishing a connection
-+to a vhost-user back-end: This includes, for example, setting up memory
-+mappings and kick and call FDs as necessary, negotiating protocol
-+features, or setting the initial vring base indices (to the same value
-+as on the source side, so that operation can resume).
++    ret = vhost_check_device_state(dev, errp);
++    if (ret < 0) {
++        goto fail;
++    }
 +
-+Both on the source and on the destination side, after the respective
-+front-end has seen all data transferred (when the transfer FD has been
-+closed), it sends the ``VHOST_USER_CHECK_DEVICE_STATE`` message to
-+verify that data transfer was successful in the back-end, too.  The
-+back-end responds once it knows whether the transfer and processing was
-+successful or not.
++    ret = 0;
++fail:
++    if (read_fd >= 0) {
++        close(read_fd);
++    }
 +
- Memory access
- -------------
- 
-@@ -949,6 +1050,7 @@ Protocol features
-   #define VHOST_USER_PROTOCOL_F_STATUS               16
-   #define VHOST_USER_PROTOCOL_F_XEN_MMAP             17
-   #define VHOST_USER_PROTOCOL_F_SHARED_OBJECT        18
-+  #define VHOST_USER_PROTOCOL_F_DEVICE_STATE         19
- 
- Front-end message types
- -----------------------
-@@ -1553,6 +1655,76 @@ Front-end message types
-   the requested UUID. Back-end will reply passing the fd when the operation
-   is successful, or no fd otherwise.
- 
-+``VHOST_USER_SET_DEVICE_STATE_FD``
-+  :id: 42
-+  :equivalent ioctl: N/A
-+  :request payload: device state transfer parameters
-+  :reply payload: ``u64``
++    return ret;
++}
 +
-+  Front-end and back-end negotiate a channel over which to transfer the
-+  back-end’s internal state during migration.  Either side (front-end or
-+  back-end) may create the channel.  The nature of this channel is not
-+  restricted or defined in this document, but whichever side creates it
-+  must create a file descriptor that is provided to the respectively
-+  other side, allowing access to the channel.  This FD must behave as
-+  follows:
++int vhost_load_backend_state(struct vhost_dev *dev, QEMUFile *f, Error **errp)
++{
++    size_t transfer_buf_size = 0;
++    g_autofree void *transfer_buf = NULL;
++    g_autoptr(GError) g_err = NULL;
++    int pipe_fds[2], read_fd = -1, write_fd = -1, reply_fd = -1;
++    int ret;
 +
-+  * For the writing end, it must allow writing the whole back-end state
-+    sequentially.  Closing the file descriptor signals the end of
-+    transfer.
++    /* [0] for reading (back-end's end), [1] for writing (our end) */
++    if (!g_unix_open_pipe(pipe_fds, FD_CLOEXEC, &g_err)) {
++        error_setg(errp, "Failed to set up state transfer pipe: %s",
++                   g_err->message);
++        ret = -EINVAL;
++        goto fail;
++    }
 +
-+  * For the reading end, it must allow reading the whole back-end state
-+    sequentially.  The end of file signals the end of the transfer.
++    read_fd = pipe_fds[0];
++    write_fd = pipe_fds[1];
 +
-+  For example, the channel may be a pipe, in which case the two ends of
-+  the pipe fulfill these requirements respectively.
++    /*
++     * VHOST_TRANSFER_STATE_PHASE_STOPPED means the device must be stopped.
++     * Ideally, it is suspended, but SUSPEND/RESUME currently do not exist for
++     * vhost-user, so just check that it is stopped at all.
++     */
++    assert(!dev->started);
 +
-+  Initially, the front-end creates a channel along with such an FD.  It
-+  passes the FD to the back-end as ancillary data of a
-+  ``VHOST_USER_SET_DEVICE_STATE_FD`` message.  The back-end may create a
-+  different transfer channel, passing the respective FD back to the
-+  front-end as ancillary data of the reply.  If so, the front-end must
-+  then discard its channel and use the one provided by the back-end.
++    /* Transfer ownership of read_fd to the back-end */
++    ret = vhost_set_device_state_fd(dev,
++                                    VHOST_TRANSFER_STATE_DIRECTION_LOAD,
++                                    VHOST_TRANSFER_STATE_PHASE_STOPPED,
++                                    read_fd,
++                                    &reply_fd,
++                                    errp);
++    if (ret < 0) {
++        error_prepend(errp, "Failed to initiate state transfer: ");
++        goto fail;
++    }
 +
-+  Whether the back-end should decide to use its own channel is decided
-+  based on efficiency: If the channel is a pipe, both ends will most
-+  likely need to copy data into and out of it.  Any channel that allows
-+  for more efficient processing on at least one end, e.g. through
-+  zero-copy, is considered more efficient and thus preferred.  If the
-+  back-end can provide such a channel, it should decide to use it.
++    /* If the back-end wishes to use a different pipe, switch over */
++    if (reply_fd >= 0) {
++        close(write_fd);
++        write_fd = reply_fd;
++    }
 +
-+  The request payload contains parameters for the subsequent data
-+  transfer, as described in the :ref:`Migrating back-end state
-+  <migrating_backend_state>` section.
++    while (true) {
++        size_t this_chunk_size = qemu_get_be32(f);
++        ssize_t write_ret;
++        const uint8_t *transfer_pointer;
 +
-+  The value returned is both an indication for success, and whether a
-+  file descriptor for a back-end-provided channel is returned: Bits 0–7
-+  are 0 on success, and non-zero on error.  Bit 8 is the invalid FD
-+  flag; this flag is set when there is no file descriptor returned.
-+  When this flag is not set, the front-end must use the returned file
-+  descriptor as its end of the transfer channel.  The back-end must not
-+  both indicate an error and return a file descriptor.
++        if (this_chunk_size == 0) {
++            /* End of state */
++            break;
++        }
 +
-+  Using this function requires prior negotiation of the
-+  ``VHOST_USER_PROTOCOL_F_DEVICE_STATE`` feature.
++        if (transfer_buf_size < this_chunk_size) {
++            transfer_buf = g_realloc(transfer_buf, this_chunk_size);
++            transfer_buf_size = this_chunk_size;
++        }
 +
-+``VHOST_USER_CHECK_DEVICE_STATE``
-+  :id: 43
-+  :equivalent ioctl: N/A
-+  :request payload: N/A
-+  :reply payload: ``u64``
++        if (qemu_get_buffer(f, transfer_buf, this_chunk_size) <
++                this_chunk_size)
++        {
++            error_setg(errp, "Failed to read state");
++            ret = -EINVAL;
++            goto fail;
++        }
 +
-+  After transferring the back-end’s internal state during migration (see
-+  the :ref:`Migrating back-end state <migrating_backend_state>`
-+  section), check whether the back-end was able to successfully fully
-+  process the state.
++        transfer_pointer = transfer_buf;
++        while (this_chunk_size > 0) {
++            write_ret = RETRY_ON_EINTR(
++                write(write_fd, transfer_pointer, this_chunk_size)
++            );
++            if (write_ret < 0) {
++                ret = -errno;
++                error_setg_errno(errp, -ret, "Failed to send state");
++                goto fail;
++            } else if (write_ret == 0) {
++                error_setg(errp, "Failed to send state: Connection is closed");
++                ret = -ECONNRESET;
++                goto fail;
++            }
 +
-+  The value returned indicates success or error; 0 is success, any
-+  non-zero value is an error.
++            assert(write_ret <= this_chunk_size);
++            this_chunk_size -= write_ret;
++            transfer_pointer += write_ret;
++        }
++    }
 +
-+  Using this function requires prior negotiation of the
-+  ``VHOST_USER_PROTOCOL_F_DEVICE_STATE`` feature.
++    /*
++     * Close our end, thus ending transfer, before inquiring the back-end about
++     * whether transfer was successful
++     */
++    close(write_fd);
++    write_fd = -1;
 +
- Back-end message types
- ----------------------
- 
++    /* Also, verify that the device is still stopped */
++    assert(!dev->started);
++
++    ret = vhost_check_device_state(dev, errp);
++    if (ret < 0) {
++        goto fail;
++    }
++
++    ret = 0;
++fail:
++    if (write_fd >= 0) {
++        close(write_fd);
++    }
++
++    return ret;
++}
 -- 
 2.41.0
 

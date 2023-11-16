@@ -1,69 +1,67 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 16 Feb 2022 17:36:15 +0000
-Message-Id: <20220216173625.128109-3-dgilbert@redhat.com>
-In-Reply-To: <20220216173625.128109-1-dgilbert@redhat.com>
-References: <20220216173625.128109-1-dgilbert@redhat.com>
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	(No client certificate requested)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id AE9042942C
+	for <virtio-fs@lists.linux.dev>; Thu, 16 Nov 2023 10:03:54 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
+Authentication-Results: smtp.subspace.kernel.org;
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="UMbmPTnn"
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
+	s=mimecast20190719; t=1700129033;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:mime-version:mime-version:content-type:content-type;
+	bh=WAki7NBoYeIJyAmtetyFYUmUlVhWQo+vMrXKfiO1GwU=;
+	b=UMbmPTnn5fNe6tOwIKvQVkvIhuLvtap+Bz8Dp8GD9o1GpGJHn8Ui/jqRxHImtAIiUfl3gW
+	2nkDuu3YBTt3Hv+EKgDeky6sZlMJiIDbE52GKG1Xg0drxZPzoStPnq8fTZex9aiUxNlBlm
+	pJ6r1hR/9WTPI6ym3uyWauFdhmVadwE=
+Received: from mail-lf1-f69.google.com (mail-lf1-f69.google.com
+ [209.85.167.69]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-46-i6HgHeH4PAKQfXbS6eENow-1; Thu, 16 Nov 2023 05:03:51 -0500
+X-MC-Unique: i6HgHeH4PAKQfXbS6eENow-1
+Received: by mail-lf1-f69.google.com with SMTP id 2adb3069b0e04-507a66ee696so108480e87.0
+        for <virtio-fs@lists.linux.dev>; Thu, 16 Nov 2023 02:03:50 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20230601; t=1700129029; x=1700733829;
+        h=to:subject:message-id:date:from:mime-version:x-gm-message-state
+         :from:to:cc:subject:date:message-id:reply-to;
+        bh=WAki7NBoYeIJyAmtetyFYUmUlVhWQo+vMrXKfiO1GwU=;
+        b=S6VfydBAs+FkNxaDp0fIU6RD1xDPL00yMkulSCdN5loZ/XY1F5DhHEc1rO7GVTb6Ir
+         gziI2uKCYY4VHJrb1RRH+O/0SfaakMLDP1WnYVPAmXSIuCtv65D7mwXg30ptytWe1nU6
+         qZ+H/hUzNcXS8aO6mrCyqaI7SSZ/97oz+KUAIqkeN1PCyXiT6R8jo3Y8Ty4M8aE9eFZV
+         3PttealU4M7CMzp6jNJ3YhMvnCFQtWY3OYLanElh3XTyOFYupIoav31oq23/er/i15iR
+         bmgyOCP0Ok7zvlekvsqXSlXAdziNxik4TDn+F2PPZRU4DyMHyX0nxTwwSFi3wWrw7GDP
+         JY5g==
+X-Gm-Message-State: AOJu0YxHh9LbG1GCt8bzdF3Ybpy7CrfTvDqjX6XrZaccM83dA3QGbd6U
+	o4bI0QD37dQYguCUVFb74mcK8VQ7s9KWK65JDw9bnIS7Rz7E4u6eClvZIBUTmecbH93iSmPQrgZ
+	7rd0XeBAXqxueh3wkPmKr7AHFHbMFdLoQKkv3tIr6zl8UZec=
+X-Received: by 2002:a05:6512:3ca8:b0:508:1a9d:d768 with SMTP id h40-20020a0565123ca800b005081a9dd768mr5751326lfv.4.1700129029511;
+        Thu, 16 Nov 2023 02:03:49 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHwVSOLslr2X/W4/Oa8G4luwzQ7Hd2c+XnIoVBDIi2Fjyr7tuXVzBsuiPXOtTsDcdVUq66uKaA/G1Jz+SEg4yI=
+X-Received: by 2002:a05:6512:3ca8:b0:508:1a9d:d768 with SMTP id
+ h40-20020a0565123ca800b005081a9dd768mr5751307lfv.4.1700129029167; Thu, 16 Nov
+ 2023 02:03:49 -0800 (PST)
+Precedence: bulk
+X-Mailing-List: virtio-fs@lists.linux.dev
+List-Id: <virtio-fs.lists.linux.dev>
+List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
+List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 02/12] virtiofsd: Fix breakage due to
-	fuse_init_in size change
-List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@redhat.com>
-List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
-Cc: virtio-fs@redhat.com
+From: German Maglione <gmaglione@redhat.com>
+Date: Thu, 16 Nov 2023 11:03:13 +0100
+Message-ID: <CAJh=p+4Yq_d3wH1C1EAn-_TQyqtgHxg8kDD3BTBV0ZqheQP3AA@mail.gmail.com>
+Subject: List migration test email
+To: virtio-fs@lists.linux.dev
+X-Mimecast-Spam-Score: 0
+X-Mimecast-Originator: redhat.com
+Content-Type: text/plain; charset="UTF-8"
 
-From: Vivek Goyal <vgoyal@redhat.com>
+This is a test email to check the new virtio-fs list
+Please ignore this message
 
-Kernel version 5.17 has increased the size of "struct fuse_init_in" struct.
-Previously this struct was 16 bytes and now it has been extended to
-64 bytes in size.
 
-Once qemu headers are updated to latest, it will expect to receive 64 byte
-size struct (for protocol version major 7 and minor > 6). But if guest is
-booting older kernel (older than 5.17), then it still sends older
-fuse_init_in of size 16 bytes. And do_init() fails. It is expecting
-64 byte struct. And this results in mount of virtiofs failing.
 
-Fix this by parsing 16 bytes only for now. Separate patches will be
-posted which will parse rest of the bytes and enable new functionality.
-Right now we don't support any of the new functionality, so we don't
-lose anything by not parsing bytes beyond 16.
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Message-Id: <20220208204813.682906-2-vgoyal@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- tools/virtiofsd/fuse_lowlevel.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index e4679c73ab..ce29a70253 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1880,6 +1880,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-                     struct fuse_mbuf_iter *iter)
- {
-     size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
-+    size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
-     struct fuse_init_in *arg;
-     struct fuse_init_out outarg;
-     struct fuse_session *se = req->se;
-@@ -1897,7 +1898,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
- 
-     /* ...and now consume the new fields. */
-     if (arg->major == 7 && arg->minor >= 6) {
--        if (!fuse_mbuf_iter_advance(iter, sizeof(*arg) - compat_size)) {
-+        if (!fuse_mbuf_iter_advance(iter, compat2_size - compat_size)) {
-             fuse_reply_err(req, EINVAL);
-             return;
-         }
 -- 
-2.35.1
+German
 

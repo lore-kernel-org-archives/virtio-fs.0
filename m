@@ -1,45 +1,43 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 5DC71374C3
-	for <virtio-fs@lists.linux.dev>; Thu,  8 Feb 2024 19:34:04 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 250883839B
+	for <virtio-fs@lists.linux.dev>; Thu,  8 Feb 2024 19:34:05 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1707420846; cv=none; b=ns+tWDSJKbha0SD9TDNMyPgjvreEADQ2MmWB54wyDE9c3E5ZPqHEI7m4C1zlSqS7rltWrvzfSfoTembtUdWcdtoKVwEypikplj/pRLvQDJZL2CrRLGbHQdm4GFJ30B7JP0UveVaj198Hkz/7mHXNMG1J2HREs9AnBxjtkuId55E=
+	t=1707420846; cv=none; b=fyVJXKDomXNMaBltMYEuq2DkQlquDtTn2JHv5mfiWL7eQeNreGDwT5l/Bv/GL+2lPhj7JRHuwdyTqaB58JnDR1EivcsakTN8ZQ4mkOP1FgyKvQ6P0y223qz4u/4fpOliPuhTOH/UGBD276hKsgoUOrVB+L+GzChbNrt4S5SUSOo=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
 	s=arc-20240116; t=1707420846; c=relaxed/simple;
-	bh=+Z8lwzYvckFWiP6BYN7U4cbT3GpIw1MQ1kqj+vQrUcc=;
-	h=From:To:Cc:Subject:Date:Message-ID:In-Reply-To:References:
-	 MIME-Version; b=tFqudsN5qAnKe9UUuky96jLLv5SZsLn4opBP7TDSF7cPMf8dqAY6AiFgxNo0gqUn8qEJ147WRytga93kEkMsUkW56LUSMz56qDRawwIcWDRvUhIPxndxo8SHYAYqFloXYUBw4n1lsHFzVIPLTsh7n4NTf38kYR4gkGov+O21sRc=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=YdtIqha3; arc=none smtp.client-ip=170.10.133.124
+	bh=gIYe1G2D5czXLxBwjohuKB4A+4yKGd/4oBCUNojNndE=;
+	h=From:To:Cc:Subject:Date:Message-ID:Content-Type:MIME-Version; b=FAP/791OXw0vXv5/xWQxC3NOd3yCTQOcu76P+QDo0EXZGQCFJ56PPqo8sfce8qgk4uHiU+F9Ccqj4FKOxslenMSTkpmknpV3ixkvB/UUTdkIIKF09geKKdIs9gmDP0i3q3Vx3spyKUeHJbgJnyFFJm64EMfKKxd2lhpDaC0BizA=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=Xlduq/Ae; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="YdtIqha3"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="Xlduq/Ae"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1707420843;
+	s=mimecast20190719; t=1707420844;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:
-	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references;
-	bh=aD5G43Xjkg+KfiRuemAiqEi3KXzjNIYSfelc8YcP8kc=;
-	b=YdtIqha39c+AUQI6CmL+boK0h3GHst6drzpEt/3utsCIVo5Jb8E3B78O/24nbP1vWHB782
-	iSFwSkPug8g8yqXe7JL0lUv/hrmbNTvzG6hEBiyumhVXwmLXUIcV6iSNes22dSUxmifae8
-	cAHb34Dtf3hns4zJN7nP4mo+wVBMwT0=
-Received: from mimecast-mx02.redhat.com (mx-ext.redhat.com [66.187.233.73])
- by relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
- cipher=TLS_AES_256_GCM_SHA384) id us-mta-362-5dtf-tMLPp6mIZwW96qeNg-1; Thu,
- 08 Feb 2024 14:33:59 -0500
-X-MC-Unique: 5dtf-tMLPp6mIZwW96qeNg-1
-Received: from smtp.corp.redhat.com (int-mx03.intmail.prod.int.rdu2.redhat.com [10.11.54.3])
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	 content-transfer-encoding:content-transfer-encoding;
+	bh=B5DAQZFX3akFCHabnQKTMIcW//WJ3thDgfeNbjmdQfE=;
+	b=Xlduq/Ae9HL+01G7HviRS873JmGCxZEo2FQtUYbLAWKwX+ExWyqitfUPtQCCsSZIOfqVRX
+	1K2Epd7sRH8vAlwiR+4DYOpmPwfjGGhWqZKJRcjOsm5DpzEirXAbTjYQWnI9cMps/IpClI
+	nmfboaSHZryxjW2I32l916AYtQxrvp8=
+Received: from mimecast-mx02.redhat.com (mimecast-mx02.redhat.com
+ [66.187.233.88]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-185-0vhgBgLjPX22OLWp2_Nu4g-1; Thu, 08 Feb 2024 14:34:00 -0500
+X-MC-Unique: 0vhgBgLjPX22OLWp2_Nu4g-1
+Received: from smtp.corp.redhat.com (int-mx01.intmail.prod.int.rdu2.redhat.com [10.11.54.1])
 	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
 	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
 	(No client certificate requested)
-	by mimecast-mx02.redhat.com (Postfix) with ESMTPS id 4A2413C0BE47;
-	Thu,  8 Feb 2024 19:33:58 +0000 (UTC)
+	by mimecast-mx02.redhat.com (Postfix) with ESMTPS id 56A1C85A589;
+	Thu,  8 Feb 2024 19:34:00 +0000 (UTC)
 Received: from localhost (unknown [10.39.192.44])
-	by smtp.corp.redhat.com (Postfix) with ESMTP id 9FA9B112131D;
-	Thu,  8 Feb 2024 19:33:57 +0000 (UTC)
+	by smtp.corp.redhat.com (Postfix) with ESMTP id CD956AC17;
+	Thu,  8 Feb 2024 19:33:59 +0000 (UTC)
 From: Stefan Hajnoczi <stefanha@redhat.com>
 To: linux-fsdevel@vger.kernel.org
 Cc: Alyssa Ross <hi@alyssa.is>,
@@ -50,11 +48,10 @@ Cc: Alyssa Ross <hi@alyssa.is>,
 	Greg KH <gregkh@linuxfoundation.org>,
 	miklos@szeredi.hu,
 	Stefan Hajnoczi <stefanha@redhat.com>
-Subject: [PATCH v2 3/3] virtiofs: emit uevents on filesystem events
-Date: Thu,  8 Feb 2024 14:32:11 -0500
-Message-ID: <20240208193212.731978-4-stefanha@redhat.com>
-In-Reply-To: <20240208193212.731978-1-stefanha@redhat.com>
-References: <20240208193212.731978-1-stefanha@redhat.com>
+Subject: [PATCH v2 0/3] virtiofs: export filesystem tags through sysfs
+Date: Thu,  8 Feb 2024 14:32:08 -0500
+Message-ID: <20240208193212.731978-1-stefanha@redhat.com>
+Content-Type: text/plain; charset="utf-8"
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -62,20 +59,24 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-X-Scanned-By: MIMEDefang 3.4.1 on 10.11.54.3
+X-Scanned-By: MIMEDefang 3.4.1 on 10.11.54.1
 
-Alyssa Ross <hi@alyssa.is> requested that virtiofs notifies userspace
-when filesytems become available. This can be used to detect when a
-filesystem with a given tag is hotplugged, for example. uevents allow
-userspace to detect changes without resorting to polling.
+v2:
+- Vivek mentioned that he didn't have time to work on this patch series
+  recently so I gave it a shot.
+- Information is now exposed in /sys/fs/virtiofs/ whereas before it was part of
+  the generic virtio device kobject, which didn't really fit.
 
-The tag is included as a uevent property so it's easy for userspace to
-identify the filesystem in question even when the sysfs directory goes
-away during removal.
+Userspace needs a way to enumerate available virtiofs filesystems and detect
+when they are hotplugged or unplugged. This would allow systemd to wait for a
+virtiofs filesystem during boot, for example.
 
-Here are example uevents:
+This patch series adds the following in sysfs:
 
-  # udevadm monitor -k -p
+  /sys/fs/virtiofs/<n>/tag    - unique identifier for mount(8)
+  /sys/fs/virtiofs/<n>/device - symlink to virtio device
+
+A uevent is emitted when virtiofs devices are hotplugged or unplugged:
 
   KERNEL[111.113221] add      /fs/virtiofs/2 (virtiofs)
   ACTION=add
@@ -89,51 +90,16 @@ Here are example uevents:
   SUBSYSTEM=virtiofs
   TAG=test
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- fs/fuse/virtio_fs.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Stefan Hajnoczi (3):
+  virtiofs: forbid newlines in tags
+  virtiofs: export filesystem tags through sysfs
+  virtiofs: emit uevents on filesystem events
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 28e96b7cde00..18a8f531e5d4 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -270,6 +270,17 @@ static void virtio_fs_start_all_queues(struct virtio_fs *fs)
- 	}
- }
- 
-+static void virtio_fs_uevent(struct virtio_fs *fs, enum kobject_action action)
-+{
-+	char tag_str[sizeof("TAG=") +
-+		     sizeof_field(struct virtio_fs_config, tag) + 1];
-+	char *envp[] = {tag_str, NULL};
-+
-+	snprintf(tag_str, sizeof(tag_str), "TAG=%s", fs->tag);
-+
-+	kobject_uevent_env(&fs->kobj, action, envp);
-+}
-+
- /* Add a new instance to the list or return -EEXIST if tag name exists*/
- static int virtio_fs_add_instance(struct virtio_device *vdev,
- 				  struct virtio_fs *fs)
-@@ -309,6 +320,8 @@ static int virtio_fs_add_instance(struct virtio_device *vdev,
- 
- 	mutex_unlock(&virtio_fs_mutex);
- 
-+	virtio_fs_uevent(fs, KOBJ_ADD);
-+
- 	return 0;
- }
- 
-@@ -977,6 +990,8 @@ static void virtio_fs_remove(struct virtio_device *vdev)
- {
- 	struct virtio_fs *fs = vdev->priv;
- 
-+	virtio_fs_uevent(fs, KOBJ_REMOVE);
-+
- 	mutex_lock(&virtio_fs_mutex);
- 	/* This device is going away. No one should get new reference */
- 	list_del_init(&fs->list);
+ fs/fuse/virtio_fs.c                         | 138 +++++++++++++++++---
+ Documentation/ABI/testing/sysfs-fs-virtiofs |  11 ++
+ 2 files changed, 128 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-fs-virtiofs
+
 -- 
 2.43.0
 

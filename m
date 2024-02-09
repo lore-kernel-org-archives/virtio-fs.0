@@ -1,55 +1,55 @@
 Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 566E228DCB
-	for <virtio-fs@lists.linux.dev>; Fri,  9 Feb 2024 11:30:38 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 6D2652E3F9
+	for <virtio-fs@lists.linux.dev>; Fri,  9 Feb 2024 11:33:34 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1707478241; cv=none; b=IhKjkVsNE2+aWreSA33X7syWzstfFilWhUA1qrsLN5qRFbhij20MTLk7PwMoQCD8kGV2QtAHLljMFFcCbpPKc3/IgRjA5+LHyIjV30HWKQBrbuC2CpeHpmSHAqJ8xsKfYEbVHxt8Mydh29lP+YMZKJdhAMhWoVNWYm0KMRhlBXU=
+	t=1707478420; cv=none; b=s6FQieeQWbSV+fGgyWAkHmNUdMNTCcJCsXzyfxxNTG7llwTz1ECGovQS7RqBq2Geuwv8CBu8fuLSDrQHsCO+9NATAsiE5i26PXSCgiQ3EcjfQYFT5F26XpZkrevePtm1ufgmRGo3V87RjjjSNbPlbcKfNYpBiMdYQZOTGjfoFCc=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1707478241; c=relaxed/simple;
-	bh=jPyi0YFU6UubKNVN0yr2/yOVx0MG1YPat+OIForxo/8=;
+	s=arc-20240116; t=1707478420; c=relaxed/simple;
+	bh=gskku9cB1cMp8o4K7vg9hH0jCdjVsxNAnucSHXg19KY=;
 	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
-	 Content-Type:Content-Disposition:In-Reply-To; b=MdSmDmjquMOVS3C5/Tw2OgWlFWme/xSZNMhQ4v/niY+vBtm9TUlSOIunKuZwRoDm4oloA+6hmdOlHCy8q+2CuMpxtdyMfTYnWi4wmBLc+UFu7nqXxatfY0/EW+WGlD5p+UVG0RJzQxmrehSh9UFGeD8wQjpvbRLX7ifIlG+VTzk=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=EJRW5BsE; arc=none smtp.client-ip=170.10.133.124
+	 Content-Type:Content-Disposition:In-Reply-To; b=QXikDU3Nzk62iXyxMtBtpnt2ovMrnObjmbzMeZ1/k9prXHlKpBzjuUvvBe7TESn59mKjKq9VjXwtTWWxTLOmikdqLlT7/7DJkM2GQHZSFr6wzFVUachQLLPH4NQ7DYaDWSCwgDokBTbPhlu63ETPLu6kWWUjRwyP4I2RceumE3k=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=gTrr9TAK; arc=none smtp.client-ip=170.10.133.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="EJRW5BsE"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="gTrr9TAK"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1707478238;
+	s=mimecast20190719; t=1707478413;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 in-reply-to:in-reply-to:references:references;
-	bh=RKNyYbIDISSdKU79eD+9vFfLTqADaQHmHbs1OnkHR5o=;
-	b=EJRW5BsEL/2c9eu75avGYfppOJsJBnPnOYSybtqBPFLr5dpD05FhOFJRphhM34pPAZ0aiC
-	usgfB8x9FgEYXRUv/k3F92G1siCwntJcfCsinoPltWROwgVQXW6iqzde4EujGPcbyi6Eci
-	1DQQUrggSkyFY9HsslkU5VsuOTnakWU=
-Received: from mimecast-mx02.redhat.com (mimecast-mx02.redhat.com
- [66.187.233.88]) by relay.mimecast.com with ESMTP with STARTTLS
- (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-78-lNtPamxeMzWv3q6_vlQvdw-1; Fri, 09 Feb 2024 06:30:33 -0500
-X-MC-Unique: lNtPamxeMzWv3q6_vlQvdw-1
-Received: from smtp.corp.redhat.com (int-mx02.intmail.prod.int.rdu2.redhat.com [10.11.54.2])
+	bh=Zx0enADi5XLBrWdavlIwqlu/KPv6Ahk5X3LE1jkjPR8=;
+	b=gTrr9TAKMg6l+DN4tHjmHbfIPc/wLESWglNUwAzB5eEU3L3wdY+S4n3Z53B5/6cbE4WdIL
+	oZddhhYW4CB71THa98bdmWzmm00JlMw3yYP8qqId/+MCv1eBFlcwu87eYkFc64qg8lUR2H
+	TUd5viPQAPMtVGZoks+p6kduVhxfZyU=
+Received: from mimecast-mx02.redhat.com (mx-ext.redhat.com [66.187.233.73])
+ by relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
+ cipher=TLS_AES_256_GCM_SHA384) id us-mta-554-PsFqdLq9Pfu6NnE8SQkr3w-1; Fri,
+ 09 Feb 2024 06:33:31 -0500
+X-MC-Unique: PsFqdLq9Pfu6NnE8SQkr3w-1
+Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.rdu2.redhat.com [10.11.54.7])
 	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
 	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
 	(No client certificate requested)
-	by mimecast-mx02.redhat.com (Postfix) with ESMTPS id 27510828CEC;
-	Fri,  9 Feb 2024 11:30:33 +0000 (UTC)
+	by mimecast-mx02.redhat.com (Postfix) with ESMTPS id 89EAB1C05133;
+	Fri,  9 Feb 2024 11:33:30 +0000 (UTC)
 Received: from localhost (unknown [10.39.193.29])
-	by smtp.corp.redhat.com (Postfix) with ESMTP id E16DC40C9444;
-	Fri,  9 Feb 2024 11:30:31 +0000 (UTC)
-Date: Fri, 9 Feb 2024 06:30:30 -0500
+	by smtp.corp.redhat.com (Postfix) with ESMTP id F15391C14B04;
+	Fri,  9 Feb 2024 11:33:29 +0000 (UTC)
+Date: Fri, 9 Feb 2024 06:33:28 -0500
 From: Stefan Hajnoczi <stefanha@redhat.com>
 To: Greg KH <gregkh@linuxfoundation.org>
 Cc: linux-fsdevel@vger.kernel.org, Alyssa Ross <hi@alyssa.is>,
 	gmaglione@redhat.com, virtio-fs@lists.linux.dev, vgoyal@redhat.com,
 	mzxreary@0pointer.de, miklos@szeredi.hu
-Subject: Re: [PATCH v2 1/3] virtiofs: forbid newlines in tags
-Message-ID: <20240209113030.GA748645@fedora>
+Subject: Re: [PATCH v2 2/3] virtiofs: export filesystem tags through sysfs
+Message-ID: <20240209113328.GB748645@fedora>
 References: <20240208193212.731978-1-stefanha@redhat.com>
- <20240208193212.731978-2-stefanha@redhat.com>
- <2024020953-rebel-ooze-2162@gregkh>
+ <20240208193212.731978-3-stefanha@redhat.com>
+ <2024020940-stinking-encrust-3754@gregkh>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -57,67 +57,124 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Ot15W0l9JUGuqbHu"
+	protocol="application/pgp-signature"; boundary="PucRtjx1X61weNtr"
 Content-Disposition: inline
-In-Reply-To: <2024020953-rebel-ooze-2162@gregkh>
-X-Scanned-By: MIMEDefang 3.4.1 on 10.11.54.2
+In-Reply-To: <2024020940-stinking-encrust-3754@gregkh>
+X-Scanned-By: MIMEDefang 3.4.1 on 10.11.54.7
 
 
---Ot15W0l9JUGuqbHu
+--PucRtjx1X61weNtr
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Feb 09, 2024 at 10:33:20AM +0000, Greg KH wrote:
-> On Thu, Feb 08, 2024 at 02:32:09PM -0500, Stefan Hajnoczi wrote:
-> > Newlines in virtiofs tags are awkward for users and potential vectors
-> > for string injection attacks.
+On Fri, Feb 09, 2024 at 10:36:47AM +0000, Greg KH wrote:
+> On Thu, Feb 08, 2024 at 02:32:10PM -0500, Stefan Hajnoczi wrote:
+> > The virtiofs filesystem is mounted using a "tag" which is exported by
+> > the virtiofs device:
 > >=20
+> >   # mount -t virtiofs <tag> /mnt
+> >=20
+> > The virtiofs driver knows about all the available tags but these are
+> > currently not exported to user space.
+> >=20
+> > People have asked for these tags to be exported to user space. Most
+> > recently Lennart Poettering has asked for it as he wants to scan the
+> > tags and mount virtiofs automatically in certain cases.
+> >=20
+> > https://gitlab.com/virtio-fs/virtiofsd/-/issues/128
+> >=20
+> > This patch exports tags at /sys/fs/virtiofs/<N>/tag where N is the id of
+> > the virtiofs device. The filesystem tag can be obtained by reading this
+> > "tag" file.
+> >=20
+> > There is also a symlink at /sys/fs/virtiofs/<N>/device that points to
+> > the virtiofs device that exports this tag.
+> >=20
+> > This patch converts the existing struct virtio_fs into a full kobject.
+> > It already had a refcount so it's an easy change. The virtio_fs objects
+> > can then be exposed in a kset at /sys/fs/virtiofs/. Note that virtio_fs
+> > objects may live slightly longer than we wish for them to be exposed to
+> > userspace, so kobject_del() is called explicitly when the underlying
+> > virtio_device is removed. The virtio_fs object is freed when all
+> > references are dropped (e.g. active mounts) but disappears as soon as
+> > the virtiofs device is gone.
+> >=20
+> > Originally-by: Vivek Goyal <vgoyal@redhat.com>
 > > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 > > ---
-> >  fs/fuse/virtio_fs.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
+> >  fs/fuse/virtio_fs.c                         | 113 ++++++++++++++++----
+> >  Documentation/ABI/testing/sysfs-fs-virtiofs |  11 ++
+> >  2 files changed, 103 insertions(+), 21 deletions(-)
+> >  create mode 100644 Documentation/ABI/testing/sysfs-fs-virtiofs
 > >=20
 > > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> > index 5f1be1da92ce..de9a38efdf1e 100644
+> > index de9a38efdf1e..28e96b7cde00 100644
 > > --- a/fs/fuse/virtio_fs.c
 > > +++ b/fs/fuse/virtio_fs.c
-> > @@ -323,6 +323,16 @@ static int virtio_fs_read_tag(struct virtio_device=
- *vdev, struct virtio_fs *fs)
-> >  		return -ENOMEM;
-> >  	memcpy(fs->tag, tag_buf, len);
-> >  	fs->tag[len] =3D '\0';
+> > @@ -31,6 +31,9 @@
+> >  static DEFINE_MUTEX(virtio_fs_mutex);
+> >  static LIST_HEAD(virtio_fs_instances);
+> > =20
+> > +/* The /sys/fs/virtio_fs/ kset */
+> > +static struct kset *virtio_fs_kset;
 > > +
-> > +	/* While the VIRTIO specification allows any character, newlines are
-> > +	 * awkward on mount(8) command-lines and cause problems in the sysfs
-> > +	 * "tag" attr and uevent TAG=3D properties. Forbid them.
-> > +	 */
-> > +	if (strchr(fs->tag, '\n')) {
-> > +		dev_err(&vdev->dev, "refusing virtiofs tag with newline character\n"=
-);
+> >  enum {
+> >  	VQ_HIPRIO,
+> >  	VQ_REQUEST
+> > @@ -55,7 +58,7 @@ struct virtio_fs_vq {
+> > =20
+> >  /* A virtio-fs device instance */
+> >  struct virtio_fs {
+> > -	struct kref refcount;
+> > +	struct kobject kobj;
+> >  	struct list_head list;    /* on virtio_fs_instances */
+> >  	char *tag;
+> >  	struct virtio_fs_vq *vqs;
+> > @@ -161,18 +164,43 @@ static inline void dec_in_flight_req(struct virti=
+o_fs_vq *fsvq)
+> >  		complete(&fsvq->in_flight_zero);
+> >  }
+> > =20
+> > -static void release_virtio_fs_obj(struct kref *ref)
+> > +static ssize_t virtio_fs_tag_attr_show(struct kobject *kobj,
+> > +		struct kobj_attribute *attr, char *buf)
+> >  {
+> > -	struct virtio_fs *vfs =3D container_of(ref, struct virtio_fs, refcoun=
+t);
+> > +	struct virtio_fs *fs =3D container_of(kobj, struct virtio_fs, kobj);
+> > +
+> > +	return sysfs_emit(buf, fs->tag);
+> > +}
+> > +
+> > +static struct kobj_attribute virtio_fs_tag_attr =3D {
+> > +	.attr =3D { .name =3D "tag", .mode=3D 0644 },
+> > +	.show =3D virtio_fs_tag_attr_show,
+> > +};
 >=20
-> Please don't let userspace spam mthe kernel log if they are the ones
-> that are setting the tags.  Just make this a debug message instead.
+> __ATTR_RO()?
+> That way we all know you got the mode setting correct :)
+>=20
+> Other than that minor thing, looks good, nice job!
 
-This check is performed while probing the device. Userspace is not
-involved but I'll change it to dev_dbg() anyway.
+Will fix, thanks!
 
 Stefan
 
---Ot15W0l9JUGuqbHu
+--PucRtjx1X61weNtr
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmXGDNYACgkQnKSrs4Gr
-c8iXbAf/VyiMiha96Y0oqFyGBXAPhzAcjtI+pW2x8TaFqNZcy9lCfhU8Bp0EidAk
-2FRcssf84hjBIo0vvmYCvYKCLltRvVoEEpWO+ANRVG6/rlZAyXfuOgx2J/PJZlmJ
-DivPMxJGZXLX9WYzO3TMVbbxHFLG1ywWRXxW1qR17mkqU9ChoLgLl/NyTSnXpEv5
-DEOfJTV2OxkT19wQ+XRLTqehlJrVDfoKHABB6Ikj5txkfFmQA2/TMShdihbTBjHP
-3r9DtfFi44B5cjNgsXS9Kke+hILXZjVyHt7STim61XMLsIjmI/4SOCvnmtN9kzGR
-jWB2ucwlHr71EXBe0pQvvwCEBru2aw==
-=DDOT
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmXGDYgACgkQnKSrs4Gr
+c8h4+Qf9Edn1M+tTRmKlrat4lz1Hu+be4PMIBUkzLziTL8pH6ydmDKXQj3Jtr44t
+4yI25aUXKu92G1+VrNNqADYgAkcfOVtjImie3tCUx8QFPEa9des6ZTBoT3wxnXLZ
+boL6Hym0rTW6ZoRQPd0ICgnmIuwglumO+zd/2h9hwYfOAGfzxWSNGs23i0apfWCz
+GEu9wIAtj89lBzF6EJ/30k+yEILIYOiCGDNYLNL6sLe4nQXJWq2dUcp6yHygkDHv
+UZP18zs9uo62Mfr8jTO1QO2Z6EaUiwrikVNEc8IlOjUD2V3cu9ro9itJCH1LabDW
+xRNAlOG+KVajHZQeUnW0W5dWrGm+jw==
+=ReO/
 -----END PGP SIGNATURE-----
 
---Ot15W0l9JUGuqbHu--
+--PucRtjx1X61weNtr--
 

@@ -1,59 +1,54 @@
 Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 500C133CE2
-	for <virtio-fs@lists.linux.dev>; Fri,  9 Feb 2024 12:19:40 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id C39927BAF9
+	for <virtio-fs@lists.linux.dev>; Fri,  9 Feb 2024 17:21:49 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1707481182; cv=none; b=VsaAjbIY+//3pLm9zXH2FkOXeqUCqCSYKvxb3jZTEKtKSkIMGTX/CiRlhwSx2fdq41HHjGlg0I23vhCaLzubx0UEP9G0o7IfCSpnqZDQVrVi5qrm/RGSEy/F7l1hZiI8ttF14zuDXTL7trFX205N87cc5m6H0njc9gBK0hbKzXE=
+	t=1707499311; cv=none; b=INznAkGsV4Jl9aHm0RTlJi/HqWXomsLCWW05+Xmj0AuH3riqiHEOPd8lLUm5G0n6Z2rVipmbybdm64p5ve490LDktivuwnXyOKcR86/ya2OKWE/ZXIkGtmFo3HHZbsJ7D42mvRYyH+XpKsPomydIu6KnImRWgc4aj0TTxufzhuE=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1707481182; c=relaxed/simple;
-	bh=Rnjg8UYrQkMr0LoNZ+6Py+M+X4Uhd+jX+nS9oqTVy4g=;
-	h=From:To:Cc:Subject:Date:Message-ID:In-Reply-To:References:
-	 MIME-Version; b=I5eYb8N9gDzMvxVqAyMJfFcRxeXVehne5IzNzaFbUYjwIkYheuaFsXbiUvYJV+k7LewaWbMw/FP7iQ95cdeqvJv8RRi9ON+usnCCbDtaoFdpJLI5MuLGXzm4Cha2tVrwq2QXwx3W9QIlUAmTx4yEcMsywZQ6e8IxGuZWBA+oQrA=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=VrHhjKzn; arc=none smtp.client-ip=170.10.129.124
+	s=arc-20240116; t=1707499311; c=relaxed/simple;
+	bh=6DQYA6WL40qK4OCrQRw2oarxqXcLsmuTrKyrxJZbLVI=;
+	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
+	 Content-Type:Content-Disposition:In-Reply-To; b=ijbjwk8493DZdl7tqj8HbltKfK5lXAS8dpMqxVdDNRakWsz0kj1cmWo1qtTuHYZQ+RIKgmTMZdMFJGLwMU+I9/njvXfz70yMRdhJPQSTDcF7sE7nzzk2e7BJFCDBqGSBSF0Y2bnIs8RtvH1iARrnn61sZrO+N/bPzji6WSZ/9gY=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=Bny33vT8; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="VrHhjKzn"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="Bny33vT8"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1707481179;
+	s=mimecast20190719; t=1707499308;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:
-	 content-transfer-encoding:content-transfer-encoding:
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 in-reply-to:in-reply-to:references:references;
-	bh=PGHyzkUs9lP9+Ur11qjQwt2Rk1b/jcG9atbOexBoWEY=;
-	b=VrHhjKzn2WWubUOc7WT11HhuSMsYloW/Kc5PdmJ2UKzyKhwnTrvwLTU+wlX7oLpcZpJzRx
-	4OZuuzHguv68xNfLLA1WFyVH+axxAU9tAdDlJlb5pkodKQ8jutyP5CsIfx2J1RhMeTSUoK
-	GHt/OiVx32+u1ouX0w2DA9CKpp8IjLI=
-Received: from mimecast-mx02.redhat.com (mx-ext.redhat.com [66.187.233.73])
- by relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
- cipher=TLS_AES_256_GCM_SHA384) id us-mta-179-i5V_3R03OhKl2sZ1HsxUwg-1; Fri,
- 09 Feb 2024 07:19:36 -0500
-X-MC-Unique: i5V_3R03OhKl2sZ1HsxUwg-1
-Received: from smtp.corp.redhat.com (int-mx03.intmail.prod.int.rdu2.redhat.com [10.11.54.3])
+	bh=Q1DyMa0OwRCuoEiLNBlCTz+pggew/ko3ryQ4Q/4k4Y4=;
+	b=Bny33vT8J+wKXHKKAFDYJxgpN7bGHKe8fpF1k6N1EtaZLuAyM6HawPD6Hz6eZHVLOb0VUS
+	DQeVFtECnH/YR89QXojCA4UMuNgx9wImFlGw5nhHQywNOVgEjv5JNlYCtU57GhHc9hGsp/
+	S1EqtrV9oJHud/9v+zY/liON/F8lr9Q=
+Received: from mimecast-mx02.redhat.com (mimecast-mx02.redhat.com
+ [66.187.233.88]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-433-UFCLKMTHN6K1aW20edLNPQ-1; Fri, 09 Feb 2024 12:21:43 -0500
+X-MC-Unique: UFCLKMTHN6K1aW20edLNPQ-1
+Received: from smtp.corp.redhat.com (int-mx05.intmail.prod.int.rdu2.redhat.com [10.11.54.5])
 	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
 	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
 	(No client certificate requested)
-	by mimecast-mx02.redhat.com (Postfix) with ESMTPS id 9C8E038060EB;
-	Fri,  9 Feb 2024 12:19:35 +0000 (UTC)
-Received: from localhost (unknown [10.39.193.29])
-	by smtp.corp.redhat.com (Postfix) with ESMTP id 02AF0112132A;
-	Fri,  9 Feb 2024 12:19:34 +0000 (UTC)
-From: Stefan Hajnoczi <stefanha@redhat.com>
-To: linux-fsdevel@vger.kernel.org
-Cc: miklos@szeredi.hu,
-	gmaglione@redhat.com,
-	Greg KH <gregkh@linuxfoundation.org>,
-	virtio-fs@lists.linux.dev,
-	vgoyal@redhat.com,
-	Alyssa Ross <hi@alyssa.is>,
-	mzxreary@0pointer.de,
-	Stefan Hajnoczi <stefanha@redhat.com>
-Subject: [PATCH v3 3/3] virtiofs: emit uevents on filesystem events
-Date: Fri,  9 Feb 2024 07:18:20 -0500
-Message-ID: <20240209121820.755722-4-stefanha@redhat.com>
-In-Reply-To: <20240209121820.755722-1-stefanha@redhat.com>
+	by mimecast-mx02.redhat.com (Postfix) with ESMTPS id 2B1221005055;
+	Fri,  9 Feb 2024 17:21:43 +0000 (UTC)
+Received: from fedora.redhat.com (unknown [10.22.32.27])
+	by smtp.corp.redhat.com (Postfix) with ESMTPS id D744A111FF;
+	Fri,  9 Feb 2024 17:21:42 +0000 (UTC)
+Received: by fedora.redhat.com (Postfix, from userid 1000)
+	id 4EBB72AE542; Fri,  9 Feb 2024 12:21:42 -0500 (EST)
+Date: Fri, 9 Feb 2024 12:21:42 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu, gmaglione@redhat.com,
+	Greg KH <gregkh@linuxfoundation.org>, virtio-fs@lists.linux.dev,
+	Alyssa Ross <hi@alyssa.is>, mzxreary@0pointer.de
+Subject: Re: [PATCH v3 0/3] virtiofs: export filesystem tags through sysfs
+Message-ID: <ZcZfJmfyU7haGtDY@redhat.com>
 References: <20240209121820.755722-1-stefanha@redhat.com>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
@@ -61,76 +56,68 @@ List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-X-Scanned-By: MIMEDefang 3.4.1 on 10.11.54.3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20240209121820.755722-1-stefanha@redhat.com>
+X-Scanned-By: MIMEDefang 3.4.1 on 10.11.54.5
 
-Alyssa Ross <hi@alyssa.is> requested that virtiofs notifies userspace
-when filesytems become available. This can be used to detect when a
-filesystem with a given tag is hotplugged, for example. uevents allow
-userspace to detect changes without resorting to polling.
+On Fri, Feb 09, 2024 at 07:18:17AM -0500, Stefan Hajnoczi wrote:
+> v3:
+> - Use dev_dbg() to avoid spamming logs [Greg]
+> - Fix 644 mode on "tag" attr and use __ATTR_RO() [Greg]
+> - Use kset_uevent_ops and eliminate explicit KOBJ_REMOVE [Greg]
+> v2:
+> - Vivek mentioned that he didn't have time to work on this patch series
+>   recently so I gave it a shot.
+> - Information is now exposed in /sys/fs/virtiofs/ whereas before it was part of
+>   the generic virtio device kobject, which didn't really fit.
+> 
+> Userspace needs a way to enumerate available virtiofs filesystems and detect
+> when they are hotplugged or unplugged. This would allow systemd to wait for a
+> virtiofs filesystem during boot, for example.
+> 
+> This patch series adds the following in sysfs:
+> 
+>   /sys/fs/virtiofs/<n>/tag    - unique identifier for mount(8)
+>   /sys/fs/virtiofs/<n>/device - symlink to virtio device
 
-The tag is included as a uevent property so it's easy for userspace to
-identify the filesystem in question even when the sysfs directory goes
-away during removal.
+Hi Stefan,
 
-Here are example uevents:
+Thanks for the patches. I am glad you are solving this problem.
 
-  # udevadm monitor -k -p
+I am testing your patches. After boot, I see /sys/fs/virtiofs/ directory
+but that directory is empty. No entries for any tags. I do have one
+tag exported named "myfs" to the VM. And I can mount it.
 
-  KERNEL[111.113221] add      /fs/virtiofs/2 (virtiofs)
-  ACTION=add
-  DEVPATH=/fs/virtiofs/2
-  SUBSYSTEM=virtiofs
-  TAG=test
+Thanks
+Vivek
 
-  KERNEL[165.527167] remove   /fs/virtiofs/2 (virtiofs)
-  ACTION=remove
-  DEVPATH=/fs/virtiofs/2
-  SUBSYSTEM=virtiofs
-  TAG=test
-
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- fs/fuse/virtio_fs.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 22d7c70ef78a..a3014fdc913e 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -306,6 +306,8 @@ static int virtio_fs_add_instance(struct virtio_device *vdev,
- 
- 	mutex_unlock(&virtio_fs_mutex);
- 
-+	kobject_uevent(&fs->kobj, KOBJ_ADD);
-+
- 	return 0;
- }
- 
-@@ -1565,9 +1567,22 @@ static struct file_system_type virtio_fs_type = {
- 	.kill_sb	= virtio_kill_sb,
- };
- 
-+static int virtio_fs_uevent(const struct kobject *kobj, struct kobj_uevent_env *env)
-+{
-+	const struct virtio_fs *fs = container_of(kobj, struct virtio_fs, kobj);
-+
-+	add_uevent_var(env, "TAG=%s", fs->tag);
-+	return 0;
-+}
-+
-+static const struct kset_uevent_ops virtio_fs_uevent_ops = {
-+	.uevent = virtio_fs_uevent,
-+};
-+
- static int __init virtio_fs_sysfs_init(void)
- {
--	virtio_fs_kset = kset_create_and_add("virtiofs", NULL, fs_kobj);
-+	virtio_fs_kset = kset_create_and_add("virtiofs", &virtio_fs_uevent_ops,
-+					     fs_kobj);
- 	if (!virtio_fs_kset)
- 		return -ENOMEM;
- 	return 0;
--- 
-2.43.0
+> 
+> A uevent is emitted when virtiofs devices are hotplugged or unplugged:
+> 
+>   KERNEL[111.113221] add      /fs/virtiofs/2 (virtiofs)
+>   ACTION=add
+>   DEVPATH=/fs/virtiofs/2
+>   SUBSYSTEM=virtiofs
+>   TAG=test
+> 
+>   KERNEL[165.527167] remove   /fs/virtiofs/2 (virtiofs)
+>   ACTION=remove
+>   DEVPATH=/fs/virtiofs/2
+>   SUBSYSTEM=virtiofs
+>   TAG=test
+> 
+> Stefan Hajnoczi (3):
+>   virtiofs: forbid newlines in tags
+>   virtiofs: export filesystem tags through sysfs
+>   virtiofs: emit uevents on filesystem events
+> 
+>  fs/fuse/virtio_fs.c                         | 135 +++++++++++++++++---
+>  Documentation/ABI/testing/sysfs-fs-virtiofs |  11 ++
+>  2 files changed, 125 insertions(+), 21 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-fs-virtiofs
+> 
+> -- 
+> 2.43.0
+> 
 

@@ -1,50 +1,50 @@
-Received: from mx0a-00069f02.pphosted.com (mx0a-00069f02.pphosted.com [205.220.165.32])
+Received: from mx0b-00069f02.pphosted.com (mx0b-00069f02.pphosted.com [205.220.177.32])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id BA3956E60C
-	for <virtio-fs@lists.linux.dev>; Fri,  1 Mar 2024 13:43:45 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.165.32
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id F279D6EB45
+	for <virtio-fs@lists.linux.dev>; Fri,  1 Mar 2024 13:43:46 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.177.32
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1709300628; cv=none; b=G1eduuJTRI87hIAzIpsxeztDwwAKOgcfEx6pxak8bVtc1BCE3lRHcCKwRm5tcyIS8kL0DVTlI8x7z/JFb6XDpaENjJEGdJtlg2GhdsBWG9w5eKJnlj5w19rFmUaNw2jxbuzY5IpQpLJ14sBSubSjRQwdP+ORXmItz+mA7gIBPew=
+	t=1709300628; cv=none; b=WZbhqZVrksLrnW2NeFpeLWItkiuOJIsE/CEuXxLUih30KWgv8GaKHAx/vJFG+Nvn2scDIsh4kBGZQy1m08rMT5MHymzXLyxiLSkMY6n1I4VVMlRe2tF6ISD4LLmPwM1AxjFqMYmGAKPTKsctVMaINYVBR0/Tior3YoxBHUHAXPU=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
 	s=arc-20240116; t=1709300628; c=relaxed/simple;
-	bh=wfzqq/NSK7uTYTgNwR0Rm+p/mhKOmvdaYJXVlM//S6o=;
+	bh=wVH8HGgctQyjeo5JictLrauG5Rg29GYXK9QDVssMguM=;
 	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
-	 MIME-Version; b=cA9mEfy1Bwk03ndcqBjZkOWgUqVp1P8dAjuCFcG14A3t3AwEPFqiWK/vUo1fWp+1e0abGYKvl4OLfV7pO+5TII4yznGGk82B9flPkZATjHyBRE8InCHwLs6q3DgkHkK5xJ1bnl0QeAhoBPtNKrBNp5TriY8WF8tSaKnT4+rzXMc=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=OpNGK58W; arc=none smtp.client-ip=205.220.165.32
+	 MIME-Version; b=eD5CoVeVby55ToRsI0XjUPETaxF4GU0ASwX3v38qLfQRKuQhhbFI3reTEpp5sxxnr4wvZWUYya7YIBKVHtFG7UQb0ZlxLWZf2FgM+8qUEE5VYckKy3op82M0bHQhgq7Y7yaDHVf4BnmmN9dfcjQS/IVUWlf4lwByZa393zt+oB8=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=WL0p0doH; arc=none smtp.client-ip=205.220.177.32
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oracle.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="OpNGK58W"
-Received: from pps.filterd (m0246617.ppops.net [127.0.0.1])
-	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 42194h43008252;
-	Fri, 1 Mar 2024 13:43:39 GMT
+	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="WL0p0doH"
+Received: from pps.filterd (m0333520.ppops.net [127.0.0.1])
+	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 42198usA012317;
+	Fri, 1 Mar 2024 13:43:40 GMT
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=from : to : cc :
  subject : date : message-id : in-reply-to : references : mime-version :
  content-transfer-encoding; s=corp-2023-11-20;
- bh=31MebaJvp72AKBEkEumWQRA9IcrmJO/cdo3sXTMK9X8=;
- b=OpNGK58W3L9ltpQn4Jz2mu+cvX0myaJM5G0LKA0qbSpUAoR0QlQtQAM3Yyw66mdc2pAT
- w9pIYulZ42co3PMTN4c5D4XEBRKhRaQAIM7gTZJL/LfKsQBWiwtFy5GeoU+p4ZzwgGoQ
- iwgrVI8YVJ03LI66SCsmDGlF10mKBVUJYPGEA5fZTcZ45rejqLoeBmJHehEoQI5cftHV
- eigcCQt9PgU6TIxZnqv1iE0Qmv5Fhnih++l1+JabGqF5WbdFryfaLPdwIQuduq+gkk3v
- crbhXVhkCi1ShzAL13cbsrK0e/GC5BoD+ibMXSVmoNJRRaKI1ypAN/Db58+f4KqmFGVi rA== 
+ bh=+yib/Zj3rSXJ1hKbXY1gPDcB2uxuzIu3Eyv0AgFx4+0=;
+ b=WL0p0doH3CRMR1U0iyYXtNtPy0M6metfdQpU0LJjZzm+RJzfHOPrrqh2kWAk1CoVFOsQ
+ pP9V91nm2z3PggTKrozaRqGVD4FnbufgUWDdLrM62gO0uabxYv65IpS01s55O97/Z9Gv
+ jg2GJZsanksXTLiggot0AWyXRB/Bj4QsqL0HdTFzOQGpNIClI7aO0RquGsJB3hoCgY0w
+ IkNpIj6PPB/dkJPjKKgSweV9CfJ6k3p3qu+uKFlRXoenQ5poshaqiH2N2qivT+IXnqGt
+ rMnIlsTIhk0q08cpVrGnOXcPxME38GqpwBD8pgMCTxITRR610WlwoTOelYi4+oJLEpbN DQ== 
 Received: from iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (iadpaimrmta01.appoci.oracle.com [130.35.100.223])
-	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3wf90vgw9s-1
+	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3wf8gds5kd-1
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
 	Fri, 01 Mar 2024 13:43:39 +0000
 Received: from pps.filterd (iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com [127.0.0.1])
-	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 421BrKQp009391;
-	Fri, 1 Mar 2024 13:43:37 GMT
+	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 421CwuK4009384;
+	Fri, 1 Mar 2024 13:43:39 GMT
 Received: from pps.reinject (localhost [127.0.0.1])
-	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTPS id 3wjrqmtrd3-1
+	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTPS id 3wjrqmtre6-1
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Fri, 01 Mar 2024 13:43:37 +0000
+	Fri, 01 Mar 2024 13:43:39 +0000
 Received: from iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com [127.0.0.1])
-	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 421DhWAO026578;
-	Fri, 1 Mar 2024 13:43:37 GMT
+	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 421DhWAQ026578;
+	Fri, 1 Mar 2024 13:43:38 GMT
 Received: from jonah-ol8.us.oracle.com (dhcp-10-65-160-211.vpn.oracle.com [10.65.160.211])
-	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTP id 3wjrqmtr9m-4;
-	Fri, 01 Mar 2024 13:43:36 +0000
+	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTP id 3wjrqmtr9m-5;
+	Fri, 01 Mar 2024 13:43:38 +0000
 From: Jonah Palmer <jonah.palmer@oracle.com>
 To: qemu-devel@nongnu.org
 Cc: mst@redhat.com, jasowang@redhat.com, eperezma@redhat.com,
@@ -56,9 +56,9 @@ Cc: mst@redhat.com, jasowang@redhat.com, eperezma@redhat.com,
         pbonzini@redhat.com, fam@euphon.net, stefanha@redhat.com,
         qemu-block@nongnu.org, qemu-s390x@nongnu.org,
         virtio-fs@lists.linux.dev
-Subject: [RFC 3/8] virtio-mmio: Handle extra notification data
-Date: Fri,  1 Mar 2024 08:43:25 -0500
-Message-Id: <20240301134330.4191007-4-jonah.palmer@oracle.com>
+Subject: [RFC 4/8] virtio-mmio: Lock ioeventfd state with VIRTIO_F_NOTIFICATION_DATA
+Date: Fri,  1 Mar 2024 08:43:26 -0500
+Message-Id: <20240301134330.4191007-5-jonah.palmer@oracle.com>
 X-Mailer: git-send-email 2.39.3
 In-Reply-To: <20240301134330.4191007-1-jonah.palmer@oracle.com>
 References: <20240301134330.4191007-1-jonah.palmer@oracle.com>
@@ -76,54 +76,45 @@ X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 adultscore=0 bulk
  spamscore=0 phishscore=0 malwarescore=0 mlxscore=0 mlxlogscore=999
  classifier=spam adjust=0 reason=mlx scancount=1 engine=8.12.0-2311290000
  definitions=main-2403010114
-X-Proofpoint-GUID: i9q_6TtIHurdUt5Q0ESFychCO9IUGOY-
-X-Proofpoint-ORIG-GUID: i9q_6TtIHurdUt5Q0ESFychCO9IUGOY-
+X-Proofpoint-ORIG-GUID: wAQDAHZ40iGWB_ja4NigNc5az8y-vd-z
+X-Proofpoint-GUID: wAQDAHZ40iGWB_ja4NigNc5az8y-vd-z
 
-Add support to virtio-mmio devices for handling the extra data sent from
-the driver to the device when the VIRTIO_F_NOTIFICATION_DATA transport
-feature has been negotiated.
+Prevent ioeventfd from being enabled/disabled when a virtio-mmio device
+has negotiated the VIRTIO_F_NOTIFICATION_DATA transport feature.
 
-The extra data that's passed to the virtio-mmio device when this feature
-is enabled varies depending on the device's virtqueue layout.
-
-The data passed to the virtio-mmio device is in the same format as the
-data passed to virtio-pci devices.
+Due to ioeventfd not being able to carry the extra data associated with
+this feature, the ioeventfd should be left in a disabled state for
+emulated virtio-mmio devices using this feature.
 
 Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
 ---
- hw/virtio/virtio-mmio.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ hw/virtio/virtio-mmio.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/hw/virtio/virtio-mmio.c b/hw/virtio/virtio-mmio.c
-index 22f9fbcf5a..2bac77460e 100644
+index 2bac77460e..fc780a03b2 100644
 --- a/hw/virtio/virtio-mmio.c
 +++ b/hw/virtio/virtio-mmio.c
-@@ -248,6 +248,7 @@ static void virtio_mmio_write(void *opaque, hwaddr offset, uint64_t value,
- {
-     VirtIOMMIOProxy *proxy = (VirtIOMMIOProxy *)opaque;
-     VirtIODevice *vdev = virtio_bus_get_device(&proxy->bus);
-+    uint16_t vq_idx;
- 
-     trace_virtio_mmio_write_offset(offset, value);
- 
-@@ -407,8 +408,15 @@ static void virtio_mmio_write(void *opaque, hwaddr offset, uint64_t value,
-         }
+@@ -424,7 +424,8 @@ static void virtio_mmio_write(void *opaque, hwaddr offset, uint64_t value,
+         virtio_update_irq(vdev);
          break;
-     case VIRTIO_MMIO_QUEUE_NOTIFY:
--        if (value < VIRTIO_QUEUE_MAX) {
--            virtio_queue_notify(vdev, value);
-+        if (virtio_vdev_has_feature(vdev, VIRTIO_F_NOTIFICATION_DATA)) {
-+            vq_idx = value & 0xFFFF;
-+            virtio_set_notification_data(vdev, vq_idx, value);
-+        } else {
-+            vq_idx = value;
-+        }
-+
-+        if (vq_idx < VIRTIO_QUEUE_MAX) {
-+            virtio_queue_notify(vdev, vq_idx);
+     case VIRTIO_MMIO_STATUS:
+-        if (!(value & VIRTIO_CONFIG_S_DRIVER_OK)) {
++        if (!(value & VIRTIO_CONFIG_S_DRIVER_OK) &&
++            !virtio_vdev_has_feature(vdev, VIRTIO_F_NOTIFICATION_DATA)) {
+             virtio_mmio_stop_ioeventfd(proxy);
          }
-         break;
-     case VIRTIO_MMIO_INTERRUPT_ACK:
+ 
+@@ -436,7 +437,8 @@ static void virtio_mmio_write(void *opaque, hwaddr offset, uint64_t value,
+ 
+         virtio_set_status(vdev, value & 0xff);
+ 
+-        if (value & VIRTIO_CONFIG_S_DRIVER_OK) {
++        if ((value & VIRTIO_CONFIG_S_DRIVER_OK) &&
++            !virtio_vdev_has_feature(vdev, VIRTIO_F_NOTIFICATION_DATA)) {
+             virtio_mmio_start_ioeventfd(proxy);
+         }
+ 
 -- 
 2.39.3
 

@@ -1,161 +1,195 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 8B8E17BAE1
-	for <virtio-fs@lists.linux.dev>; Tue,  5 Mar 2024 06:56:10 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 6416C7EEE1
+	for <virtio-fs@lists.linux.dev>; Tue,  5 Mar 2024 08:05:30 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1709621772; cv=none; b=IvYHjKeLJzVutAHTuTqp3R43/2j+Y+hgrgZ1Vay5WfRuk7C++2mRj+VGOLjhwVQCblWz/at6/WXbc8jkBkQBLNTIYYTJlUPiaaGducNxHKznzYvMslb7Yk8S1CPkxtMdqp+ctpvUGJuRuYljonb9+snUL6yCFQJmJKqsapv1bxE=
+	t=1709625933; cv=none; b=supaVRsJpZt6WFyOG/f1TzWCmEFROwpv/rPYvDwr9/40H8Dyd9hanvc5UsxGHv9B+9oaodoZvBMZDkBVsS/80WVRyZ7wMRS0WQSXsgowNT07mva/TxoXQ4mTjKkv/xs5o+g6VHEWX7BlACsyXWdCTlt7QsrrzS19TtUTeSFVMqo=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1709621772; c=relaxed/simple;
-	bh=zmY/cY5i+Hkv0zlObtf63hq/QDBJ3oGYovwmmpDQp9c=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=pK43hV51yG11hKBRWt89Li5CsUJJJxI5ki71xlDxx8dPrFMfhGX3bEH5hNZAJFM9j/XfMhbh9p4EOAYcNH5ABlD+33CRXIBs9kGmTWIixVF9rOBEH25cHRzqwpl8sHpSXsOUSjeT9dKH4Y4AamWh4oCCu5KdtDnQ5rOJAk1sz9g=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=PPrCAziD; arc=none smtp.client-ip=170.10.129.124
+	s=arc-20240116; t=1709625933; c=relaxed/simple;
+	bh=Duhr2gAEEmKEnQkzqCftyqBs6He9qzZ1BFj0CrEeTYo=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=L3RN8O+V5J/Xu+/Q1KInW0EaN8V/KMYV/HyPsgouwZfTA/4i1nPusoSNIAuRDlG72+mbbOsv1hQWcmzwfJTbqNn6AnZp9ht4eylqwe8fMfDXLC71RFfEmeKJ6qLvzn00WBCpIdzIdWlsgtNiW7Mzf3XJUMKZUBWdzxy+IEGlaLA=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=ag5+cxs9; arc=none smtp.client-ip=170.10.133.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="PPrCAziD"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="ag5+cxs9"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1709621769;
+	s=mimecast20190719; t=1709625929;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references:autocrypt:autocrypt;
-	bh=nZMRmZ/2SsjkSO0PkukIWpzEubGAMevMx9kQUeQSna0=;
-	b=PPrCAziDVsANZ5/Fj/3PyAbX5Q3QAeTGbnGEAks23wbhGA9fiCYEVOwl7KEqBZ8wA8jnZV
-	z+6KSlHExRDcFxcIY4HZ65sCsRZO9n2P74Aa2icAGOLcSkY/u6oi0q3CL1y0LzYaq0qJfY
-	8mozqT4xz8Cncu7TVQhntYzC9CioonU=
-Received: from mail-ej1-f69.google.com (mail-ej1-f69.google.com
- [209.85.218.69]) by relay.mimecast.com with ESMTP with STARTTLS
+	 in-reply-to:in-reply-to:references:references;
+	bh=kD497RezhP4vTgtcu4VeuKKr+RMuIVXyas22WS8OZL0=;
+	b=ag5+cxs9MOtWdkQLppLtH6LaPYW68FGcnuZOQ+kURNIbFGLYz5SRfJpMf9Xv3WmglOF3dC
+	Y565aneLv8kHyk6FcBbP1vPU9ajl1B6ts3eeXcpxzNXV7vWsCRAZjXNkNMIm/K8rMk1fFn
+	8KA+Edr+sXQUjzf/+6l2LDkYwtu99sE=
+Received: from mail-yb1-f198.google.com (mail-yb1-f198.google.com
+ [209.85.219.198]) by relay.mimecast.com with ESMTP with STARTTLS
  (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-267-kTirLHlbNdajjG9i7MkWQw-1; Tue, 05 Mar 2024 01:56:07 -0500
-X-MC-Unique: kTirLHlbNdajjG9i7MkWQw-1
-Received: by mail-ej1-f69.google.com with SMTP id a640c23a62f3a-a457ac99155so88437266b.2
-        for <virtio-fs@lists.linux.dev>; Mon, 04 Mar 2024 22:56:07 -0800 (PST)
+ us-mta-468--Ax9wyNsMCGnCn0dtyC9fg-1; Tue, 05 Mar 2024 03:05:28 -0500
+X-MC-Unique: -Ax9wyNsMCGnCn0dtyC9fg-1
+Received: by mail-yb1-f198.google.com with SMTP id 3f1490d57ef6-dc3645a6790so788385276.0
+        for <virtio-fs@lists.linux.dev>; Tue, 05 Mar 2024 00:05:27 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1709621766; x=1710226566;
-        h=content-transfer-encoding:in-reply-to:autocrypt:from:references:cc
-         :to:content-language:subject:user-agent:mime-version:date:message-id
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
-        bh=nZMRmZ/2SsjkSO0PkukIWpzEubGAMevMx9kQUeQSna0=;
-        b=QcOZNNGITNA2Rfn6mRj7XBdcRLi0Ox29j0iEOo20hfxJtn/2IYFHbQ0bMGmTp9ri3o
-         fsGO/NnVGTckPJ8V4Y0p0n2BU0kL3478k6ctmr2dD+mHaV+hmo/18URWPP8O1SGzL3NH
-         eXdDreBiPcanUwrB0kpgHaHCkkTws2uBdKHNZZ87JpJob8fQl1Xty2sQkqPW/JY6FV/9
-         LeMLOTxMDxOm+AJ0s0btm47mO771X1P21pA1LwRC/UBTforSi8JQCAdB6vyR0/1tbYtO
-         4H1+0q9o1xZ6LifIVaf+B077Q3jtclkxPASvLho0akJCovgfa5/C5ykB23+vmUOOlphE
-         VY5Q==
-X-Forwarded-Encrypted: i=1; AJvYcCVtJyuRPpbMZ/quhw2xnofAingETa4Q4VnNDp657UDFYcVlNDc1aAQXOwWwe9VceWLzJOtoMq9OCeba2BdCxwUtPzMILHPaKo9y
-X-Gm-Message-State: AOJu0Yzs5dp0bxQvGJoLb5b5yUb5mOt/mzLrrZkzf0Bhx/ZEQc2XvBnj
-	m1WnWKp1rmeWLEiDc8FT0IQe7dpgG/XBg806RKzrdAHUyO13MqLANiCGU9b10pXY+oz+nWlGeKY
-	DtdVUw8B4FzfLD++ZHkBhGeB8JgJJi7VEDsg+yPQRaDBC+KEx0JXkMjP+Tw==
-X-Received: by 2002:a17:906:2b4e:b0:a45:622e:a0b9 with SMTP id b14-20020a1709062b4e00b00a45622ea0b9mr2386799ejg.64.1709621766797;
-        Mon, 04 Mar 2024 22:56:06 -0800 (PST)
-X-Google-Smtp-Source: AGHT+IEPW9itF42tECIBVFWAJUABPk0V7sAEskFZPaEpiKuX64LfEF6rIZb99uyQvNgz0x0GKl/GHA==
-X-Received: by 2002:a17:906:2b4e:b0:a45:622e:a0b9 with SMTP id b14-20020a1709062b4e00b00a45622ea0b9mr2386779ejg.64.1709621766468;
-        Mon, 04 Mar 2024 22:56:06 -0800 (PST)
-Received: from [192.168.0.9] (ip-109-43-178-243.web.vodafone.de. [109.43.178.243])
-        by smtp.gmail.com with ESMTPSA id uz3-20020a170907118300b00a44bb63f29csm4010255ejb.47.2024.03.04.22.56.04
-        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Mon, 04 Mar 2024 22:56:06 -0800 (PST)
-Message-ID: <4ae198c2-37ea-4df6-bc99-2c03848cef26@redhat.com>
-Date: Tue, 5 Mar 2024 07:56:03 +0100
+        d=1e100.net; s=20230601; t=1709625927; x=1710230727;
+        h=content-transfer-encoding:cc:to:subject:message-id:date:from
+         :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to;
+        bh=kD497RezhP4vTgtcu4VeuKKr+RMuIVXyas22WS8OZL0=;
+        b=Ea8dWr2QANZVRb9jMzg755Mk59VAZZm9QrWRw2l5NVNCia5iZm0v0e4/AvgR/h6huh
+         WStJpeP9KZEj8qGN2GiLLFn+fMCdqc3n9AUK4VwpZ1Mf2brpDTtSOlzly1hzOZy2uDBA
+         6bq6IGljEaEtUfJ5E62rB+xa3KyEjRMBotjV5yRHsBq+kCDDeWAZ9dgJNK9OMBeH8RfB
+         0s9ej67MQZvoaW9ER3GWFRA1Cs+xco9dN/FRK7Hh0qitZRLEaTbe7qeIYedGeN96yR96
+         a4Po2F0c8Yn7JCF9VOG+K3jsTKTgJoYU0RreJ2/ohIEXoqidiLVcCRJQGj4PB9A+23LP
+         wRjQ==
+X-Forwarded-Encrypted: i=1; AJvYcCXS7ndbu9JBoMgsCoUNbLgCyPJRaJgPFGRk8LHbohaCLSEJUxe817hTwvqf37B53W2qPv5K1bbFkUUptaZNf59WjGFrIB2vlPen
+X-Gm-Message-State: AOJu0YxX2DncW75GqezjnyzlNLgRzhJWpcVUSCKcdaQEkWNXAv9rsINP
+	AuCEz0HKmiVj77b3dw/KA1nWBZKs9vhLlcj9sdNWm5qBVczqjlM/9ZYXVf7HHX9we1RprpU02FX
+	numafq5UJRvVdRwodsqcFmpButapoG7FJICRefrfSTrdv2c70vahsgBvgQ+CUDa2tF+8PEEFiYn
+	rCkrMR+rD0lhJQiNN4h0Z8Faxcar8ljztB
+X-Received: by 2002:a25:950:0:b0:dd0:bb7c:3f40 with SMTP id u16-20020a250950000000b00dd0bb7c3f40mr338047ybm.39.1709625927438;
+        Tue, 05 Mar 2024 00:05:27 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHsPIHfm8Aklf2IkhUfnQFfP+m0vX60rwQba2+NGaq0VoCW3ftftWbe66UIRvg8mVsszix75owzRUQDEeU7Cjo=
+X-Received: by 2002:a25:950:0:b0:dd0:bb7c:3f40 with SMTP id
+ u16-20020a250950000000b00dd0bb7c3f40mr338041ybm.39.1709625927204; Tue, 05 Mar
+ 2024 00:05:27 -0800 (PST)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [RFC 0/8] virtio,vhost: Add VIRTIO_F_NOTIFICATION_DATA support
-To: Xinying Yu <xinying.yu@nephogine.com>,
- Eugenio Perez Martin <eperezma@redhat.com>,
- Wentao Jia <wentao.jia@nephogine.com>,
- Rick Zhong <zhaoyong.zhong@nephogine.com>
-Cc: Jonah Palmer <jonah.palmer@oracle.com>,
- "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>,
- "mst@redhat.com" <mst@redhat.com>, "jasowang@redhat.com"
- <jasowang@redhat.com>, "si-wei.liu@oracle.com" <si-wei.liu@oracle.com>,
- "boris.ostrovsky@oracle.com" <boris.ostrovsky@oracle.com>,
- "raphael@enfabrica.net" <raphael@enfabrica.net>,
- "kwolf@redhat.com" <kwolf@redhat.com>, "hreitz@redhat.com"
- <hreitz@redhat.com>, "pasic@linux.ibm.com" <pasic@linux.ibm.com>,
- "borntraeger@linux.ibm.com" <borntraeger@linux.ibm.com>,
- "farman@linux.ibm.com" <farman@linux.ibm.com>,
- "richard.henderson@linaro.org" <richard.henderson@linaro.org>,
- "david@redhat.com" <david@redhat.com>, "iii@linux.ibm.com"
- <iii@linux.ibm.com>, "cohuck@redhat.com" <cohuck@redhat.com>,
- "pbonzini@redhat.com" <pbonzini@redhat.com>, "fam@euphon.net"
- <fam@euphon.net>, "stefanha@redhat.com" <stefanha@redhat.com>,
- "qemu-block@nongnu.org" <qemu-block@nongnu.org>,
- "qemu-s390x@nongnu.org" <qemu-s390x@nongnu.org>,
- "virtio-fs@lists.linux.dev" <virtio-fs@lists.linux.dev>
-References: <20240301134330.4191007-1-jonah.palmer@oracle.com>
- <CAJaqyWfD96Dh9gVavzC22KuaG4bwJ0m7sbWOsy9fR4y1HJ3-Gg@mail.gmail.com>
- <PH0PR13MB56827829C8502484EACF080D88222@PH0PR13MB5682.namprd13.prod.outlook.com>
-From: Thomas Huth <thuth@redhat.com>
-Autocrypt: addr=thuth@redhat.com; keydata=
- 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
-In-Reply-To: <PH0PR13MB56827829C8502484EACF080D88222@PH0PR13MB5682.namprd13.prod.outlook.com>
+References: <20240304194612.611660-1-jonah.palmer@oracle.com> <20240304194612.611660-2-jonah.palmer@oracle.com>
+In-Reply-To: <20240304194612.611660-2-jonah.palmer@oracle.com>
+From: Eugenio Perez Martin <eperezma@redhat.com>
+Date: Tue, 5 Mar 2024 09:04:51 +0100
+Message-ID: <CAJaqyWe8WZEvWkS90gR=FrENV4eBYkOfZKpMrCCc_7BnpnzUZw@mail.gmail.com>
+Subject: Re: [PATCH v1 1/8] virtio/virtio-pci: Handle extra notification data
+To: Jonah Palmer <jonah.palmer@oracle.com>
+Cc: qemu-devel@nongnu.org, mst@redhat.com, jasowang@redhat.com, 
+	si-wei.liu@oracle.com, boris.ostrovsky@oracle.com, raphael@enfabrica.net, 
+	kwolf@redhat.com, hreitz@redhat.com, pasic@linux.ibm.com, 
+	borntraeger@linux.ibm.com, farman@linux.ibm.com, thuth@redhat.com, 
+	richard.henderson@linaro.org, david@redhat.com, iii@linux.ibm.com, 
+	cohuck@redhat.com, pbonzini@redhat.com, fam@euphon.net, stefanha@redhat.com, 
+	qemu-block@nongnu.org, qemu-s390x@nongnu.org, virtio-fs@lists.linux.dev
 X-Mimecast-Spam-Score: 0
 X-Mimecast-Originator: redhat.com
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-On 05/03/2024 04.21, Xinying Yu wrote:
+On Mon, Mar 4, 2024 at 8:46=E2=80=AFPM Jonah Palmer <jonah.palmer@oracle.co=
+m> wrote:
+>
+> Add support to virtio-pci devices for handling the extra data sent
+> from the driver to the device when the VIRTIO_F_NOTIFICATION_DATA
+> transport feature has been negotiated.
+>
+> The extra data that's passed to the virtio-pci device when this
+> feature is enabled varies depending on the device's virtqueue
+> layout.
+>
+> In a split virtqueue layout, this data includes:
+>  - upper 16 bits: shadow_avail_idx
+>  - lower 16 bits: virtqueue index
+>
+> In a packed virtqueue layout, this data includes:
+>  - upper 16 bits: 1-bit wrap counter & 15-bit shadow_avail_idx
+>  - lower 16 bits: virtqueue index
+>
 
-> One more thing, I would ask how do  I get the full series patch? Do I copy 
-> the RFC line by line from this link[1]?
+Reviewed-by: Eugenio P=C3=A9rez <eperezma@redhat.com>
 
-For getting patches that you might have missed on the mailing list, I 
-recommend lore.kernel.org :
+Thanks!
 
- 
-https://lore.kernel.org/qemu-devel/20240301134330.4191007-1-jonah.palmer@oracle.com/
-
-You can download mbox files there that you can apply locally with "git am".
-
-  HTH,
-   Thomas
+> Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
+> ---
+>  hw/virtio/virtio-pci.c     | 10 +++++++---
+>  hw/virtio/virtio.c         | 18 ++++++++++++++++++
+>  include/hw/virtio/virtio.h |  1 +
+>  3 files changed, 26 insertions(+), 3 deletions(-)
+>
+> diff --git a/hw/virtio/virtio-pci.c b/hw/virtio/virtio-pci.c
+> index 1a7039fb0c..d12edc567f 100644
+> --- a/hw/virtio/virtio-pci.c
+> +++ b/hw/virtio/virtio-pci.c
+> @@ -384,7 +384,7 @@ static void virtio_ioport_write(void *opaque, uint32_=
+t addr, uint32_t val)
+>  {
+>      VirtIOPCIProxy *proxy =3D opaque;
+>      VirtIODevice *vdev =3D virtio_bus_get_device(&proxy->bus);
+> -    uint16_t vector;
+> +    uint16_t vector, vq_idx;
+>      hwaddr pa;
+>
+>      switch (addr) {
+> @@ -408,8 +408,12 @@ static void virtio_ioport_write(void *opaque, uint32=
+_t addr, uint32_t val)
+>              vdev->queue_sel =3D val;
+>          break;
+>      case VIRTIO_PCI_QUEUE_NOTIFY:
+> -        if (val < VIRTIO_QUEUE_MAX) {
+> -            virtio_queue_notify(vdev, val);
+> +        vq_idx =3D val;
+> +        if (vq_idx < VIRTIO_QUEUE_MAX) {
+> +            if (virtio_vdev_has_feature(vdev, VIRTIO_F_NOTIFICATION_DATA=
+)) {
+> +                virtio_queue_set_shadow_avail_data(vdev, val);
+> +            }
+> +            virtio_queue_notify(vdev, vq_idx);
+>          }
+>          break;
+>      case VIRTIO_PCI_STATUS:
+> diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
+> index d229755eae..bcb9e09df0 100644
+> --- a/hw/virtio/virtio.c
+> +++ b/hw/virtio/virtio.c
+> @@ -2255,6 +2255,24 @@ void virtio_queue_set_align(VirtIODevice *vdev, in=
+t n, int align)
+>      }
+>  }
+>
+> +void virtio_queue_set_shadow_avail_data(VirtIODevice *vdev, uint32_t dat=
+a)
+> +{
+> +    /* Lower 16 bits is the virtqueue index */
+> +    uint16_t i =3D data;
+> +    VirtQueue *vq =3D &vdev->vq[i];
+> +
+> +    if (!vq->vring.desc) {
+> +        return;
+> +    }
+> +
+> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_RING_PACKED)) {
+> +        vq->shadow_avail_wrap_counter =3D (data >> 31) & 0x1;
+> +        vq->shadow_avail_idx =3D (data >> 16) & 0x7FFF;
+> +    } else {
+> +        vq->shadow_avail_idx =3D (data >> 16);
+> +    }
+> +}
+> +
+>  static void virtio_queue_notify_vq(VirtQueue *vq)
+>  {
+>      if (vq->vring.desc && vq->handle_output) {
+> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+> index c8f72850bc..53915947a7 100644
+> --- a/include/hw/virtio/virtio.h
+> +++ b/include/hw/virtio/virtio.h
+> @@ -335,6 +335,7 @@ void virtio_queue_update_rings(VirtIODevice *vdev, in=
+t n);
+>  void virtio_init_region_cache(VirtIODevice *vdev, int n);
+>  void virtio_queue_set_align(VirtIODevice *vdev, int n, int align);
+>  void virtio_queue_notify(VirtIODevice *vdev, int n);
+> +void virtio_queue_set_shadow_avail_data(VirtIODevice *vdev, uint32_t dat=
+a);
+>  uint16_t virtio_queue_vector(VirtIODevice *vdev, int n);
+>  void virtio_queue_set_vector(VirtIODevice *vdev, int n, uint16_t vector)=
+;
+>  int virtio_queue_set_host_notifier_mr(VirtIODevice *vdev, int n,
+> --
+> 2.39.3
+>
 

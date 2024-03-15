@@ -1,302 +1,147 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
+Received: from mx0a-00069f02.pphosted.com (mx0a-00069f02.pphosted.com [205.220.165.32])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4CFAD17BBF
-	for <virtio-fs@lists.linux.dev>; Fri, 15 Mar 2024 09:24:35 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id F2A2747F54
+	for <virtio-fs@lists.linux.dev>; Fri, 15 Mar 2024 16:56:11 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.165.32
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1710494678; cv=none; b=lG9EKnaWQJIDbmhEtM4rcpCnVoiTWp6CCBoAxHpaQ0vDLa7fTTyq3sUUBj+4qozTMVWPUp7x+V4AazAONJqdLiqVWp+gBj8Sci0h8zjk32cR3KSdppsdUKWlNB0rWCNOFEg0ZMXMs/R2VXMeGax1Nz7gGUioDcdJXc0Plt3ojD8=
+	t=1710521774; cv=none; b=LC3+lrbYlF/IZ5VIzYhJG/L7EcK+FbkDBNTVKwrqLMxLT464fsMPCCmMmW77n1SCvwSjAT38ZRZeCxX+X5lt+3DzpLaRemq1q/+vZBk2QJM0A5e5TB1pxHKVvZVBhZ0z6yZKedRBM15Clgolx0KEylY8Ckl/cP6WA1H67v2IoT4=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1710494678; c=relaxed/simple;
-	bh=ll5VF2BEfciF2iZDJoYhXCUD6s2TT1ZZB4wDKShTzK4=;
-	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=KGnD80xmbQLGKZ4vslf4hDUWFqBR9EVDFRaT0Js943l8ByyKcQVPe9f8UmCs0z8ooVRwzrFP3l9Y7jV2nQ+u1p+BnKcz7AStCWJPfD9hJ9mcEwBgPdHWglN77vYgx/HF/qdjwvxCHcdGDShnIF6YvIYtAe1KsqDkE9fpn4GCA2Q=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=aruVsjWA; arc=none smtp.client-ip=170.10.129.124
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
+	s=arc-20240116; t=1710521774; c=relaxed/simple;
+	bh=9COi4X6dgZ3WY87I9x6m4FEd6jSQQ8NRynak6loGpYs=;
+	h=From:To:Cc:Subject:Date:Message-Id:MIME-Version:Content-Type; b=jVyS8ipWakZHKxsukXcZ8ek1mr14mk3sybthR0tWr3OlTVyng45fmpQelxD8+FfSohXv9shvZIyKwiaUxOmAJY8Jnqh9G0F468DGGBqmJmnil1eJ24YzeJems9PjP0T4fbVq5SM2bGqjtH62jet8XfD0mHWjUuIvXdebtNHJ+Pw=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=CSWqoKz6; arc=none smtp.client-ip=205.220.165.32
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oracle.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="aruVsjWA"
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1710494674;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references;
-	bh=mWzTJtK5+qwiIRrpV+ZanjEQ9IkwPbwutzuOE5g2BG0=;
-	b=aruVsjWAi25i8lZWlRNrRTUf0XwVmomaNUjytORVSiZMg6OauoKZTY9GrzEbYyJY5Qs0OL
-	+JKnk8jwpLhlugUq62w4plyozHA5nrvjPWZqAONt7MUkNMzbB1G/95XSzdtXk7O4iUQ+og
-	5URaG+z8HMWDmxm+p0uxE4J/XlbZ+I8=
-Received: from mail-yb1-f198.google.com (mail-yb1-f198.google.com
- [209.85.219.198]) by relay.mimecast.com with ESMTP with STARTTLS
- (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-361-BkYaAmEWPx-5mnnKmMSs3w-1; Fri, 15 Mar 2024 05:24:32 -0400
-X-MC-Unique: BkYaAmEWPx-5mnnKmMSs3w-1
-Received: by mail-yb1-f198.google.com with SMTP id 3f1490d57ef6-dc64e0fc7c8so2522403276.2
-        for <virtio-fs@lists.linux.dev>; Fri, 15 Mar 2024 02:24:32 -0700 (PDT)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1710494672; x=1711099472;
-        h=content-transfer-encoding:cc:to:subject:message-id:date:from
-         :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
-         :subject:date:message-id:reply-to;
-        bh=mWzTJtK5+qwiIRrpV+ZanjEQ9IkwPbwutzuOE5g2BG0=;
-        b=ZIL62gGjM0nfGF5jhRogXneJRqqWHvV0oO56InrQBmfpOGLzrvVh75kg9Nd5CHkc5M
-         c/LtOBtLVOcYUgGOMrxNNTnaMrXjt/PfMOVkZYZ91cg0sZhy6MaTmLxqD23vYDs0DUCu
-         HdTvvDkJj+30nV+5k6sOMiGqVM/ZOxZJ54MnUOvhg7IVQI8Sc7f8cYretQjJeyWWKmQ0
-         lny1qOPvn7g607idDwpgGQ79hZbgU8JSKerMoWz7iszCSpsWo1SdDGzbjCKU5EEfuHco
-         TXKzVuNMBlUQ7CbaZV1nRenh67Kl0cgDPhxbw/dPSoZsAW/o7KOLXqKzH7njPGQk5BqU
-         XKpg==
-X-Forwarded-Encrypted: i=1; AJvYcCXKojfmFHWdd4Hjde48YMNhx0yxVWBUcUWC7GNJp4DB5LEPp4LQ0I541XI6q1PVc8vTV6GCZ001rr2JISR89n0G98fyssa+6/RT
-X-Gm-Message-State: AOJu0Yw2z48BLxfxDaRi7/6/5dn73gPgd2OAdY4fiOPRkJfZ8pU2m/HW
-	c1gW+wT1/3gWMY+aBaMbntAtrbibV+3NVwwvdhvC0mB2UP831plUk7Dp0XIpiHmWr6plWA9D7CV
-	txJ8KscUPOYJEbsV5dPlUTjIQFH3RMBBWdnOK+MRZ7NRYvVJgsY9VB2Gz4asMHZj8lSFdrYA+14
-	W1LCCugfZ9SPmA9coFU2yUp7ngu+szOVMb
-X-Received: by 2002:a25:eb07:0:b0:dcc:623d:e475 with SMTP id d7-20020a25eb07000000b00dcc623de475mr3744498ybs.30.1710494672199;
-        Fri, 15 Mar 2024 02:24:32 -0700 (PDT)
-X-Google-Smtp-Source: AGHT+IFAMFLYeYRO6dzL578Qnc5UDUuZtDFEe6QCt4Jg5JydcsCCCJqhcPyRq/IswfdyKddF3Sl7XTZbhMNwEPCDfPQ=
-X-Received: by 2002:a25:eb07:0:b0:dcc:623d:e475 with SMTP id
- d7-20020a25eb07000000b00dcc623de475mr3744481ybs.30.1710494671889; Fri, 15 Mar
- 2024 02:24:31 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="CSWqoKz6"
+Received: from pps.filterd (m0246627.ppops.net [127.0.0.1])
+	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 42FGWljV031318;
+	Fri, 15 Mar 2024 16:56:04 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=from : to : cc :
+ subject : date : message-id : mime-version : content-type :
+ content-transfer-encoding; s=corp-2023-11-20;
+ bh=3eHbAAIIQmEG5KvxGNSGBd9oTioylrZC7es/fv+Lq+k=;
+ b=CSWqoKz6Ru49Qgm/R+I16oHcmh9orH6/m7vtEtVRmqO/JSpDLUBwZZegQPZPke5ZztpG
+ Bmaa7ZDyRKYuTpTjTj7udnqNazbwHufmiSCdST7CS8fTfRN5rHbTzvJjvsWuGZehkOiM
+ 9SY0RkRJ0Xxax0m45w/eZa4JV4PHZvpnQfaNlswjF/TnnKzXV13cPAWzBbJG6V4fMZul
+ STL/oo3sG/eXk4/UgLE9iHPWBJ18KVAiWPbxe9il/d/RkerJf4la1CMt4GnjQXVCBEpl
+ MuVqmK2pOaaafAnmibxmduS3FuXF8zkfcClqrxGhc7VxkGptrUJIAIAHFpnVF9vDoKLZ EQ== 
+Received: from phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta01.appoci.oracle.com [138.1.114.2])
+	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3wvsxk01b1-1
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+	Fri, 15 Mar 2024 16:56:04 +0000
+Received: from pps.filterd (phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
+	by phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 42FFkhqn033842;
+	Fri, 15 Mar 2024 16:56:03 GMT
+Received: from pps.reinject (localhost [127.0.0.1])
+	by phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTPS id 3wre7bw7jv-1
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+	Fri, 15 Mar 2024 16:56:03 +0000
+Received: from phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
+	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 42FGu2YO039399;
+	Fri, 15 Mar 2024 16:56:02 GMT
+Received: from jonah-ol8.us.oracle.com (dhcp-10-65-177-130.vpn.oracle.com [10.65.177.130])
+	by phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTP id 3wre7bw7fq-1;
+	Fri, 15 Mar 2024 16:56:02 +0000
+From: Jonah Palmer <jonah.palmer@oracle.com>
+To: qemu-devel@nongnu.org
+Cc: mst@redhat.com, jasowang@redhat.com, eperezma@redhat.com,
+        si-wei.liu@oracle.com, boris.ostrovsky@oracle.com,
+        jonah.palmer@oracle.com, raphael@enfabrica.net, kwolf@redhat.com,
+        hreitz@redhat.com, pasic@linux.ibm.com, borntraeger@linux.ibm.com,
+        farman@linux.ibm.com, thuth@redhat.com, richard.henderson@linaro.org,
+        david@redhat.com, iii@linux.ibm.com, cohuck@redhat.com,
+        pbonzini@redhat.com, fam@euphon.net, stefanha@redhat.com,
+        qemu-block@nongnu.org, qemu-s390x@nongnu.org, leiyang@redhat.com,
+        schalla@marvell.com, vattunuru@marvell.com, jerinj@marvell.com,
+        dtatulea@nvidia.com, virtio-fs@lists.linux.dev
+Subject: [PATCH v3 for 9.1 0/6] virtio,vhost: Add VIRTIO_F_NOTIFICATION_DATA support
+Date: Fri, 15 Mar 2024 12:55:51 -0400
+Message-Id: <20240315165557.26942-1-jonah.palmer@oracle.com>
+X-Mailer: git-send-email 2.39.3
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-References: <20240313115412.3334962-1-jonah.palmer@oracle.com>
- <20240313115412.3334962-2-jonah.palmer@oracle.com> <CACGkMEv6bRgrV_nvZK5Tb89CvTP5Kpyj4+na4Q9F=xBOJ6=8sw@mail.gmail.com>
- <b0e4a124-cced-4cbc-9f89-b8967f5a0b2c@oracle.com> <CAJaqyWcmzuY5R8hC-zwp_mEK40sYgwHU0vhewKziQLsY2EnpLg@mail.gmail.com>
- <f173f397-965f-43f9-9ce0-b417e86d6935@oracle.com> <CAJaqyWfspBXGw0WE2=HBuZiBJjyWTrMm2jyB4e0mP9UkixS4Mg@mail.gmail.com>
- <8b87682b-f22f-461e-bca7-1c80a6b9c760@oracle.com>
-In-Reply-To: <8b87682b-f22f-461e-bca7-1c80a6b9c760@oracle.com>
-From: Eugenio Perez Martin <eperezma@redhat.com>
-Date: Fri, 15 Mar 2024 10:23:55 +0100
-Message-ID: <CAJaqyWdcnoTLrpEXeq8HxwbxxNxNvF2_Db9PwkaixdTU6tNcBQ@mail.gmail.com>
-Subject: Re: [PATCH v2 1/6] virtio/virtio-pci: Handle extra notification data
-To: Jonah Palmer <jonah.palmer@oracle.com>
-Cc: Jason Wang <jasowang@redhat.com>, qemu-devel@nongnu.org, mst@redhat.com, 
-	si-wei.liu@oracle.com, boris.ostrovsky@oracle.com, raphael@enfabrica.net, 
-	kwolf@redhat.com, hreitz@redhat.com, pasic@linux.ibm.com, 
-	borntraeger@linux.ibm.com, farman@linux.ibm.com, thuth@redhat.com, 
-	richard.henderson@linaro.org, david@redhat.com, iii@linux.ibm.com, 
-	cohuck@redhat.com, pbonzini@redhat.com, fam@euphon.net, stefanha@redhat.com, 
-	qemu-block@nongnu.org, qemu-s390x@nongnu.org, leiyang@redhat.com, 
-	schalla@marvell.com, vattunuru@marvell.com, jerinj@marvell.com, 
-	dtatulea@nvidia.com, virtio-fs@lists.linux.dev
-X-Mimecast-Spam-Score: 0
-X-Mimecast-Originator: redhat.com
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+X-Proofpoint-Virus-Version: vendor=baseguard
+ engine=ICAP:2.0.272,Aquarius:18.0.1011,Hydra:6.0.619,FMLib:17.11.176.26
+ definitions=2024-03-15_04,2024-03-13_01,2023-05-22_02
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 adultscore=0 phishscore=0
+ mlxlogscore=999 malwarescore=0 mlxscore=0 bulkscore=0 spamscore=0
+ suspectscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.12.0-2311290000 definitions=main-2403150138
+X-Proofpoint-GUID: 7ovHRep8jnaRjrKMKAvk1xKl9lGZnAT2
+X-Proofpoint-ORIG-GUID: 7ovHRep8jnaRjrKMKAvk1xKl9lGZnAT2
 
-On Thu, Mar 14, 2024 at 9:24=E2=80=AFPM Jonah Palmer <jonah.palmer@oracle.c=
-om> wrote:
->
->
->
-> On 3/14/24 3:05 PM, Eugenio Perez Martin wrote:
-> > On Thu, Mar 14, 2024 at 5:06=E2=80=AFPM Jonah Palmer <jonah.palmer@orac=
-le.com> wrote:
-> >>
-> >>
-> >>
-> >> On 3/14/24 10:55 AM, Eugenio Perez Martin wrote:
-> >>> On Thu, Mar 14, 2024 at 1:16=E2=80=AFPM Jonah Palmer <jonah.palmer@or=
-acle.com> wrote:
-> >>>>
-> >>>>
-> >>>>
-> >>>> On 3/13/24 11:01 PM, Jason Wang wrote:
-> >>>>> On Wed, Mar 13, 2024 at 7:55=E2=80=AFPM Jonah Palmer <jonah.palmer@=
-oracle.com> wrote:
-> >>>>>>
-> >>>>>> Add support to virtio-pci devices for handling the extra data sent
-> >>>>>> from the driver to the device when the VIRTIO_F_NOTIFICATION_DATA
-> >>>>>> transport feature has been negotiated.
-> >>>>>>
-> >>>>>> The extra data that's passed to the virtio-pci device when this
-> >>>>>> feature is enabled varies depending on the device's virtqueue
-> >>>>>> layout.
-> >>>>>>
-> >>>>>> In a split virtqueue layout, this data includes:
-> >>>>>>     - upper 16 bits: shadow_avail_idx
-> >>>>>>     - lower 16 bits: virtqueue index
-> >>>>>>
-> >>>>>> In a packed virtqueue layout, this data includes:
-> >>>>>>     - upper 16 bits: 1-bit wrap counter & 15-bit shadow_avail_idx
-> >>>>>>     - lower 16 bits: virtqueue index
-> >>>>>>
-> >>>>>> Tested-by: Lei Yang <leiyang@redhat.com>
-> >>>>>> Reviewed-by: Eugenio P=C3=A9rez <eperezma@redhat.com>
-> >>>>>> Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
-> >>>>>> ---
-> >>>>>>     hw/virtio/virtio-pci.c     | 10 +++++++---
-> >>>>>>     hw/virtio/virtio.c         | 18 ++++++++++++++++++
-> >>>>>>     include/hw/virtio/virtio.h |  1 +
-> >>>>>>     3 files changed, 26 insertions(+), 3 deletions(-)
-> >>>>>>
-> >>>>>> diff --git a/hw/virtio/virtio-pci.c b/hw/virtio/virtio-pci.c
-> >>>>>> index cb6940fc0e..0f5c3c3b2f 100644
-> >>>>>> --- a/hw/virtio/virtio-pci.c
-> >>>>>> +++ b/hw/virtio/virtio-pci.c
-> >>>>>> @@ -384,7 +384,7 @@ static void virtio_ioport_write(void *opaque, =
-uint32_t addr, uint32_t val)
-> >>>>>>     {
-> >>>>>>         VirtIOPCIProxy *proxy =3D opaque;
-> >>>>>>         VirtIODevice *vdev =3D virtio_bus_get_device(&proxy->bus);
-> >>>>>> -    uint16_t vector;
-> >>>>>> +    uint16_t vector, vq_idx;
-> >>>>>>         hwaddr pa;
-> >>>>>>
-> >>>>>>         switch (addr) {
-> >>>>>> @@ -408,8 +408,12 @@ static void virtio_ioport_write(void *opaque,=
- uint32_t addr, uint32_t val)
-> >>>>>>                 vdev->queue_sel =3D val;
-> >>>>>>             break;
-> >>>>>>         case VIRTIO_PCI_QUEUE_NOTIFY:
-> >>>>>> -        if (val < VIRTIO_QUEUE_MAX) {
-> >>>>>> -            virtio_queue_notify(vdev, val);
-> >>>>>> +        vq_idx =3D val;
-> >>>>>> +        if (vq_idx < VIRTIO_QUEUE_MAX) {
-> >>>>>> +            if (virtio_vdev_has_feature(vdev, VIRTIO_F_NOTIFICATI=
-ON_DATA)) {
-> >>>>>> +                virtio_queue_set_shadow_avail_data(vdev, val);
-> >>>>>> +            }
-> >>>>>> +            virtio_queue_notify(vdev, vq_idx);
-> >>>>>>             }
-> >>>>>>             break;
-> >>>>>>         case VIRTIO_PCI_STATUS:
-> >>>>>> diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
-> >>>>>> index d229755eae..bcb9e09df0 100644
-> >>>>>> --- a/hw/virtio/virtio.c
-> >>>>>> +++ b/hw/virtio/virtio.c
-> >>>>>> @@ -2255,6 +2255,24 @@ void virtio_queue_set_align(VirtIODevice *v=
-dev, int n, int align)
-> >>>>>>         }
-> >>>>>>     }
-> >>>>>>
-> >>>>>> +void virtio_queue_set_shadow_avail_data(VirtIODevice *vdev, uint3=
-2_t data)
-> >>>
-> >>> Maybe I didn't explain well, but I think it is better to pass directl=
-y
-> >>> idx to a VirtQueue *. That way only the caller needs to check for a
-> >>> valid vq idx, and (my understanding is) the virtio.c interface is
-> >>> migrating to VirtQueue * use anyway.
-> >>>
-> >>
-> >> Oh, are you saying to just pass in a VirtQueue *vq instead of
-> >> VirtIODevice *vdev and get rid of the vq->vring.desc check in the func=
-tion?
-> >>
-> >
-> > No, that needs to be kept. I meant the access to vdev->vq[i] without
-> > checking for a valid i.
-> >
->
-> Ahh okay I see what you mean. But I thought the following was checking
-> for a valid VQ index:
->
-> if (vq_idx < VIRTIO_QUEUE_MAX)
->
+The goal of these patches are to add support to a variety of virtio and
+vhost devices for the VIRTIO_F_NOTIFICATION_DATA transport feature. This
+feature indicates that a driver will pass extra data (instead of just a
+virtqueue's index) when notifying the corresponding device.
 
-Right, but then the (potentially multiple) callers are responsible to
-check for that. If we accept a VirtQueue *, it is assumed it is valid
-already.
+The data passed in by the driver when this feature is enabled varies in
+format depending on if the device is using a split or packed virtqueue
+layout:
 
-> Of course the virtio device may not have up to VIRTIO_QUEUE_MAX
-> virtqueues, so maybe we should be checking for validity like this?
->
-> if (vdev->vq[i].vring.num =3D=3D 0)
->
+ Split VQ
+  - Upper 16 bits: shadow_avail_idx
+  - Lower 16 bits: virtqueue index
 
-Actually yes, if you're going to send a new version I think checking
-against num is better. Good find!
+ Packed VQ
+  - Upper 16 bits: 1-bit wrap counter & 15-bit shadow_avail_idx
+  - Lower 16 bits: virtqueue index
 
-> Or was there something else you had in mind? Apologies for the confusion.
->
+Also, due to the limitations of ioeventfd not being able to carry the
+extra provided by the driver, having both VIRTIO_F_NOTIFICATION_DATA
+feature and ioeventfd enabled is a functional mismatch. The user must
+explicitly disable ioeventfd for the device in the Qemu arguments when
+using this feature, else the device will fail to complete realization.
 
-No worries, virtio.c is full of checks like that :).
+For example, a device must explicitly enable notification_data as well
+as disable ioeventfd:
 
-Thanks!
+    -device virtio-scsi-pci,...,ioeventfd=off,notification_data=on
 
-> > You can get the VirtQueue in the caller with virtio_get_queue. Which
-> > also does not check for a valid index, but that way is clearer the
-> > caller needs to check it.
-> >
->
-> Roger, I'll use this instead for clarity.
->
-> > As a side note, the check for desc !=3D 0 is widespread in QEMU but the
-> > driver may use 0 address for desc, so it's not 100% valid. But to
-> > change that now requires a deeper change out of the scope of this
-> > series, so let's keep it for now :).
-> >
-> > Thanks! >
->
-> I'll add it to the todo list =3D]
->
-> >>>>>> +{
-> >>>>>> +    /* Lower 16 bits is the virtqueue index */
-> >>>>>> +    uint16_t i =3D data;
-> >>>>>> +    VirtQueue *vq =3D &vdev->vq[i];
-> >>>>>> +
-> >>>>>> +    if (!vq->vring.desc) {
-> >>>>>> +        return;
-> >>>>>> +    }
-> >>>>>> +
-> >>>>>> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_RING_PACKED)) {
-> >>>>>> +        vq->shadow_avail_wrap_counter =3D (data >> 31) & 0x1;
-> >>>>>> +        vq->shadow_avail_idx =3D (data >> 16) & 0x7FFF;
-> >>>>>> +    } else {
-> >>>>>> +        vq->shadow_avail_idx =3D (data >> 16);
-> >>>>>
-> >>>>> Do we need to do a sanity check for this value?
-> >>>>>
-> >>>>> Thanks
-> >>>>>
-> >>>>
-> >>>> It can't hurt, right? What kind of check did you have in mind?
-> >>>>
-> >>>> if (vq->shadow_avail_idx >=3D vq->vring.num)
-> >>>>
-> >>>
-> >>> I'm a little bit lost too. shadow_avail_idx can take all uint16_t
-> >>> values. Maybe you meant checking for a valid vq index, Jason?
-> >>>
-> >>> Thanks!
-> >>>
-> >>>> Or something else?
-> >>>>
-> >>>>>> +    }
-> >>>>>> +}
-> >>>>>> +
-> >>>>>>     static void virtio_queue_notify_vq(VirtQueue *vq)
-> >>>>>>     {
-> >>>>>>         if (vq->vring.desc && vq->handle_output) {
-> >>>>>> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio=
-.h
-> >>>>>> index c8f72850bc..53915947a7 100644
-> >>>>>> --- a/include/hw/virtio/virtio.h
-> >>>>>> +++ b/include/hw/virtio/virtio.h
-> >>>>>> @@ -335,6 +335,7 @@ void virtio_queue_update_rings(VirtIODevice *v=
-dev, int n);
-> >>>>>>     void virtio_init_region_cache(VirtIODevice *vdev, int n);
-> >>>>>>     void virtio_queue_set_align(VirtIODevice *vdev, int n, int ali=
-gn);
-> >>>>>>     void virtio_queue_notify(VirtIODevice *vdev, int n);
-> >>>>>> +void virtio_queue_set_shadow_avail_data(VirtIODevice *vdev, uint3=
-2_t data);
-> >>>>>>     uint16_t virtio_queue_vector(VirtIODevice *vdev, int n);
-> >>>>>>     void virtio_queue_set_vector(VirtIODevice *vdev, int n, uint16=
-_t vector);
-> >>>>>>     int virtio_queue_set_host_notifier_mr(VirtIODevice *vdev, int =
-n,
-> >>>>>> --
-> >>>>>> 2.39.3
-> >>>>>>
-> >>>>>
-> >>>>
-> >>>
-> >>
-> >
->
+A significant aspect of this effort has been to maintain compatibility
+across different backends. As such, the feature is offered by backend
+devices only when supported, with fallback mechanisms where backend
+support is absent.
+
+v3: Validate VQ idx via. virtio_queue_get_num() (pci, mmio, ccw)
+    Rename virtio_queue_set_shadow_avail_data
+    Only pass in upper 16 bits of 32-bit extra data (was redundant)
+    Make notification compatibility check function static
+    Drop tags on patches 1/6, 3/6, and 4/6
+
+v2: Don't disable ioeventfd by default, user must disable it
+    Drop tags on patch 2/6
+
+Jonah Palmer (6):
+  virtio/virtio-pci: Handle extra notification data
+  virtio: Prevent creation of device using notification-data with ioeventfd
+  virtio-mmio: Handle extra notification data
+  virtio-ccw: Handle extra notification data
+  vhost/vhost-user: Add VIRTIO_F_NOTIFICATION_DATA to vhost feature bits
+  virtio: Add VIRTIO_F_NOTIFICATION_DATA property definition
+
+ hw/block/vhost-user-blk.c    |  1 +
+ hw/net/vhost_net.c           |  2 ++
+ hw/s390x/s390-virtio-ccw.c   | 17 +++++++++++----
+ hw/scsi/vhost-scsi.c         |  1 +
+ hw/scsi/vhost-user-scsi.c    |  1 +
+ hw/virtio/vhost-user-fs.c    |  2 +-
+ hw/virtio/vhost-user-vsock.c |  1 +
+ hw/virtio/virtio-mmio.c      | 10 +++++++--
+ hw/virtio/virtio-pci.c       | 11 +++++++---
+ hw/virtio/virtio.c           | 40 ++++++++++++++++++++++++++++++++++++
+ include/hw/virtio/virtio.h   |  6 +++++-
+ net/vhost-vdpa.c             |  1 +
+ 12 files changed, 82 insertions(+), 11 deletions(-)
+
+-- 
+2.39.3
 

@@ -1,73 +1,73 @@
-Received: from mx0a-00069f02.pphosted.com (mx0a-00069f02.pphosted.com [205.220.165.32])
+Received: from mx0b-00069f02.pphosted.com (mx0b-00069f02.pphosted.com [205.220.177.32])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4A25C131E32
-	for <virtio-fs@lists.linux.dev>; Mon, 25 Mar 2024 17:08:37 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=fail smtp.client-ip=205.220.165.32
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 8A03B5381B
+	for <virtio-fs@lists.linux.dev>; Mon, 25 Mar 2024 17:34:59 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=fail smtp.client-ip=205.220.177.32
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1711386519; cv=fail; b=Dz1upsDLdMfm1N9H/5l4/fKWsh3/cL1pJ0rH65E+1HkQyJvmuJX1OJhpFMABhNXPj+vS5diidULTaNZYtNgzryM5IBsO1Oo8MAFpMjGCj+Kd3rzMnlrlGiT2dzognCbD8Yih7vfqeSP7lI1rFvCQ+w3y0yfw83xvQrwWU3OhoAY=
+	t=1711388101; cv=fail; b=XayEn3LbNF6BXLSJWIx0ktUPAJQnjvJczeV1J60t8fo0bDmG22EC8khD/J+xUf+laOlnPUkzbTF4PPtdA48hbKQjApg8iPEx5OI6hNhoEu/R/VnmWMPjBLjrujLV9WCCsILVdvCdm/wP5qeJuKd+IXiU0KdCy6tcU88otiSGu8A=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1711386519; c=relaxed/simple;
-	bh=H/Zv9eVQn7y+L2LnyYKMCekQS2vEKb2etNJ0ae61O2g=;
+	s=arc-20240116; t=1711388101; c=relaxed/simple;
+	bh=3//I6q8B0rLLqpZvXEn7Z28STCECS6KwEudFzrYm0ME=;
 	h=Message-ID:Date:Subject:To:Cc:References:From:In-Reply-To:
-	 Content-Type:MIME-Version; b=CGySOCn17aMzuZimoFCMjiCigqgzJWuUzmCNz5AP6HNzBSWhGzuxPRfgckxANEyE2zKqy1w3+0az5oIECvW/J6Ig8sQ/DgwZlm9+K/FtZCyzfF5HMWzxTSC2K39iG5/hSSbElxw5CVmmyw/ViueGHGaWA/aaht2JgwvKd9NY1yA=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=grFW6g/U; dkim=pass (1024-bit key) header.d=oracle.onmicrosoft.com header.i=@oracle.onmicrosoft.com header.b=Q0p34SBV; arc=fail smtp.client-ip=205.220.165.32
+	 Content-Type:MIME-Version; b=bAQ/2pOtNgzR+PIk33+Frj41D9HN9EO4LgODf/yW1cg88Dz0Dp2QiwHYKmpGzGYxNXOmXBzwOlYPG3MBMX5WhU2GfAiMITelSPE749WTaY45R4G8FxEWnada3SNLJx/7QLR+d+pQW0/+MWVNoPFF7yPFL5KCPF2wJevOUNX5b6c=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=giYRcvQn; dkim=pass (1024-bit key) header.d=oracle.onmicrosoft.com header.i=@oracle.onmicrosoft.com header.b=faxdaMQv; arc=fail smtp.client-ip=205.220.177.32
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oracle.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="grFW6g/U";
-	dkim=pass (1024-bit key) header.d=oracle.onmicrosoft.com header.i=@oracle.onmicrosoft.com header.b="Q0p34SBV"
-Received: from pps.filterd (m0246617.ppops.net [127.0.0.1])
-	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 42PBtw8v002744;
-	Mon, 25 Mar 2024 17:08:33 GMT
+	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="giYRcvQn";
+	dkim=pass (1024-bit key) header.d=oracle.onmicrosoft.com header.i=@oracle.onmicrosoft.com header.b="faxdaMQv"
+Received: from pps.filterd (m0333520.ppops.net [127.0.0.1])
+	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 42PHRVXV029498;
+	Mon, 25 Mar 2024 17:34:54 GMT
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=message-id : date :
  subject : to : cc : references : from : in-reply-to : content-type :
  content-transfer-encoding : mime-version; s=corp-2023-11-20;
- bh=I/w66yf7XZeXGafram8B2dJU77uTTJInb4t+KDEhkd0=;
- b=grFW6g/UDNXMn9fYvb02rIZsHxa7cJMmU0wwSoTVK9XZyAYGuQNUT7Wc/pAIvJTndZBq
- X9JX27K6Qx1WKQ9Fl1B12Qw4K/0Iv6Nth5s9IADx7og/rP9NN3Mh3J2g5VVrvS2Zc6be
- dFd3w+/YuBk+jP9OF+KrYGghN0tTF2rPWZcCcvkY4MnzDThq7bmc0KDgeNNGsv8GfJg1
- hqyCz9lxX6gSPzqLoGpi0aM73JqXqOiYuXbkepJEePrT1thXU8HsjXzrzpS4t5kGxqBW
- T1rB0lLsFGbyBSYHpJHl9rnTRLVDM1NcmcrEc+8VW931R9/5rZbwqsVidG8gocuQHc/P aQ== 
-Received: from iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com (iadpaimrmta02.appoci.oracle.com [147.154.18.20])
-	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3x2s9gsn9w-1
+ bh=kowof4zSR2s+0VstKOOEps4zszM/DpB5XJ1WngSV670=;
+ b=giYRcvQn3z3qcgO/Xb17wkCiJe0MdvuQhQLOeW3W47ctTtwx+Ci4i9xRdD2CwukIpYKL
+ CUChqvHqDtdZb9kMl5+UQnLttEmMgikKg47rkdmd0MkcTt+mUOX7AKPJqJzdRzpPygj3
+ 8N5tG5r+rISIipFbYPTcNj+rlguMtK/qgo2DzolGFo5AmLUr6LDIWwFJf+Xxve04iYpB
+ zSUOe3CC5MYjDpU+7eoUJ+UTlSpn/0S1LjSH88sB0q9iappyKIzpPlT13UYLqnb7+a0M
+ YlfEbP9MXjyeoQXpA/hM96AzX3fWU34BpalwH2IskC8NdVgOSLvPUUQr1CRvetne81nb 5Q== 
+Received: from phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta01.appoci.oracle.com [138.1.114.2])
+	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3x1q4dua3w-1
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Mon, 25 Mar 2024 17:08:32 +0000
-Received: from pps.filterd (iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com [127.0.0.1])
-	by iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 42PGp9K3006856;
-	Mon, 25 Mar 2024 17:08:31 GMT
-Received: from nam10-bn7-obe.outbound.protection.outlook.com (mail-bn7nam10lp2101.outbound.protection.outlook.com [104.47.70.101])
-	by iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTPS id 3x1nhc2fgh-1
+	Mon, 25 Mar 2024 17:34:54 +0000
+Received: from pps.filterd (phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
+	by phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 42PGkM3I020231;
+	Mon, 25 Mar 2024 17:34:49 GMT
+Received: from nam04-mw2-obe.outbound.protection.outlook.com (mail-mw2nam04lp2169.outbound.protection.outlook.com [104.47.73.169])
+	by phxpaimrmta01.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTPS id 3x1nh5u0w5-1
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Mon, 25 Mar 2024 17:08:31 +0000
+	Mon, 25 Mar 2024 17:34:49 +0000
 ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
- b=bdkqIQAZDWSQsuZqIshCfuj5SH3k/b1cIY6zUK0G3eLDhACkrntK0bBHpV6LAf35H1ByeZGwMz+PqgVZmnbQ9hOtzbFfK1U5WlMzNlVFHoKPDU+jFoHfm0YDnLnxunsFps/SKA4TdztbQone42XqVoo8So5zbKqZV2+RAZsZzUoA3aVGiu/LSFmLBFk0mCJ5XHsYaT21oLZ6BGowudbQNgK/ASkhC5Si6oVLIas33MtSohF6UEvp4OZMA2ysn+wy9mvdoZqyHe+dDTQbnvwZy8hNhnsWdAkYrpqTSjA+ZVps6y5XQQkko4irRcPHZLiIEpZc/0VLxOQ8a9G1JPxiZQ==
+ b=nGk2YP9vEQ7TeQCtkoc5Z9H9BgxixNVOfFsbd4SZ0WGPen41MeOPr4/HFOzrxVkc0wlFOJi0/xv+zsacuZaN4ip7+p9e2RPf/Zq6v9BCHEfUt+LV6UW2MpajfDgU6LmRiINlaxvOz4a/IaiqCvmA8tXJN0DXUMOQiPpnJP+fxwOpTpzg68y83mvNpfJ/yNq1WbRvVcI9rVr3ksI4IAXr1cdBW665a/7bOp27xTOogUFlB7qHTs+V91F9FIA/AWFaT+j1euVY00/fu1OE9M3KhjbbpNKx8uI9cQSCM4pHs6Ro1DLKlLe06ubnFIcanLq71ufWT82J8gzSIPbWS8iOhg==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com;
  s=arcselector9901;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
- bh=I/w66yf7XZeXGafram8B2dJU77uTTJInb4t+KDEhkd0=;
- b=n0cs4MTxiRCw1j/JudOFs48NcNueY6FB8T/829H6t6mqckh0ZK3RYUE70Nt6iu4AqWB7WJTd9YlNeYDmeOqatdiZ7h36s5B5ENfUf/C5DAAUAmhHoO0lW+KInY1dCFkgDkoAQhqTo+IN7LDzZQCYMTFrpZ0T8a3aoH+jzTWjK39lJc+Nrsb/HI8vZAP6p+wMcwmmAXwcmmUjtkwsJfH2M7CIcN1r9UiQsoS9KjEb7plVA6WaT7wzA/tvJ+ViVGTR7ist+95eUPOJjSKncqpcT5Gmd0jfcmYkgdBNYX/Rvqnk1RKS/HR8Os5T51lxre8Cz1rvPlzOhxQT1ssdT8GE/Q==
+ bh=kowof4zSR2s+0VstKOOEps4zszM/DpB5XJ1WngSV670=;
+ b=ZvcA/3evbFn7RwSECCiPuAGSKtps/BV7yhu3zCCkkUvQjZ4Q/uYb2srnY48BfT+KzgtZqHQfU0FklNgJxVaLCjzPjbj7+tKMA9fSIjO+owVGAYycVuNhzrfgwLjifmqPwIDy1RJIN0u3MOnj+Evj6Vxy3nm3+nNlCpaQoOAlGDb/qzqS9uBaB4Noqs+Z6jNZuP5LGRIPvlr1MbzfD2gYA1/WQmndpg5+isV758JoLkx1wBPlKCEAMtoIBf+EqcdYgbqeWWJslaa9elMi8pyMsV+fpSjz8D/mfiSjMSDsz+YfofQcSsknyi9UaAiQHJT+AL0aeIDZoU9CllayllTGRQ==
 ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
  smtp.mailfrom=oracle.com; dmarc=pass action=none header.from=oracle.com;
  dkim=pass header.d=oracle.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=oracle.onmicrosoft.com; s=selector2-oracle-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=I/w66yf7XZeXGafram8B2dJU77uTTJInb4t+KDEhkd0=;
- b=Q0p34SBVH51o0p14pZX5nmZu60/krcUiMuPeGH6PaAMRNNIqedmQdvkqyBTczqq+onmVwZitcqIzTr8Axgy2vtNxbB8Xdh58hlql4dU+R+EnunZN9/BgT8srEr90/OXALB6DGwMFxqVZffjGi2tNnNFXJ9CtrvXs8kGYgcTLKzw=
+ bh=kowof4zSR2s+0VstKOOEps4zszM/DpB5XJ1WngSV670=;
+ b=faxdaMQvCRFg0NlYGuDFYYMrHl5NCModMkLHQdRTGTGTw3Ha8TpUNPwCk7TalEQbYDSYCLMp+UCO+7LfNym+WmQvwMKdA3QCS7hXSbcJ1D6kM1iuPSd9Jj8EJBGuco3aVs4n+6DpQGLVplqX2bkZ2zpVqtVXNGmfssbIFs8OYrM=
 Received: from PH0PR10MB4664.namprd10.prod.outlook.com (2603:10b6:510:41::11)
- by BLAPR10MB5107.namprd10.prod.outlook.com (2603:10b6:208:324::5) with
+ by LV3PR10MB7819.namprd10.prod.outlook.com (2603:10b6:408:1b0::5) with
  Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.7409.31; Mon, 25 Mar
- 2024 17:08:29 +0000
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.7409.32; Mon, 25 Mar
+ 2024 17:34:47 +0000
 Received: from PH0PR10MB4664.namprd10.prod.outlook.com
  ([fe80::75a:a398:452a:90a9]) by PH0PR10MB4664.namprd10.prod.outlook.com
  ([fe80::75a:a398:452a:90a9%6]) with mapi id 15.20.7409.031; Mon, 25 Mar 2024
- 17:08:29 +0000
-Message-ID: <205047df-d581-4eb3-9a63-73b7f1754d01@oracle.com>
-Date: Mon, 25 Mar 2024 13:08:25 -0400
+ 17:34:47 +0000
+Message-ID: <b12559db-fc07-4fec-92d3-0e492ae34947@oracle.com>
+Date: Mon, 25 Mar 2024 13:34:42 -0400
 User-Agent: Mozilla Thunderbird
-Subject: Re: [RFC 1/8] virtio: Define InOrderVQElement
+Subject: Re: [RFC 4/8] virtio: Implement in-order handling for virtio devices
 Content-Language: en-US
 To: Eugenio Perez Martin <eperezma@redhat.com>
 Cc: qemu-devel@nongnu.org, mst@redhat.com, raphael@enfabrica.net,
@@ -77,14 +77,14 @@ Cc: qemu-devel@nongnu.org, mst@redhat.com, raphael@enfabrica.net,
         virtio-fs@lists.linux.dev, si-wei.liu@oracle.com,
         boris.ostrovsky@oracle.com
 References: <20240321155717.1392787-1-jonah.palmer@oracle.com>
- <20240321155717.1392787-2-jonah.palmer@oracle.com>
- <CAJaqyWdg5tg1XR43bHkMRnqvkTZVvrqXMKM__YD6t-xGBOXdYg@mail.gmail.com>
+ <20240321155717.1392787-5-jonah.palmer@oracle.com>
+ <CAJaqyWedsT+0DT-SCAH7SMFnuWHazTsbe1kNC+PENDSxvu3W0A@mail.gmail.com>
 From: Jonah Palmer <jonah.palmer@oracle.com>
-In-Reply-To: <CAJaqyWdg5tg1XR43bHkMRnqvkTZVvrqXMKM__YD6t-xGBOXdYg@mail.gmail.com>
+In-Reply-To: <CAJaqyWedsT+0DT-SCAH7SMFnuWHazTsbe1kNC+PENDSxvu3W0A@mail.gmail.com>
 Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 8bit
-X-ClientProxiedBy: BL1PR13CA0085.namprd13.prod.outlook.com
- (2603:10b6:208:2b8::30) To PH0PR10MB4664.namprd10.prod.outlook.com
+X-ClientProxiedBy: BY3PR05CA0020.namprd05.prod.outlook.com
+ (2603:10b6:a03:254::25) To PH0PR10MB4664.namprd10.prod.outlook.com
  (2603:10b6:510:41::11)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
@@ -93,142 +93,322 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 X-MS-PublicTrafficType: Email
-X-MS-TrafficTypeDiagnostic: PH0PR10MB4664:EE_|BLAPR10MB5107:EE_
-X-MS-Office365-Filtering-Correlation-Id: 7dc91461-27f8-4b8a-8743-08dc4cee311b
+X-MS-TrafficTypeDiagnostic: PH0PR10MB4664:EE_|LV3PR10MB7819:EE_
+X-MS-Office365-Filtering-Correlation-Id: def11f73-e8b9-4e67-8dea-08dc4cf1dd91
 X-MS-Exchange-SenderADCheck: 1
 X-MS-Exchange-AntiSpam-Relay: 0
 X-Microsoft-Antispam: BCL:0;
 X-Microsoft-Antispam-Message-Info: 
-	moa8ZKT/Rm4OCikoy8CHgn8UQTJO7AmJAJ7rhZnXuhjzlMmQ+LLTc5fIQZPFo52cfj+GpZB/GXxnhTJoEfzo6SOKYMsVGqqEKXHWWnJHeQVyfAIkZBQYAmWSIPRtvAZPgqlek3ZPIlUtmmQuSYZlje/PFjEvSLKnWZJnC3QT1oXPZ4Rhra52sPMautRGkx2rfKdNd1GztcM/UFiVNvbU8mPjgw87QKeG03Yqi3PUi9otpBUMb28unxiDoTK4aFaNBmLdfQCwVlbQi7F42Y7nQofTrGPFx9upUTb0bW/MEjpUTJ18f3KxX5Fup3c6EyXeFwm1syd0pLY+P+eZO6FSwSeQN0aLWD++uNz+kqF5JKYOn276ub7s941albbK5X3dOf6aV5EVKoX4MiA7ureD++4tiOKB9Z8jQgXTJMMD1xbrzYscLPY9w4zgiCefvcnWALFsLhemd/zLSvQqd780kiz49qvXKEytFj4Kqepxc0b7fG8oxYH3XZLZ+ujYx1whzmIGIaUTm/B0LjdIpvwE7Dh+5aA7mpXA5fNmQ2oj//pz06pKW0/9SIa8NFRTxf/NImfSp/ybzdiubCDgUGOakEKGF7sgWJkx90dn88jYZ+7NsYyKk/PGpBm5GKAiJsmxQ+IgTiwPWIgjTi4NY8wHhiYIappGV85+Smxb6IE3C98=
+	+4XznSQ7gdj6YM/oaGS4Ni9VXjg3UjJkw71Mo30rQLzjR4/R4tnMGdVkRHerQsBhOtcKsW6VGMzKQdmgNnNoW511NbebaRW1p7tp7kaia/MoJ4nPLgz/WSKIMlBZnHBqGteMNpJ7Zrt02oJe651y3SHZPJ0fpJmRcEc1TzxD3OH30RWFDmwhZPyLaXdbj6ZB/IYokVEUkT8j7t6gdv9hP31SkZbKRaYwHCrJoxVOoXFLFdxgtmBV7Z3UGtM11LKx+ldte6awwD25HgmShiNIodhnODeu7KaRon4VMpz7H1Uad5oM9H8Lhm4aT7I3KqOuxHG7pL5ZBHfAOgrVeQS/jPgRyLkTvA23Y2ITk0dlltRU2DUxaDercsgkKz5FslrA7h0RSyOYHnCmLnrKsASrai1cAijNk+kCyUtEKRYcFSSQK2s3QDiQE6auPU3Hd6ZcMalNoF2w3cR+ocxqiXJzkoSE8eYVtv0zyvbP8zGWGx3S+P1zLrXNmOBtPP89L+ok3SfN/fBsCkg2V05dNAm33BckbVG9VVb2dFo26kpTAU8vWhhXvZZFwllr8Sw0NOmOOaJXne4jFqAqVBRwKQilxG7gzq+fbrE45kPxi9oryPZGp2sWosFgbJILxLATxKX03JdrYlR6r6nKzHTZ4cRRrqyEWNWO4fHeup71xlNtLUE=
 X-Forefront-Antispam-Report: 
-	CIP:255.255.255.255;CTRY:;LANG:en;SCL:1;SRV:;IPV:NLI;SFV:NSPM;H:PH0PR10MB4664.namprd10.prod.outlook.com;PTR:;CAT:NONE;SFS:(13230031)(376005)(366007)(7416005)(1800799015);DIR:OUT;SFP:1101;
+	CIP:255.255.255.255;CTRY:;LANG:en;SCL:1;SRV:;IPV:NLI;SFV:NSPM;H:PH0PR10MB4664.namprd10.prod.outlook.com;PTR:;CAT:NONE;SFS:(13230031)(7416005)(1800799015)(376005)(366007);DIR:OUT;SFP:1101;
 X-MS-Exchange-AntiSpam-MessageData-ChunkCount: 1
 X-MS-Exchange-AntiSpam-MessageData-0: 
-	=?utf-8?B?djZOK01pSklJY2pTc3lJYVZWaG5JVFNZUXA1bDF2M0h4eE04bitHM1lGRDN0?=
- =?utf-8?B?OWlHYm1FQzZjNFFGeVVqcE05VFpqTlBiQWdIT2hHRm1WNld0WURoV29MRlVz?=
- =?utf-8?B?S1BvcWpPb2hJV0NWaSt2OFB5S0lzWHNWSTNHOHphaDZXek9rYUlGaEg4SXZS?=
- =?utf-8?B?N2NTM3BGVlZpRkZXOERuZzQrRUpqTWs0eVc0YWltaVJIRXhmL1VzR3ZrTGtI?=
- =?utf-8?B?WCszZWZBaWR3em5MZ1BPMVJWZU9ZVDROWERDaXVEVThvSTc3eU1PY29vTzJZ?=
- =?utf-8?B?amFaRHpHWmM5bHR6VTFIcHNHQ1lUV0lpU0hvOCtSbUJMVmNqWXlvempRei9H?=
- =?utf-8?B?RnRld1VnbW0yc2wwZ0RvTXNiZ1F4aXVpSDFtWmdYa2taWnQ1Q0JBTnhVWG1Z?=
- =?utf-8?B?VzYrd1BJZzVDYUJCMjlXMzZ0S21SUWo2dFg5eUhWRXhlOUZzZHNYaFNKajZZ?=
- =?utf-8?B?V0hMb0dNcnhGd0Vid2lIN1V5NDB1c3hpek9JUEtGM2dhSlMwcmhyRkJ1Vlp2?=
- =?utf-8?B?aWpQSUJhRUEwZWhHSTY3ejVYMXFSemkxRDlBeVVlRU9PZWI3NXYyc2piS2Y2?=
- =?utf-8?B?azNCd1U5V3JTM2FnNSsxV0k2RWpTUVg1bG5uMTNCYUlDUFhSTXBsZkFRTElX?=
- =?utf-8?B?S01UUnh3T3NoSElhZ3Y4RDIrVFZZWFYrODgwU0RHdzdPbTVKRjZ3a2RHdWg5?=
- =?utf-8?B?djBOVEprSmNxMEY2b2NyUWhhYVdDNUQyZHZadmZFQ2plUUpuQnRjZ2JKZTd3?=
- =?utf-8?B?cnJnM21jQ0hrc09ubGRQUkdhWXdTTERJZFdOY0Q2a0hXOG9jZWRCYmZMYjRT?=
- =?utf-8?B?K3BUUUNyUTZJTVFyNHRHMGxLbVU2RGJ6ZEZ3Y2JsR3pXQzR3U0VjZnFuRCth?=
- =?utf-8?B?ck9zMktoVHpNaXpWeGRXU3duVFdyVW81WEpXSUxXRGFOTWNqZGxwc1ZRRkl0?=
- =?utf-8?B?ZzJ1ZlZWQjZoQkFMUnRTbUlCQmVYMnlNbVlrdUtEdm1zMUFwMmlNbDExNlls?=
- =?utf-8?B?a0pyQTBxdy9kZVpJWWRxS3RRWmtXaFBoOGhRMDd6RmtUMlVSM2VhZnJ2TEQ1?=
- =?utf-8?B?V3ZyTlY5YjNqeFc0S29YMkI4Vk0wTFpTMDkxSUo0b2thc3hjODNieEo0QWtx?=
- =?utf-8?B?QnFZQzYwWGRGVS9MMmIxOWJGczVkbE11RTA0clRUWTYwWGZ4N0h1a1NMSUVy?=
- =?utf-8?B?STI1Ui9aU25JcWEzNE5JcjJZakdmeWE0WWdvQjdVWDdvRDZ0RTFNeXNQQVhU?=
- =?utf-8?B?WGNxNWhuU3FPdzRST01uOS9CakhNUG5Td1FGVTdkeUFEYlozN0tEZFRFblVC?=
- =?utf-8?B?NHROK0pkT1ZTK2xCb2ZSTnRMYysyN1kyMXdjNlFLUHp5SmFISjdTQzlGMWRY?=
- =?utf-8?B?bDZRbDVIRUl3Y2tzakQ3cnpIc1I1dmR4YU9lR1VvMnVqVVExbzdqYUQ5eWNs?=
- =?utf-8?B?bGlub05CM0hJRjNHbDF4TkVyM0tFb3Z1TlFNT091WnpwVXNFQ3FvL29MSW1S?=
- =?utf-8?B?L0ZxM1Npbjd3VEtJNWYvc21ob3ErbWZVWDRvb3hvSHgvNEVnckpZTHoyMEhO?=
- =?utf-8?B?OG1nMlBya2JNNHNFRlZMdmZDVFl3dFZmYWpydzRVR3lzK1ZoOGpxVTdnYVRI?=
- =?utf-8?B?eGVXZnJ5ckp1L2o4b3NqVmV0WXlxMDNNZGg0cTVDSGdmSEVoRFpBRDVYRUFq?=
- =?utf-8?B?OUtiRG43MzRVUWkvNGx4WTF0VzNKZXNIMGlMN2dBWENoSGZZTkNPNWN4SlVV?=
- =?utf-8?B?NGJhVXlHQXZhZXBLRUhBellNK28yUFAxMXVmcytJT2RSRExnNmxpWDZaTW1K?=
- =?utf-8?B?cjFGUDRoRDZQOC93WFFqN0srd3V2U1lSR1ZSTnl0My9Uc2VMMWNFNCt0T3NM?=
- =?utf-8?B?YTlzS2dSS0ZpYlN0dFl5SldJV0xWK3d4ZGo1cEE4OHdqa2RqMGgyQXN4Z3VL?=
- =?utf-8?B?clJFaks3YnVoVmREUVZ4QnpCUDc3cWJqeXRDOGZEMytUWlZwYjN4eWowQWxq?=
- =?utf-8?B?emhEWE4wckFYbU0vYnpkaWE5RDY4ekE3VXo2Z3ZLYkxBWXhGTUZGQ21Kc2hs?=
- =?utf-8?B?NFc4MXVib0N3QWdCdUVBR2N4UnhlV3RoRFdVNGVCOSsxM1dJSVJRRTg1Tk9T?=
- =?utf-8?B?SXpDMU84WUQxYm1KTEFMcjE1ajVUVGpsTWJBdXNPK0NuaE9keXA1NUFCWGhL?=
- =?utf-8?Q?ORyX0AwOC7EwRK66A5TsHPk=3D?=
+	=?utf-8?B?OEtqSHV1N3JPWk56ZForOCtBV2sxMExnRUE3a2pqQUJyeFJkMUhJQ3ppVkda?=
+ =?utf-8?B?dWJWc2hYY0FvNkhJQW05WkNJenNjWTBTeVNJTXVqK1k2dyt2STMvblk5VFhF?=
+ =?utf-8?B?SEF4ZFhOMEdTTlk4bU9wUnFScEM4ejVjTGt2Z2E4eXhzaDRTZWFabWM4SGxr?=
+ =?utf-8?B?cWZFZWdrL2JFVVV2ZmlVeDhsN1g1V2ZmV05WY3lkYVlqS2ZoR21uVEEvaW1l?=
+ =?utf-8?B?VFF1VE1vOURpWitvaXliOVlNMGFRdXVITWRSZFM4L2FpN1V1VzQ3c1hDWVF0?=
+ =?utf-8?B?YUNyQURjRXF5cXJza0lxMXNFTDlKeDJSNGNndytHbFZJa1kwYnlmNVhWSGhk?=
+ =?utf-8?B?ZXp2Q2xrK1Ira0RoWnRvUUIrc1dSMUFHdEl6VmNWVXFlN0hVM2doTkwvL0pW?=
+ =?utf-8?B?YmVva0dBNzR3bGFVdDV3Y1VQRmtsRXNaQXd4OURXTjNkNXkrTjBHMGNwUWdB?=
+ =?utf-8?B?MXNUNndzU2pPU3BLcERGMStQVVJKbVhPR1liTTUwS1Q4b0ZWZVVjWFU3OTRw?=
+ =?utf-8?B?ZzFXSVljdkJ3YXZRVlY3ZnZqMlZ3QnhTMG9seEVlOVNLY1FVZi9nUHJKUkty?=
+ =?utf-8?B?VmJmZDdvclpVN2k5ZVZYK0V1ZFBvNWp3c3lSNHUzYzJ6NExYZFpudjA4V3hm?=
+ =?utf-8?B?R2QvWFdtODFnN0lCbkdXdmJoUWNPd2RvVUlsRTJQbTl0TldSMmRnbXpMVk90?=
+ =?utf-8?B?TnN6UGtrbXpCaU5YdmJWK0x2RWp3VWM5ekFGMkhvVENTY0NHMUdnUnBVdlNQ?=
+ =?utf-8?B?aE1QY2JoYXpSd0tzd0pXOHYwaitPWXg4NW5wK2hCVGhhTUZXejFsMDlOR3ZH?=
+ =?utf-8?B?d2Q1TGJ1QnZaM0N1b29qc0hkbkt2TUlDRG9wbklDaXNmTlZWb2F0cGlaNTVa?=
+ =?utf-8?B?dzM2aGM4UGdQci9ZVlh5L0pWcUJQdG1jY21IMHhyMlJPZi91SmF1d0J2SUFt?=
+ =?utf-8?B?MmRtNmt4YUFsRHQyc2x5YTVZNmI1ZURPVm9hNDMzVnNwTVpMVnNHN0xmK3V5?=
+ =?utf-8?B?VlF2MEdaN0ZKVUFTeDF5UUtvYS81RGpCY3hEbWNGZVpGaWUyVUQxalZrcEcr?=
+ =?utf-8?B?bGhCV2pURnZidzFhQ2pNY1A5amJDcTJueStlMVhGeDdSOStMTVY1NXBpRWtV?=
+ =?utf-8?B?TXV1MUlwdm9UR1JPaTNxNXlid05ueXo3R2h1WVhPRFp0UjM4U3RwM0lwUDhj?=
+ =?utf-8?B?N3NUTWtVWnM5V0JKYjJNREhOT1JPQW5qRDkwZGJmaXhBaFVXU2w3RmFDa3ZN?=
+ =?utf-8?B?L0UwK1R2cSsxbS9ENmxjZnU3Y1FhT2Y4a1lMalE3dCtZT1ZFSmFzNHIzdVNr?=
+ =?utf-8?B?L1RwUFVPRkZNQTlRWnAza0ZqSHl1VEVkZHZzUnQ0TjdMSXdiamVKVklBYk9v?=
+ =?utf-8?B?alJpb1l0ODRINzZmbGdFQmRnaTB5b2ZjbmJ3YjluaEc0bGZmMjc5bml1ZTJH?=
+ =?utf-8?B?YTNtL01pUkVpaWlsMnd2ZXhlSXVvN2JYMDE4QVBuempzRGFDa0lHTkpFTWl1?=
+ =?utf-8?B?TTZXdmJmdkFveTM1c3RMcFNRelF4czFQbW9ZVTllZWFvZWs5YzByRGlPUHhE?=
+ =?utf-8?B?czV0Vk5rUEhQK0c5UzBHdkhUMUhlc3QzYTlkS2ErYllmRFpRQXJTSUtHSGYz?=
+ =?utf-8?B?N2NyRWtrY3NOcXhtc21oRnJoYUhmWkZLcGcvc0FZSXVSVzNMWk1VYnlFOFBv?=
+ =?utf-8?B?N3JQUmFKUVVqNytSOFpudkt3ZHZZanB4d09McXJteU96SHNTaG85QWpzT1Nv?=
+ =?utf-8?B?RVF6NURZQ2IvWjlkVko0RGxyS1NwZFhDY1VmQnQ2TGlvV2ZucWpMMXBzQ0hK?=
+ =?utf-8?B?bXdVREdvcmlIaGs4S0E0WVJNSWxiV0diWVdzdEpOK2NyNi8raStEdUduSWhT?=
+ =?utf-8?B?YVFYUmYxNHBsWGdsUVEvenBLaGhhZ2xqYmxNaEI2enJxSEE0RlI5amN0WEZn?=
+ =?utf-8?B?SkNJU004S1B2U2NtelNnU2p4RFJ4T25nZ2x0ekN3VjRzWTd6RFlxTnllcGVl?=
+ =?utf-8?B?VjZMQWR3U1g2ZzlWR3doUEhDdndMMmFXMGlmRlpOVFRrY1YzSkxkSldsalpX?=
+ =?utf-8?B?MGl1aW9oM2k5a3BoMEVMSzNyVlgrWFg1b1BMWFBlcFN1M1pNN3dKOHUvTnN4?=
+ =?utf-8?B?cFJXNVQ5a1dDbVRmUXJWejNkRHdzbFIwMFdSalhXTkNyOHFucTlHYkx2UkJU?=
+ =?utf-8?Q?29VMNzFCoM9F+7NindDjcaE=3D?=
 X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
 X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: 
-	i+ZfXaFQBpXNQujy6XJYwain0um68ppZj03RzhEkxts4pUrrk8qI0sxBD1uJ/MZFfmmEpp85og6NYfGmCtee8faJwlENZ1klUCpFGU7+3kNZxJn724gJ6RtPj8AWzAqUahSsMoyjLyabfZIUk7eWA2LdKklADtv3WXsMDp7K+GehzJEfqGbY1s9JTAN2QC8aiK99yLbnOHf4aseKQ+wYWmmYHbPCTsw4mWr5lHwJKf89koslAbQp48Hq3JZmfajM3oVufs2nZQUv6C6pTv0kle9eeZkPSNH/JazGt6rG/X7sFSaNKxg69/5nuiktgU+ym2ZxkMCgztOKFNjrLW7jcYxqnhOIC26TkRjR+3bxyhQWi7Rn2WMr0S9sVhVxDjoyOlKWt4rSAT/pC7miCjaj+s7TD1IhtLtotlXvQl6QRfKkqtWZjx/3H260mcsPBdNqGNX9T+d+IbVhQ+JpRljbFXFyw4znedzwye7k90Gt3TXQfS7JkQewFahnTrWzeFETOeHrBhBds+FqLqYTxXvQCPc4Xm+s+NtExK3w9DoPLCm+0DJf2FAjs5Z9Mzl7r+wYFl/GKcFqwHpOiC+4MJWeF1N7KIemPXxrf5Vdt04eXjo=
+	/mpDC8iPQUBsL+4LPxwRuyEubUhhwtLVTC7buuHSoS2A7g1CyPbaE04dFvnLMhuR4e7QrqAXYKz22PeovczDIwXyJfS1WK5jqelCYDN2eh2MKVy3HAZNUhjsPts7q3VmiphdWK4yi5+D3S4TXQf6GNw/vvlPYPTT7z3iFo0iqw1Y3Q+drOhcxMWiaZQGRPRRWiC9YTiYJBEofhIYGzAmsc9ky9bE65a4DQFk9JGusxA7Hg+JDVm3Z9+2Wa9uUpwc9uTNYNJq5xozXv5iak5vfmbs0v+k6/rEu4F5fQrovDhdfDY1znqsscqcgTrUwQxNCBfwDwbeiY9lCZOYOrPkvhT+pkB+bc6pwbQTYO/Vf0DuEDVlDU3LI6Hyz4Xtd3Vh3mrKfIp0bQnxTLasOUeiiQttgrZIyG39QtvIoRnyudFMcdRcrK982ubF0aiBH42lkNI29RjXEs5ZKg0GFS48YGZfnrfZAvmM2YmnRFpx6YjUnNUdV19441pjSJPPtuTuhdjGZu6Wxc7pjaml9DcRx7/aISVsNntXfjN23TOvM6hJUvlhg+nlzwqgED5W7XgRe0+OjkeB84xK/slCjok8MuJ/T3qet3yL2GfHwMrPqsA=
 X-OriginatorOrg: oracle.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 7dc91461-27f8-4b8a-8743-08dc4cee311b
+X-MS-Exchange-CrossTenant-Network-Message-Id: def11f73-e8b9-4e67-8dea-08dc4cf1dd91
 X-MS-Exchange-CrossTenant-AuthSource: PH0PR10MB4664.namprd10.prod.outlook.com
 X-MS-Exchange-CrossTenant-AuthAs: Internal
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 25 Mar 2024 17:08:29.1027
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 25 Mar 2024 17:34:46.9333
  (UTC)
 X-MS-Exchange-CrossTenant-FromEntityHeader: Hosted
 X-MS-Exchange-CrossTenant-Id: 4e2c6054-71cb-48f1-bd6c-3a9705aca71b
 X-MS-Exchange-CrossTenant-MailboxType: HOSTED
-X-MS-Exchange-CrossTenant-UserPrincipalName: D5XWHFBQK1BSgNhnXQyYGr2Q4uC8GHG8yAe8nRBD0B5DMPftxZlqVaAoRsA1k413iy8/oySLkJaEoMatd7pqjQ==
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BLAPR10MB5107
+X-MS-Exchange-CrossTenant-UserPrincipalName: dyTRPh8A3nPaGGpehHrZ8naSAAM4V6XtT+ueETbl80405tsm09oUng0hQLXwnyRbfWsW2PqX+MrWZLKjnzQbaw==
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: LV3PR10MB7819
 X-Proofpoint-Virus-Version: vendor=baseguard
  engine=ICAP:2.0.272,Aquarius:18.0.1011,Hydra:6.0.619,FMLib:17.11.176.26
  definitions=2024-03-25_15,2024-03-21_02,2023-05-22_02
-X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 mlxlogscore=999 bulkscore=0
- adultscore=0 mlxscore=0 phishscore=0 malwarescore=0 spamscore=0
- suspectscore=0 classifier=spam adjust=0 reason=mlx scancount=1
- engine=8.12.0-2403210000 definitions=main-2403250098
-X-Proofpoint-GUID: GPlJTftdhgiL0J3cYSiaO-XNmpQZEhH-
-X-Proofpoint-ORIG-GUID: GPlJTftdhgiL0J3cYSiaO-XNmpQZEhH-
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 bulkscore=0 mlxlogscore=999
+ suspectscore=0 adultscore=0 mlxscore=0 spamscore=0 malwarescore=0
+ phishscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.12.0-2403210000 definitions=main-2403250101
+X-Proofpoint-ORIG-GUID: d3J4PvwJH67BNpF-StTH0fIybj1Un4S1
+X-Proofpoint-GUID: d3J4PvwJH67BNpF-StTH0fIybj1Un4S1
 
 
 
-On 3/22/24 5:45 AM, Eugenio Perez Martin wrote:
+On 3/22/24 6:46 AM, Eugenio Perez Martin wrote:
 > On Thu, Mar 21, 2024 at 4:57 PM Jonah Palmer <jonah.palmer@oracle.com> wrote:
 >>
->> Define the InOrderVQElement structure for the VIRTIO_F_IN_ORDER
->> transport feature implementation.
+>> Implements in-order handling for most virtio devices using the
+>> VIRTIO_F_IN_ORDER transport feature, specifically those who call
+>> virtqueue_push to push their used elements onto the used ring.
 >>
->> The InOrderVQElement structure is used to encapsulate out-of-order
->> VirtQueueElement data that was processed by the host. This data
->> includes:
->>   - The processed VirtQueueElement (elem)
->>   - Length of data (len)
->>   - VirtQueueElement array index (idx)
->>   - Number of processed VirtQueueElements (count)
+>> The logic behind this implementation is as follows:
 >>
->> InOrderVQElements will be stored in a buffering mechanism until an
->> order can be achieved.
+>> 1.) virtqueue_pop always enqueues VirtQueueElements in-order.
+>>
+>> virtqueue_pop always retrieves one or more buffer descriptors in-order
+>> from the available ring and converts them into a VirtQueueElement. This
+>> means that the order in which VirtQueueElements are enqueued are
+>> in-order by default.
+>>
+>> By virtue, as VirtQueueElements are created, we can assign a sequential
+>> key value to them. This preserves the order of buffers that have been
+>> made available to the device by the driver.
+>>
+>> As VirtQueueElements are assigned a key value, the current sequence
+>> number is incremented.
+>>
+>> 2.) Requests can be completed out-of-order.
+>>
+>> While most devices complete requests in the same order that they were
+>> enqueued by default, some devices don't (e.g. virtio-blk). The goal of
+>> this out-of-order handling is to reduce the impact of devices that
+>> process elements in-order by default while also guaranteeing compliance
+>> with the VIRTIO_F_IN_ORDER feature.
+>>
+>> Below is the logic behind handling completed requests (which may or may
+>> not be in-order).
+>>
+>> 3.) Does the incoming used VirtQueueElement preserve the correct order?
+>>
+>> In other words, is the sequence number (key) assigned to the
+>> VirtQueueElement the expected number that would preserve the original
+>> order?
+>>
+>> 3a.)
+>> If it does... immediately push the used element onto the used ring.
+>> Then increment the next expected sequence number and check to see if
+>> any previous out-of-order VirtQueueElements stored on the hash table
+>> has a key that matches this next expected sequence number.
+>>
+>> For each VirtQueueElement found on the hash table with a matching key:
+>> push the element on the used ring, remove the key-value pair from the
+>> hash table, and then increment the next expected sequence number. Repeat
+>> this process until we're unable to find an element with a matching key.
+>>
+>> Note that if the device uses batching (e.g. virtio-net), then we skip
+>> the virtqueue_flush call and let the device call it themselves.
+>>
+>> 3b.)
+>> If it does not... stash the VirtQueueElement, along with relevant data,
+>> as a InOrderVQElement on the hash table. The key used is the order_key
+>> that was assigned when the VirtQueueElement was created.
 >>
 >> Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
 >> ---
->>   include/hw/virtio/virtio.h | 7 +++++++
->>   1 file changed, 7 insertions(+)
+>>   hw/virtio/virtio.c         | 70 ++++++++++++++++++++++++++++++++++++--
+>>   include/hw/virtio/virtio.h |  8 +++++
+>>   2 files changed, 76 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
+>> index 40124545d6..40e4377f1e 100644
+>> --- a/hw/virtio/virtio.c
+>> +++ b/hw/virtio/virtio.c
+>> @@ -992,12 +992,56 @@ void virtqueue_flush(VirtQueue *vq, unsigned int count)
+>>       }
+>>   }
+>>
+>> +void virtqueue_order_element(VirtQueue *vq, const VirtQueueElement *elem,
+>> +                             unsigned int len, unsigned int idx,
+>> +                             unsigned int count)
+>> +{
+>> +    InOrderVQElement *in_order_elem;
+>> +
+>> +    if (elem->order_key == vq->current_order_idx) {
+>> +        /* Element is in-order, push to used ring */
+>> +        virtqueue_fill(vq, elem, len, idx);
+>> +
+>> +        /* Batching? Don't flush */
+>> +        if (count) {
+>> +            virtqueue_flush(vq, count);
+> 
+> The "count" parameter is the number of heads used, but here you're
+> only using one head (elem). Same with the other virtqueue_flush in the
+> function.
+> 
+
+True. This acts more as a flag than an actual count since, unless we're 
+batching (which in the current setup, the device would explicitly call 
+virtqueue_flush separately), this value will be either 0 or 1.
+
+> Also, this function sometimes replaces virtqueue_fill and other
+> replaces virtqueue_fill + virtqueue_flush (both examples in patch
+> 6/8). I have the impression the series would be simpler if
+> virtqueue_order_element is a static function just handling the
+> virtio_vdev_has_feature(vq->vdev, VIRTIO_F_IN_ORDER) path of
+> virtqueue_fill, so the caller does not need to know if the in_order
+> feature is on or off.
+> 
+
+Originally I wanted this function to replace virtqueue_fill + 
+virtqueue_flush but after looking at virtio_net_receive_rcu and 
+vhost_svq_flush, where multiple virtqueue_fill's can be called before a 
+single virtqueue_flush, I added this 'if (count)' conditional to handle 
+both cases.
+
+I did consider virtqueue_order_element just handling the virtqueue_fill 
+path but then I wasn't sure how to handle calling virtqueue_flush when 
+retrieving out-of-order data from the hash table.
+
+For example, devices that call virtqueue_push would call virtqueue_fill 
+and then virtqueue_flush afterwards. In the scenario where, say, elem1 
+was found out of order and put into the hash table, and then elem0 comes 
+along. For elem0 we'd call virtqueue_fill and then we should call 
+virtqueue_flush to keep the order going. Then we'd find elem1 and do the 
+same. I have trouble seeing how we could properly call virtqueue_flush 
+after finding out-of-order elements (that are now ready to be placed on 
+the used ring in-order) in the hash table.
+
+>> +        }
+>> +
+>> +        /* Increment next expected order, search for more in-order elements */
+>> +        while ((in_order_elem = g_hash_table_lookup(vq->in_order_ht,
+>> +                        GUINT_TO_POINTER(++vq->current_order_idx))) != NULL) {
+>> +            /* Found in-order element, push to used ring */
+>> +            virtqueue_fill(vq, in_order_elem->elem, in_order_elem->len,
+>> +                           in_order_elem->idx);
+>> +
+>> +            /* Batching? Don't flush */
+>> +            if (count) {
+>> +                virtqueue_flush(vq, in_order_elem->count);
+>> +            }
+>> +
+>> +            /* Remove key-value pair from hash table */
+>> +            g_hash_table_remove(vq->in_order_ht,
+>> +                                GUINT_TO_POINTER(vq->current_order_idx));
+>> +        }
+>> +    } else {
+>> +        /* Element is out-of-order, stash in hash table */
+>> +        in_order_elem = virtqueue_alloc_in_order_element(elem, len, idx,
+>> +                                                         count);
+>> +        g_hash_table_insert(vq->in_order_ht, GUINT_TO_POINTER(elem->order_key),
+>> +                            in_order_elem);
+>> +    }
+>> +}
+>> +
+>>   void virtqueue_push(VirtQueue *vq, const VirtQueueElement *elem,
+>>                       unsigned int len)
+>>   {
+>>       RCU_READ_LOCK_GUARD();
+>> -    virtqueue_fill(vq, elem, len, 0);
+>> -    virtqueue_flush(vq, 1);
+>> +    if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_IN_ORDER)) {
+>> +        virtqueue_order_element(vq, elem, len, 0, 1);
+>> +    } else {
+>> +        virtqueue_fill(vq, elem, len, 0);
+>> +        virtqueue_flush(vq, 1);
+>> +    }
+>>   }
+>>
+>>   /* Called within rcu_read_lock().  */
+>> @@ -1478,6 +1522,18 @@ void virtqueue_map(VirtIODevice *vdev, VirtQueueElement *elem)
+>>                                                                           false);
+>>   }
+>>
+>> +void *virtqueue_alloc_in_order_element(const VirtQueueElement *elem,
+>> +                                       unsigned int len, unsigned int idx,
+>> +                                       unsigned int count)
+>> +{
+>> +    InOrderVQElement *in_order_elem = g_malloc(sizeof(InOrderVQElement));
+>> +    in_order_elem->elem = elem;
+>> +    in_order_elem->len = len;
+>> +    in_order_elem->idx = idx;
+>> +    in_order_elem->count = count;
+>> +    return in_order_elem;
+>> +}
+>> +
+>>   static void *virtqueue_alloc_element(size_t sz, unsigned out_num, unsigned in_num)
+>>   {
+>>       VirtQueueElement *elem;
+>> @@ -1626,6 +1682,11 @@ static void *virtqueue_split_pop(VirtQueue *vq, size_t sz)
+>>           elem->in_sg[i] = iov[out_num + i];
+>>       }
+>>
+>> +    /* Assign key for in-order processing */
+>> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
+>> +        elem->order_key = vq->current_order_key++;
+> 
+> Since you're adding this in both split_pop and packed_pop, why not add
+> it in virtqueue_pop?
+> 
+
+I wanted to add this order_key to the VirtQueueElement after it was 
+created. I suppose I could do this directly in virtqueue_alloc_element 
+but I'd have to add another parameter to it, which might be unnecessary 
+given it'd only be applicable for this specific in_order feature.
+
+I also suppose I could just capture the VirtQueueElement being returned 
+from virtqueue_packed_pop/virtqueue_split_pop and make the assignment 
+there, but it felt out of place to do it in virtqueue_pop.
+
+>> +    }
+>> +
+>>       vq->inuse++;
+>>
+>>       trace_virtqueue_pop(vq, elem, elem->in_num, elem->out_num);
+>> @@ -1762,6 +1823,11 @@ static void *virtqueue_packed_pop(VirtQueue *vq, size_t sz)
+>>           vq->last_avail_wrap_counter ^= 1;
+>>       }
+>>
+>> +    /* Assign key for in-order processing */
+>> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
+>> +        elem->order_key = vq->current_order_key++;
+>> +    }
+>> +
+>>       vq->shadow_avail_idx = vq->last_avail_idx;
+>>       vq->shadow_avail_wrap_counter = vq->last_avail_wrap_counter;
 >>
 >> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
->> index b3c74a1bca..c8aa435a5e 100644
+>> index f83d7e1fee..eeeda397a9 100644
 >> --- a/include/hw/virtio/virtio.h
 >> +++ b/include/hw/virtio/virtio.h
->> @@ -77,6 +77,13 @@ typedef struct VirtQueueElement
->>       struct iovec *out_sg;
->>   } VirtQueueElement;
+>> @@ -275,6 +275,14 @@ void virtio_del_queue(VirtIODevice *vdev, int n);
 >>
->> +typedef struct InOrderVQElement {
->> +    const VirtQueueElement *elem;
-> 
-> Some subsystems allocate space for extra elements after
-> VirtQueueElement, like VirtIOBlockReq. You can request virtqueue_pop
-> to allocate this extra space by its second argument. Would it work for
-> this?
-> 
-
-I don't see why not. Although this may not be necessary due to me 
-missing a key aspect mentioned in your comment below.
-
->> +    unsigned int len;
->> +    unsigned int idx;
->> +    unsigned int count;
-> 
-> Now I don't get why these fields cannot be obtained from elem->(len,
-> index, ndescs) ?
-> 
-
-Interesting. I didn't realize that these values are equivalent to a 
-VirtQueueElement's len, index, and ndescs fields.
-
-Is this always true? Else I would've expected, for example, 
-virtqueue_push to not need the 'unsigned int len' parameter if this 
-information is already included via. the VirtQueueElement being passed in.
-
->> +} InOrderVQElement;
+>>   void virtio_delete_queue(VirtQueue *vq);
+>>
+>> +void *virtqueue_alloc_in_order_element(const VirtQueueElement *elem,
+>> +                                       unsigned int len, unsigned int idx,
+>> +                                       unsigned int count);
 >> +
->>   #define VIRTIO_QUEUE_MAX 1024
->>
->>   #define VIRTIO_NO_VECTOR 0xffff
+>> +void virtqueue_order_element(VirtQueue *vq, const VirtQueueElement *elem,
+>> +                             unsigned int len, unsigned int idx,
+>> +                             unsigned int count);
+>> +
+>>   void virtqueue_push(VirtQueue *vq, const VirtQueueElement *elem,
+>>                       unsigned int len);
+>>   void virtqueue_flush(VirtQueue *vq, unsigned int count);
 >> --
 >> 2.39.3
 >>

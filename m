@@ -1,179 +1,195 @@
-Received: from mx0a-00069f02.pphosted.com (mx0a-00069f02.pphosted.com [205.220.165.32])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 7B426132810
-	for <virtio-fs@lists.linux.dev>; Thu, 28 Mar 2024 16:22:19 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.165.32
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id EFC5D135A6D
+	for <virtio-fs@lists.linux.dev>; Wed,  3 Apr 2024 10:19:33 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1711642941; cv=none; b=jOIhX+WkmptDzlHL9erieyTWIo1U7aXrDBQoiaaJ2EEry+N488+0ZAJoJINZacCPJFK+CDJPj510+nncFq5epGalX4N4mLblkDsg0yezLjDDZGQ0rQQNquvmANTlBoTqsN3A4polMDfNbY12+KMkplNEe24SmI0CPZXSpaowK20=
+	t=1712139575; cv=none; b=eECMXa/SgcpGZhaWP7tEs9J/3fPq6EGdAwFG7kqXzOBOnvO6B4DoNb58ljHa2VwCkhYVk+Xu22oQiUTzr7+NU52SI6KL8F6vUCGhj4wYqlRVcnaSPuCKvHjYrmp7ggQWUgKwKBWyZ7WGtITa3YSyCxg5fBqOg2yAiY9p3/Qtd9w=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1711642941; c=relaxed/simple;
-	bh=nIvsSPnKgAnMpEv0V+EJQQ41/YodH05GMB3QPAO50jg=;
-	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
-	 MIME-Version; b=fUxoIaxRRFAPNr01ClF8mA9A2kDTeG3HCpjQvg/FQeFXDThqvewN5tUQc/5NxwwAq6ikRZLPXtVRcewsJ3ccoYbnT/qjJqiZVwPaAvvyj982QIceAUG0H6qr/41t2/YUk1flYjPu114jpupPAYIPeCAKdZP8AeJWipr17vYen0I=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=PeEXh6VP; arc=none smtp.client-ip=205.220.165.32
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=oracle.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oracle.com
+	s=arc-20240116; t=1712139575; c=relaxed/simple;
+	bh=kiXjTDWuqFfg06UzfBaD0dMyPaBpxmDPf7jFRtxs1l4=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=gRMZi/h3imSAiNC3TFowyEdOR2fyC9M8hAvkMFJH5fZhqscrypz08FXRN17NzlQVrP8idZfAXqr/WFUVngn+Ih6EKgxnKBm16mDAKUjuXn/LBUIVbAf3NVDaDlJgEN2hCbJDSplnmJJyFy2BoemVqC7D7CacWCe89ADGOhl9FZA=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=iTB+qM0l; arc=none smtp.client-ip=170.10.129.124
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="PeEXh6VP"
-Received: from pps.filterd (m0246617.ppops.net [127.0.0.1])
-	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 42SFP3Gj009598;
-	Thu, 28 Mar 2024 16:22:09 GMT
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=from : to : cc :
- subject : date : message-id : in-reply-to : references : mime-version :
- content-transfer-encoding; s=corp-2023-11-20;
- bh=t+MOBr6NcxD2+45PzNWIRJWhFZkAKFOHgU3aasbwS2Q=;
- b=PeEXh6VPCBq5F3IObjBRiYRY8OhsqKH9MqkWsnSSQbUyLzawWN1d0kAoYNZXISEQ87d/
- nCjKVcacYvftWcoL4aV3bpUlumYuoWvoqsZnZIts4vILCuThfbV1Zy4Y5SNgzVF+xwhP
- I62Qz1mS7q0EKXWnPCgmFRRFv750fXXSgVPykwC3kDngFgWOFTroa7knSm7SPQeIw8RS
- eSZjiJvukKcEldeVf9stki0t8GxnMsi1pi217wcHC8XiHniB2idgr6RTFuJp5kppRVcw
- jlkQEIQevR/3o8Clh9eK8ZKwSivrn0D95F+wBOGCd9fHE3SMK37z4OR9uow2BvFwx1yk qA== 
-Received: from iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (iadpaimrmta01.appoci.oracle.com [130.35.100.223])
-	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3x2s9h0jtw-1
-	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Thu, 28 Mar 2024 16:22:09 +0000
-Received: from pps.filterd (iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com [127.0.0.1])
-	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 42SGG4FM015182;
-	Thu, 28 Mar 2024 16:22:07 GMT
-Received: from pps.reinject (localhost [127.0.0.1])
-	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTPS id 3x1nhgfgfk-1
-	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Thu, 28 Mar 2024 16:22:07 +0000
-Received: from iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com [127.0.0.1])
-	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 42SGM5Zv010492;
-	Thu, 28 Mar 2024 16:22:07 GMT
-Received: from jonah-ol8.us.oracle.com (dhcp-10-39-220-183.vpn.oracle.com [10.39.220.183])
-	by iadpaimrmta01.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTP id 3x1nhgfgcy-2;
-	Thu, 28 Mar 2024 16:22:07 +0000
-From: Jonah Palmer <jonah.palmer@oracle.com>
-To: qemu-devel@nongnu.org
-Cc: mst@redhat.com, raphael@enfabrica.net, kwolf@redhat.com, hreitz@redhat.com,
-        jasowang@redhat.com, pbonzini@redhat.com, fam@euphon.net,
-        eperezma@redhat.com, stefanha@redhat.com, qemu-block@nongnu.org,
-        schalla@marvell.com, leiyang@redhat.com, virtio-fs@lists.linux.dev,
-        si-wei.liu@oracle.com, boris.ostrovsky@oracle.com,
-        jonah.palmer@oracle.com
-Subject: [RFC v2 1/5] virtio: Initialize sequence variables
-Date: Thu, 28 Mar 2024 12:21:59 -0400
-Message-Id: <20240328162203.3775114-2-jonah.palmer@oracle.com>
-X-Mailer: git-send-email 2.39.3
-In-Reply-To: <20240328162203.3775114-1-jonah.palmer@oracle.com>
-References: <20240328162203.3775114-1-jonah.palmer@oracle.com>
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="iTB+qM0l"
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
+	s=mimecast20190719; t=1712139572;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	 content-transfer-encoding:content-transfer-encoding:
+	 in-reply-to:in-reply-to:references:references;
+	bh=iMLbgUGtw/LVyRlI2BcEZJWtW3QAwcebOn57SCM4cv8=;
+	b=iTB+qM0lpOro0SQup+awtXhyMA2zWsD89iZBvqGEQbUyfuIsNV276dCWfi2rvsrk/eTPEE
+	mZ3+IMWxK38zfZgVYcO+FwkigG6i9l06Igu2f0ZDqScVTSJV2XMeKn6AV5zhmeh5fYpIT8
+	//RHmW2C1XWdoNt5P/WHBqgV9K4LksQ=
+Received: from mail-yb1-f198.google.com (mail-yb1-f198.google.com
+ [209.85.219.198]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-523-6vc2C015OtausFcL-J8RSw-1; Wed, 03 Apr 2024 06:19:31 -0400
+X-MC-Unique: 6vc2C015OtausFcL-J8RSw-1
+Received: by mail-yb1-f198.google.com with SMTP id 3f1490d57ef6-dc74ac7d015so7187864276.0
+        for <virtio-fs@lists.linux.dev>; Wed, 03 Apr 2024 03:19:31 -0700 (PDT)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20230601; t=1712139571; x=1712744371;
+        h=content-transfer-encoding:cc:to:subject:message-id:date:from
+         :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to;
+        bh=iMLbgUGtw/LVyRlI2BcEZJWtW3QAwcebOn57SCM4cv8=;
+        b=NdiKyZryKWU4+SYGGkxUwjTpUj0cop43O3BEAyh+yRx8LS22zY25COD6PFAQYNhPHR
+         Hl602zQIlC9cFmOydz2FkYybDOtcncauIyr6ogisVkXaOy87UqxuIqDnA+EuiSbuPGFm
+         Dfxu9t4L2y5OQa9YyWOQxkMjAWgiPkkRJtHEg7vPvonfYd7BmLh2Pxb47U/8CSAKZglo
+         1QXauH+2m4fE6ij4zrSWd4lJBZgv+EEG+IEKeVXgMTN7Fgqq5O5IdMdOqdiJX/mti+3T
+         iuKcRgUMGDUU+MS2xxrqOqmw2tm6tSm758U8GNHj7M1ZBFCYISFjV0DYPmfAQbGQeYy8
+         U2Cg==
+X-Forwarded-Encrypted: i=1; AJvYcCUrlutyl/npHtXLIRkhjIhkbu3yf6wEdyloDZe69nzeUBauQDwLhVYttUUmfqF3Knm0Dul76VBfQ5rNK7C/uW6CyNFOXw/dS0KK
+X-Gm-Message-State: AOJu0YyZGcLe0y9uZo/RAEncWMXNB7vqrKHd2qjl+hO8ThyADrDEPSW4
+	gl6Tb/matqpQK3iLv9ODg+Ols+wQoRBJr8KpyGihdOcMXbFtARyDCOGOmoEhT1kzyZ4EbqaBa1v
+	2fIE3x77FKJwcG9zAN9ALmNTf7JpQZzF5UeyFgejaXRA+h63Cxnn6iOBeStcld5b+Kr4Z4IpSVq
+	RYOZbdv7nKAu1fV/U/O96q5Td4p2Bbm4P0
+X-Received: by 2002:a25:bcca:0:b0:dcc:3020:e68 with SMTP id l10-20020a25bcca000000b00dcc30200e68mr11442882ybm.64.1712139570897;
+        Wed, 03 Apr 2024 03:19:30 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IE1pbpDKhYXQOe3zZv/yIiBMp0aLzykqZY7QDBxwg2EqhK34VOkEOCvEtBzx2zePFFuXoiqJpiXO677UQJcE+A=
+X-Received: by 2002:a25:bcca:0:b0:dcc:3020:e68 with SMTP id
+ l10-20020a25bcca000000b00dcc30200e68mr11442870ybm.64.1712139570604; Wed, 03
+ Apr 2024 03:19:30 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-X-Proofpoint-Virus-Version: vendor=baseguard
- engine=ICAP:2.0.272,Aquarius:18.0.1011,Hydra:6.0.619,FMLib:17.11.176.26
- definitions=2024-03-28_15,2024-03-28_01,2023-05-22_02
-X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 mlxscore=0 phishscore=0 suspectscore=0
- mlxlogscore=999 bulkscore=0 spamscore=0 adultscore=0 malwarescore=0
- classifier=spam adjust=0 reason=mlx scancount=1 engine=8.12.0-2403210000
- definitions=main-2403280111
-X-Proofpoint-GUID: yIwmXhld4fui8KBKq2wn5XuC7ZmmavOX
-X-Proofpoint-ORIG-GUID: yIwmXhld4fui8KBKq2wn5XuC7ZmmavOX
+References: <20240328162203.3775114-1-jonah.palmer@oracle.com> <20240328162203.3775114-2-jonah.palmer@oracle.com>
+In-Reply-To: <20240328162203.3775114-2-jonah.palmer@oracle.com>
+From: Eugenio Perez Martin <eperezma@redhat.com>
+Date: Wed, 3 Apr 2024 12:18:54 +0200
+Message-ID: <CAJaqyWdyZdu48+cZ2umafLRi9NTz3YHxSxmyq6SD9d4noTR2jQ@mail.gmail.com>
+Subject: Re: [RFC v2 1/5] virtio: Initialize sequence variables
+To: Jonah Palmer <jonah.palmer@oracle.com>
+Cc: qemu-devel@nongnu.org, mst@redhat.com, raphael@enfabrica.net, 
+	kwolf@redhat.com, hreitz@redhat.com, jasowang@redhat.com, pbonzini@redhat.com, 
+	fam@euphon.net, stefanha@redhat.com, qemu-block@nongnu.org, 
+	schalla@marvell.com, leiyang@redhat.com, virtio-fs@lists.linux.dev, 
+	si-wei.liu@oracle.com, boris.ostrovsky@oracle.com
+X-Mimecast-Spam-Score: 0
+X-Mimecast-Originator: redhat.com
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Initialize sequence variables for VirtQueue and VirtQueueElement
-structures. A VirtQueue's sequence variables are initialized when a
-VirtQueue is being created or reset. A VirtQueueElement's sequence
-variable is initialized when a VirtQueueElement is being initialized.
-These variables will be used to support the VIRTIO_F_IN_ORDER feature.
+On Thu, Mar 28, 2024 at 5:22=E2=80=AFPM Jonah Palmer <jonah.palmer@oracle.c=
+om> wrote:
+>
+> Initialize sequence variables for VirtQueue and VirtQueueElement
+> structures. A VirtQueue's sequence variables are initialized when a
+> VirtQueue is being created or reset. A VirtQueueElement's sequence
+> variable is initialized when a VirtQueueElement is being initialized.
+> These variables will be used to support the VIRTIO_F_IN_ORDER feature.
+>
+> A VirtQueue's used_seq_idx represents the next expected index in a
+> sequence of VirtQueueElements to be processed (put on the used ring).
+> The next VirtQueueElement added to the used ring must match this
+> sequence number before additional elements can be safely added to the
+> used ring. It's also particularly useful for helping find the number of
+> new elements added to the used ring.
+>
+> A VirtQueue's current_seq_idx represents the current sequence index.
+> This value is essentially a counter where the value is assigned to a new
+> VirtQueueElement and then incremented. Given its uint16_t type, this
+> sequence number can be between 0 and 65,535.
+>
+> A VirtQueueElement's seq_idx represents the sequence number assigned to
+> the VirtQueueElement when it was created. This value must match with the
+> VirtQueue's used_seq_idx before the element can be put on the used ring
+> by the device.
+>
+> Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
+> ---
+>  hw/virtio/virtio.c         | 18 ++++++++++++++++++
+>  include/hw/virtio/virtio.h |  1 +
+>  2 files changed, 19 insertions(+)
+>
+> diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
+> index fb6b4ccd83..069d96df99 100644
+> --- a/hw/virtio/virtio.c
+> +++ b/hw/virtio/virtio.c
+> @@ -132,6 +132,10 @@ struct VirtQueue
+>      uint16_t used_idx;
+>      bool used_wrap_counter;
+>
+> +    /* In-Order sequence indices */
+> +    uint16_t used_seq_idx;
+> +    uint16_t current_seq_idx;
+> +
 
-A VirtQueue's used_seq_idx represents the next expected index in a
-sequence of VirtQueueElements to be processed (put on the used ring).
-The next VirtQueueElement added to the used ring must match this
-sequence number before additional elements can be safely added to the
-used ring. It's also particularly useful for helping find the number of
-new elements added to the used ring.
+I'm having a hard time understanding the difference between these and
+last_avail_idx and used_idx. It seems to me if we replace them
+everything will work? What am I missing?
 
-A VirtQueue's current_seq_idx represents the current sequence index.
-This value is essentially a counter where the value is assigned to a new
-VirtQueueElement and then incremented. Given its uint16_t type, this
-sequence number can be between 0 and 65,535.
-
-A VirtQueueElement's seq_idx represents the sequence number assigned to
-the VirtQueueElement when it was created. This value must match with the
-VirtQueue's used_seq_idx before the element can be put on the used ring
-by the device.
-
-Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
----
- hw/virtio/virtio.c         | 18 ++++++++++++++++++
- include/hw/virtio/virtio.h |  1 +
- 2 files changed, 19 insertions(+)
-
-diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
-index fb6b4ccd83..069d96df99 100644
---- a/hw/virtio/virtio.c
-+++ b/hw/virtio/virtio.c
-@@ -132,6 +132,10 @@ struct VirtQueue
-     uint16_t used_idx;
-     bool used_wrap_counter;
- 
-+    /* In-Order sequence indices */
-+    uint16_t used_seq_idx;
-+    uint16_t current_seq_idx;
-+
-     /* Last used index value we have signalled on */
-     uint16_t signalled_used;
- 
-@@ -1621,6 +1625,11 @@ static void *virtqueue_split_pop(VirtQueue *vq, size_t sz)
-         elem->in_sg[i] = iov[out_num + i];
-     }
- 
-+    /* Assign sequence index for in-order processing */
-+    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
-+        elem->seq_idx = vq->current_seq_idx++;
-+    }
-+
-     vq->inuse++;
- 
-     trace_virtqueue_pop(vq, elem, elem->in_num, elem->out_num);
-@@ -1760,6 +1769,11 @@ static void *virtqueue_packed_pop(VirtQueue *vq, size_t sz)
-     vq->shadow_avail_idx = vq->last_avail_idx;
-     vq->shadow_avail_wrap_counter = vq->last_avail_wrap_counter;
- 
-+    /* Assign sequence index for in-order processing */
-+    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
-+        elem->seq_idx = vq->current_seq_idx++;
-+    }
-+
-     trace_virtqueue_pop(vq, elem, elem->in_num, elem->out_num);
- done:
-     address_space_cache_destroy(&indirect_desc_cache);
-@@ -2087,6 +2101,8 @@ static void __virtio_queue_reset(VirtIODevice *vdev, uint32_t i)
-     vdev->vq[i].notification = true;
-     vdev->vq[i].vring.num = vdev->vq[i].vring.num_default;
-     vdev->vq[i].inuse = 0;
-+    vdev->vq[i].used_seq_idx = 0;
-+    vdev->vq[i].current_seq_idx = 0;
-     virtio_virtqueue_reset_region_cache(&vdev->vq[i]);
- }
- 
-@@ -2334,6 +2350,8 @@ VirtQueue *virtio_add_queue(VirtIODevice *vdev, int queue_size,
-     vdev->vq[i].vring.align = VIRTIO_PCI_VRING_ALIGN;
-     vdev->vq[i].handle_output = handle_output;
-     vdev->vq[i].used_elems = g_new0(VirtQueueElement, queue_size);
-+    vdev->vq[i].used_seq_idx = 0;
-+    vdev->vq[i].current_seq_idx = 0;
- 
-     return &vdev->vq[i];
- }
-diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
-index b3c74a1bca..910b2a3427 100644
---- a/include/hw/virtio/virtio.h
-+++ b/include/hw/virtio/virtio.h
-@@ -75,6 +75,7 @@ typedef struct VirtQueueElement
-     hwaddr *out_addr;
-     struct iovec *in_sg;
-     struct iovec *out_sg;
-+    uint16_t seq_idx;
- } VirtQueueElement;
- 
- #define VIRTIO_QUEUE_MAX 1024
--- 
-2.39.3
+>      /* Last used index value we have signalled on */
+>      uint16_t signalled_used;
+>
+> @@ -1621,6 +1625,11 @@ static void *virtqueue_split_pop(VirtQueue *vq, si=
+ze_t sz)
+>          elem->in_sg[i] =3D iov[out_num + i];
+>      }
+>
+> +    /* Assign sequence index for in-order processing */
+> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
+> +        elem->seq_idx =3D vq->current_seq_idx++;
+> +    }
+> +
+>      vq->inuse++;
+>
+>      trace_virtqueue_pop(vq, elem, elem->in_num, elem->out_num);
+> @@ -1760,6 +1769,11 @@ static void *virtqueue_packed_pop(VirtQueue *vq, s=
+ize_t sz)
+>      vq->shadow_avail_idx =3D vq->last_avail_idx;
+>      vq->shadow_avail_wrap_counter =3D vq->last_avail_wrap_counter;
+>
+> +    /* Assign sequence index for in-order processing */
+> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
+> +        elem->seq_idx =3D vq->current_seq_idx++;
+> +    }
+> +
+>      trace_virtqueue_pop(vq, elem, elem->in_num, elem->out_num);
+>  done:
+>      address_space_cache_destroy(&indirect_desc_cache);
+> @@ -2087,6 +2101,8 @@ static void __virtio_queue_reset(VirtIODevice *vdev=
+, uint32_t i)
+>      vdev->vq[i].notification =3D true;
+>      vdev->vq[i].vring.num =3D vdev->vq[i].vring.num_default;
+>      vdev->vq[i].inuse =3D 0;
+> +    vdev->vq[i].used_seq_idx =3D 0;
+> +    vdev->vq[i].current_seq_idx =3D 0;
+>      virtio_virtqueue_reset_region_cache(&vdev->vq[i]);
+>  }
+>
+> @@ -2334,6 +2350,8 @@ VirtQueue *virtio_add_queue(VirtIODevice *vdev, int=
+ queue_size,
+>      vdev->vq[i].vring.align =3D VIRTIO_PCI_VRING_ALIGN;
+>      vdev->vq[i].handle_output =3D handle_output;
+>      vdev->vq[i].used_elems =3D g_new0(VirtQueueElement, queue_size);
+> +    vdev->vq[i].used_seq_idx =3D 0;
+> +    vdev->vq[i].current_seq_idx =3D 0;
+>
+>      return &vdev->vq[i];
+>  }
+> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+> index b3c74a1bca..910b2a3427 100644
+> --- a/include/hw/virtio/virtio.h
+> +++ b/include/hw/virtio/virtio.h
+> @@ -75,6 +75,7 @@ typedef struct VirtQueueElement
+>      hwaddr *out_addr;
+>      struct iovec *in_sg;
+>      struct iovec *out_sg;
+> +    uint16_t seq_idx;
+>  } VirtQueueElement;
+>
+>  #define VIRTIO_QUEUE_MAX 1024
+> --
+> 2.39.3
+>
 

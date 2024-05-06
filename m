@@ -1,157 +1,104 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
+Received: from mx0b-00069f02.pphosted.com (mx0b-00069f02.pphosted.com [205.220.177.32])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 9F695ED8
-	for <virtio-fs@lists.linux.dev>; Tue, 16 Apr 2024 00:47:58 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id EC313154448
+	for <virtio-fs@lists.linux.dev>; Mon,  6 May 2024 15:04:46 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.177.32
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1713228480; cv=none; b=P0fU8O46dmGQ3Kqk+sB4svw+7jbnyTWNChO1F36rKGujGI7zJs+w48zGjApuAwgURm7O6TjkF9/iB8kSWsUaZD4EQ3OQZNqE9+WakL217LJjrkps5ostU4ICnigDhM27BsZzDKWga3vE5giQK5sdRzCS4pSlroTWw6zUDb4krMs=
+	t=1715007888; cv=none; b=fxZApVi8SY9dI04+TeAxUT9w00+KvTmQezOLDY7bjIEIGOFiZqUCTP7GoqfCBNE4z0IKWC/mGk04+npLTsFZkdQAUJOxg0kxYsJktiaJlxW5vcEV16WW7JkhNy30KVe2mHHnpjIDM+N8VokVRzwe5EkUBYRMFgyzuCxGpumCgig=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1713228480; c=relaxed/simple;
-	bh=byCP/FDg3cxi3Q9avxehHBL47kJoTd6F79Ew7XP5zhs=;
-	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=HocZYhrDqGBIxVFGqJNmG++oLS7Tyaha0E6xS1U8aCKyC/EUcj92vUBP/uI2bl6dJ6fqy3WYDCXiBC7pubh4qTmEkTPSzAnc0WW5fi8uirc8ZXF4Jx9dFRLOrUacEouWPvwTXhGPfH3FjyfD3kZh91Zhw7wB8csom4YM3e8+bJw=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=WCRWsmYj; arc=none smtp.client-ip=170.10.129.124
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
+	s=arc-20240116; t=1715007888; c=relaxed/simple;
+	bh=if9/+ZOlLlnifr5OS3PuWII5DUHpaf8eR1m/PwqEYbA=;
+	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
+	 MIME-Version; b=A/H62G20UZQVeY5Q086J9Mhjmvzai1mUIjomIy55/Qy+Zq7s5RuDyJFQWtUuRBfIjGAMTZkaY967gJifizLy62NPOPPc/LtTgrxVY/4BSaEqKew9yU6JfP0w4Fm+k0lwwbVn+11AOGNkh9jBI6uKVPJ5IG2kd13vxsMsmJ4Fdwk=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=kIi0LkSo; arc=none smtp.client-ip=205.220.177.32
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=oracle.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oracle.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="WCRWsmYj"
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1713228477;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references;
-	bh=997gQ0EC64A1IFQr7b9ClHckWVuOZOzu8dRw7fYVG2c=;
-	b=WCRWsmYjm12O9ry1G7muS29RY043E3rwgwPhSzVoUXSJt6flpCKVZA/AubKJ5PE22fNy4k
-	NXTMw+83M2wdcIR7mnrhSNJgUsbh9RZ/FEiylZGSVzr70ZLPO+GdJul7toC0iXeA2UCk/v
-	Li22qPaqACk/Oj9HT0Ou0Jf65VJwifY=
-Received: from mail-ej1-f69.google.com (mail-ej1-f69.google.com
- [209.85.218.69]) by relay.mimecast.com with ESMTP with STARTTLS
- (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-73-XLM3CahdPBuv8HJ4J-obKg-1; Mon, 15 Apr 2024 20:47:56 -0400
-X-MC-Unique: XLM3CahdPBuv8HJ4J-obKg-1
-Received: by mail-ej1-f69.google.com with SMTP id a640c23a62f3a-a54c11dccf1so78443766b.0
-        for <virtio-fs@lists.linux.dev>; Mon, 15 Apr 2024 17:47:55 -0700 (PDT)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1713228475; x=1713833275;
-        h=content-transfer-encoding:cc:to:subject:message-id:date:from
-         :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
-         :subject:date:message-id:reply-to;
-        bh=997gQ0EC64A1IFQr7b9ClHckWVuOZOzu8dRw7fYVG2c=;
-        b=POp5boJ0j4dJsTvWpRwDXiJs4SlHfLEVUtB1o63OuoSN2ud9xnz29//79vMwkDHFs3
-         elhc4a4LTGi0u6+tS4T5u2z0m471tewe6WMcmh+/SrOTqEg+X+XuxzrJ0GobgZ7o4f0Y
-         2+gVrlvFlGXar3wKvdaBPEZ/DZPgdWFfMZXeqRBsWnNMnLGnV7zGDEoG1XnOcL5u4mbD
-         Zw/6BwQSr7f9VZQhQz+jTTFnddsXqh84Qk7K3EiIMVtjM76mC+ITcOz8bx3EXvaJIhe8
-         d08e/lYmmg79kMrbDtNoHY3TWsn3a44sQ6/KD7ZqGSQ509l8Pf3FDiInPqgbA5DkioJW
-         xH7A==
-X-Forwarded-Encrypted: i=1; AJvYcCVahn20K0ZXExxB6JfF9hxKl+1EYFoIGy0vNAnu0gLyvkY+1PPnoWcNg6YWRtlrMd3bRpxe75o0chVzlaQxW7UYz+3+6Igcf/jp
-X-Gm-Message-State: AOJu0Yyjbo3Ocv5Zs174LIQ684slnT+8dpVOnPnXSMCHUrO56+lRnh2J
-	Sw//skskgtEyzapxXQ2LJU1y3tgpamQMqDW/VnhVFePZEwkN3TvUkfaxLcBj16eiFwtBA0M17gU
-	YZR2V33Mb/yObllSuUTygq6YS5c0NdJsLH+fkBuRyEgzTOQbsxacY2WsZG8AUViIhCxXgeynjYu
-	jO+cHQ5S2TXA+iSSr6h52YKu6qQF233/9b
-X-Received: by 2002:a17:907:972a:b0:a51:827d:c99b with SMTP id jg42-20020a170907972a00b00a51827dc99bmr9051232ejc.14.1713228475033;
-        Mon, 15 Apr 2024 17:47:55 -0700 (PDT)
-X-Google-Smtp-Source: AGHT+IHpeVQr9oYRUmNPe4+JyA6CSwp2Lae4DDkx8dqE5KYybKeOsdpAWhFNCR2NnUP093EGYCi3/FSTR5igpSY95Bk=
-X-Received: by 2002:a17:907:972a:b0:a51:827d:c99b with SMTP id
- jg42-20020a170907972a00b00a51827dc99bmr9051211ejc.14.1713228474641; Mon, 15
- Apr 2024 17:47:54 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="kIi0LkSo"
+Received: from pps.filterd (m0246631.ppops.net [127.0.0.1])
+	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 446AnARK031879;
+	Mon, 6 May 2024 15:04:40 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=from : to : cc :
+ subject : date : message-id : in-reply-to : references : mime-version :
+ content-transfer-encoding; s=corp-2023-11-20;
+ bh=XK8FpfVa3AtG1crGS3Ap2YXMGsjEuRPSdPZw6tCz1sY=;
+ b=kIi0LkSoCMo/vDIFkyHYC1Oz5j3GgKe5VOtHZCdmmgGM3pfJoj19L4l/I09Mk62BXLpY
+ wnF7irNsSp/OZCIHolPiBLxSVQXTPC+Zhjhihj+kdvDurscsOMNvjvOcR7tUR1aoGdu0
+ 8DlFNON0Wzl8WWfYXRN6vm/iXpvuQrDzOMLFLZgQXGd7hn5EIDZFpP73bIet+3Xcp+hW
+ O10APPcZmtM+vXrpoqJiQzh4TXvv22WRxZXHovuZ0XhvNg9LYgcJ5sVDetSo41ovMmih
+ JWu2fkvLlXPn2ugOTaw1FQLzSAA4MmCS96tgZxIA+vpSxJJU1tqTK8kOsveXcFpl9q4l Yg== 
+Received: from phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta02.appoci.oracle.com [147.154.114.232])
+	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3xwbt52txy-1
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+	Mon, 06 May 2024 15:04:40 +0000
+Received: from pps.filterd (phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
+	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 446DmJWt006938;
+	Mon, 6 May 2024 15:04:39 GMT
+Received: from pps.reinject (localhost [127.0.0.1])
+	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTPS id 3xwbf6rwfb-1
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+	Mon, 06 May 2024 15:04:39 +0000
+Received: from phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
+	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 446F4ZlJ002521;
+	Mon, 6 May 2024 15:04:38 GMT
+Received: from jonah-ol8.us.oracle.com (dhcp-10-39-221-117.vpn.oracle.com [10.39.221.117])
+	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTP id 3xwbf6rw8e-2;
+	Mon, 06 May 2024 15:04:38 +0000
+From: Jonah Palmer <jonah.palmer@oracle.com>
+To: qemu-devel@nongnu.org
+Cc: mst@redhat.com, raphael@enfabrica.net, kwolf@redhat.com, hreitz@redhat.com,
+        jasowang@redhat.com, pbonzini@redhat.com, fam@euphon.net,
+        eperezma@redhat.com, stefanha@redhat.com, qemu-block@nongnu.org,
+        schalla@marvell.com, leiyang@redhat.com, virtio-fs@lists.linux.dev,
+        si-wei.liu@oracle.com, boris.ostrovsky@oracle.com,
+        jonah.palmer@oracle.com
+Subject: [PATCH 1/6] virtio: Add bool to VirtQueueElement
+Date: Mon,  6 May 2024 11:04:23 -0400
+Message-Id: <20240506150428.1203387-2-jonah.palmer@oracle.com>
+X-Mailer: git-send-email 2.39.3
+In-Reply-To: <20240506150428.1203387-1-jonah.palmer@oracle.com>
+References: <20240506150428.1203387-1-jonah.palmer@oracle.com>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-References: <20240408153408.3527586-1-jonah.palmer@oracle.com>
-In-Reply-To: <20240408153408.3527586-1-jonah.palmer@oracle.com>
-From: Lei Yang <leiyang@redhat.com>
-Date: Tue, 16 Apr 2024 08:47:17 +0800
-Message-ID: <CAPpAL=yBZqQuRbv6W_7o11+KgMyLHfqix2AyA8By7f7oZvgB4Q@mail.gmail.com>
-Subject: Re: [RFC v3 0/6] virtio,vhost: Add VIRTIO_F_IN_ORDER support
-To: Jonah Palmer <jonah.palmer@oracle.com>
-Cc: qemu-devel@nongnu.org, mst@redhat.com, raphael@enfabrica.net, 
-	kwolf@redhat.com, hreitz@redhat.com, jasowang@redhat.com, pbonzini@redhat.com, 
-	fam@euphon.net, eperezma@redhat.com, stefanha@redhat.com, 
-	qemu-block@nongnu.org, schalla@marvell.com, virtio-fs@lists.linux.dev, 
-	si-wei.liu@oracle.com, boris.ostrovsky@oracle.com
-X-Mimecast-Spam-Score: 0
-X-Mimecast-Originator: redhat.com
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+Content-Transfer-Encoding: 8bit
+X-Proofpoint-Virus-Version: vendor=baseguard
+ engine=ICAP:2.0.293,Aquarius:18.0.1039,Hydra:6.0.650,FMLib:17.11.176.26
+ definitions=2024-05-06_09,2024-05-06_02,2023-05-22_02
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 bulkscore=0 mlxlogscore=999
+ phishscore=0 spamscore=0 suspectscore=0 mlxscore=0 malwarescore=0
+ adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.12.0-2404010000 definitions=main-2405060104
+X-Proofpoint-GUID: 88Sq-Vmd6BqG5eTpR8_8CMs2FPj2uMju
+X-Proofpoint-ORIG-GUID: 88Sq-Vmd6BqG5eTpR8_8CMs2FPj2uMju
 
-QE tested this series with packed=3Don/off, in_order=3Dtrue and vhost=3Doff
-under regression tests, everything are works fine.
+Add the boolean 'filled' member to the VirtQueueElement structure. The
+use of this boolean will signify if the element has been written to the
+used / descriptor ring or not. This boolean is used to support the
+VIRTIO_F_IN_ORDER feature.
 
 Tested-by: Lei Yang <leiyang@redhat.com>
+Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
+---
+ include/hw/virtio/virtio.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-On Mon, Apr 8, 2024 at 11:34=E2=80=AFPM Jonah Palmer <jonah.palmer@oracle.c=
-om> wrote:
->
-> The goal of these patches is to add support to a variety of virtio and
-> vhost devices for the VIRTIO_F_IN_ORDER transport feature. This feature
-> indicates that all buffers are used by the device in the same order in
-> which they were made available by the driver.
->
-> These patches attempt to implement a generalized, non-device-specific
-> solution to support this feature.
->
-> The core feature behind this solution is a buffer mechanism in the form
-> of a VirtQueue's used_elems VirtQueueElement array. This allows devices
-> who always use buffers in-order by default to have a minimal overhead
-> impact. Devices that may not always use buffers in-order likely will
-> experience a performance hit. How large that performance hit is will
-> depend on how frequent elements are completed out-of-order.
->
-> A VirtQueue whose device who uses this feature will use its used_elems
-> VirtQueueElement array to hold used VirtQueueElements. The index that
-> used elements are placed in used_elems is the same index on the
-> used/descriptor ring that would satisfy the in-order requirement. In
-> other words, used elements are placed in their in-order locations on
-> used_elems and are only written to the used/descriptor ring once the
-> elements on used_elems are able to continue their expected order.
->
-> To differentiate between a "used" and "unused" element on the used_elems
-> array (a "used" element being an element that has returned from
-> processing and an "unused" element being an element that has not yet
-> been processed), we added a boolean 'filled' member to the
-> VirtQueueElement struct. This flag is set to true when the element comes
-> back from processing (virtqueue_ordered_fill) and then set back to false
-> once it's been written to the used/descriptor ring
-> (virtqueue_ordered_flush).
->
-> ---
-> v3: Add elements to used_elems during virtqueue_split/packed_pop
->     Replace current_seq_idx usage with vq->last_avail_idx
->     Remove used_seq_idx, leverage used_idx and last_avail_idx for
->     searching used_elems
->     Remove seq_idx in VirtQueueElement
->     Add boolean to VirtQueueElement to signal element status
->     Add virtqueue_ordered_fill/flush functions for ordering
->
-> v2: Use a VirtQueue's used_elems array as a buffer mechanism
->
-> v1: Implement custom GLib GHashTable as a buffer mechanism
->
-> Jonah Palmer (6):
->   virtio: Add bool to VirtQueueElement
->   virtio: virtqueue_pop - VIRTIO_F_IN_ORDER support
->   virtio: virtqueue_ordered_fill - VIRTIO_F_IN_ORDER support
->   virtio: virtqueue_ordered_flush - VIRTIO_F_IN_ORDER support
->   vhost,vhost-user: Add VIRTIO_F_IN_ORDER to vhost feature bits
->   virtio: Add VIRTIO_F_IN_ORDER property definition
->
->  hw/block/vhost-user-blk.c    |   1 +
->  hw/net/vhost_net.c           |   2 +
->  hw/scsi/vhost-scsi.c         |   1 +
->  hw/scsi/vhost-user-scsi.c    |   1 +
->  hw/virtio/vhost-user-fs.c    |   1 +
->  hw/virtio/vhost-user-vsock.c |   1 +
->  hw/virtio/virtio.c           | 118 ++++++++++++++++++++++++++++++++++-
->  include/hw/virtio/virtio.h   |   5 +-
->  net/vhost-vdpa.c             |   1 +
->  9 files changed, 127 insertions(+), 4 deletions(-)
->
-> --
-> 2.39.3
->
+diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+index 7d5ffdc145..9ed9c3763c 100644
+--- a/include/hw/virtio/virtio.h
++++ b/include/hw/virtio/virtio.h
+@@ -69,6 +69,7 @@ typedef struct VirtQueueElement
+     unsigned int ndescs;
+     unsigned int out_num;
+     unsigned int in_num;
++    bool filled;
+     hwaddr *in_addr;
+     hwaddr *out_addr;
+     struct iovec *in_sg;
+-- 
+2.39.3
 

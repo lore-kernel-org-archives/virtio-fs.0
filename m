@@ -1,50 +1,50 @@
 Received: from mx0b-00069f02.pphosted.com (mx0b-00069f02.pphosted.com [205.220.177.32])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 891F7154436
-	for <virtio-fs@lists.linux.dev>; Mon,  6 May 2024 15:04:52 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A086E154448
+	for <virtio-fs@lists.linux.dev>; Mon,  6 May 2024 15:04:54 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.177.32
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1715007894; cv=none; b=j87mxXT32F7vA1htVqrSMge8nN8rXkT+ZG5NqYHUrQVGOcGsuKUJszaCrho9nEHhLBzp7eaChFQQioEUwCQtQ64UiaFw2QBXMqto3iRl0DXCNWiprqkLolTiLQYpCR6MYc/+ZEUAakoQ4xBYYg4zoQucg+HmhP1pMAMorZX+L1Q=
+	t=1715007896; cv=none; b=KwuYDs1xdVvtN5oIOcUZsNFRx3w/EpbICGuZes7CZceNwQw9E7MyNbzdE2vYjSmzLUepvXygpHsFHVmwitQIdd5HA/qcgt0VH7rJnpjfnH7SMYhIgujRheQB9xB7BnAvXGOG+QJpEZ6+AY50tf/CNWWX/sIsKuj/ED/TwWhugCo=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1715007894; c=relaxed/simple;
-	bh=lsxJ0lXzSklDaoAika0Jg8pwLle+LtQETV52MlHgjak=;
+	s=arc-20240116; t=1715007896; c=relaxed/simple;
+	bh=LiKoChpj1vTINa0rzJwxyJ1NG4vATBIo7WV9ejcNBbQ=;
 	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
-	 MIME-Version; b=PCcOhUBZ76BaXyOmLHsLqz3AEfncVqTr2UxzXR0TK/bucyJyCfaDmt1NdpkgTh53Q5KoGJ/nFovtk3g1CglXkyzQSmJjLdDrY/aCjSmA/KsnmQgzPASf61zfljqupU70cIok7LRdH7BDQlN6IDK0LL7yTc8zL+DGXYfVOm0YuEA=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=lNxpt+qM; arc=none smtp.client-ip=205.220.177.32
+	 MIME-Version:Content-Type; b=JkWo0NxOHuTU9ByO9ELU+nxnOF7tV66B4mvrxeJCdBMiegbKsZtx0hagO6U6zbGGdiePR6kvrRH+P58YFX9D2lcDleQtb9Ryh/ZuNYAYvkPz/efz3LhTjlVveR5SkECwq4zwa38Nero2QOiaFidEAmS5KhPjXYcXUccPN+yDzLo=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=djZGPSK6; arc=none smtp.client-ip=205.220.177.32
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=oracle.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oracle.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="lNxpt+qM"
-Received: from pps.filterd (m0246632.ppops.net [127.0.0.1])
-	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 446AmxpD018880;
-	Mon, 6 May 2024 15:04:48 GMT
+	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="djZGPSK6"
+Received: from pps.filterd (m0333520.ppops.net [127.0.0.1])
+	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 446An4FY027866;
+	Mon, 6 May 2024 15:04:50 GMT
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=from : to : cc :
  subject : date : message-id : in-reply-to : references : mime-version :
- content-transfer-encoding; s=corp-2023-11-20;
- bh=JeRPLc8Nz0JpIpjv/pdvoKN/oEGM1EJVi+w7A1bLScI=;
- b=lNxpt+qMGpt/+2xTx2mJcSxD180pO/OXbONIEWVyDp1qGrMd/3mB3L8HnNwcIynhaF9u
- sboFKaYnbJEeRlO1ZdzWM6JdHmdzyc+9yE6w9qMNJyBGR3Z15ZQf1WRMRfd1tPNOVKKq
- wToMBT+k0ePfTlEJcQR9bHGYbcNsIUg6lvmAPIua6uRD/Jx626iABKbVjWbr4ZIrioeB
- ZxYwXvMwVduk8vt0MrEJMsX7wm9Ft12OvxF0vGK5iY424UYo7Y0xgs/L5cBtHBR35XzS
- 4p++PkryEhl2LW6IeQurb+ZCkKjGCwIt/9t72IeRmqqleUGC+qgdhKiJ420KZJ8U5sDs pA== 
+ content-type : content-transfer-encoding; s=corp-2023-11-20;
+ bh=Os7saOwkoS3oTr9xuuvbVdiETTtORsGl7vlRiblzmb4=;
+ b=djZGPSK6EG80Zru0IEttreLLxsFOW8JD3C2zVEJJKSvr0qd0Y+QJjUxlr6qCeG2mpvLR
+ G0yGjyLiTvey/h0hyusz5hqGEcVJa9x3R2MEMmqDSOjiuLJMhDcftT67tUGH6ry08KPg
+ aXM76fSbzhEEGvbUpmrftwPuKkFiIzh+rAPA/8Wu7wcx2/9BoJwGQdQGKzEtfjbXchi5
+ kqcZblsNW+P00bGykjIUVZWsFPm9v6mOA5cjC7TCy8O8G/Ousr1HHICPVsPfuFUigWlE
+ dFB1cDqUO9QKeOW4Ams+MERqpEZHCnn2AVqJcdP5CWNfvXxWWXs9PNXOuGG3c7068T8U Eg== 
 Received: from phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta02.appoci.oracle.com [147.154.114.232])
-	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3xwcmvat39-1
+	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3xwd2dtt89-1
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Mon, 06 May 2024 15:04:47 +0000
+	Mon, 06 May 2024 15:04:50 +0000
 Received: from pps.filterd (phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
-	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 446DpmYE007085;
-	Mon, 6 May 2024 15:04:46 GMT
+	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 446DVC3R007034;
+	Mon, 6 May 2024 15:04:49 GMT
 Received: from pps.reinject (localhost [127.0.0.1])
-	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTPS id 3xwbf6rwp5-1
+	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTPS id 3xwbf6rwqy-1
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Mon, 06 May 2024 15:04:46 +0000
+	Mon, 06 May 2024 15:04:49 +0000
 Received: from phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
-	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 446F4ZlP002521;
-	Mon, 6 May 2024 15:04:46 GMT
+	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 446F4ZlR002521;
+	Mon, 6 May 2024 15:04:48 GMT
 Received: from jonah-ol8.us.oracle.com (dhcp-10-39-221-117.vpn.oracle.com [10.39.221.117])
-	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTP id 3xwbf6rw8e-5;
-	Mon, 06 May 2024 15:04:45 +0000
+	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTP id 3xwbf6rw8e-6;
+	Mon, 06 May 2024 15:04:48 +0000
 From: Jonah Palmer <jonah.palmer@oracle.com>
 To: qemu-devel@nongnu.org
 Cc: mst@redhat.com, raphael@enfabrica.net, kwolf@redhat.com, hreitz@redhat.com,
@@ -53,9 +53,9 @@ Cc: mst@redhat.com, raphael@enfabrica.net, kwolf@redhat.com, hreitz@redhat.com,
         schalla@marvell.com, leiyang@redhat.com, virtio-fs@lists.linux.dev,
         si-wei.liu@oracle.com, boris.ostrovsky@oracle.com,
         jonah.palmer@oracle.com
-Subject: [PATCH 4/6] virtio: virtqueue_ordered_flush - VIRTIO_F_IN_ORDER support
-Date: Mon,  6 May 2024 11:04:26 -0400
-Message-Id: <20240506150428.1203387-5-jonah.palmer@oracle.com>
+Subject: [PATCH 5/6] vhost,vhost-user: Add VIRTIO_F_IN_ORDER to vhost feature bits
+Date: Mon,  6 May 2024 11:04:27 -0400
+Message-Id: <20240506150428.1203387-6-jonah.palmer@oracle.com>
 X-Mailer: git-send-email 2.39.3
 In-Reply-To: <20240506150428.1203387-1-jonah.palmer@oracle.com>
 References: <20240506150428.1203387-1-jonah.palmer@oracle.com>
@@ -65,6 +65,7 @@ List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 X-Proofpoint-Virus-Version: vendor=baseguard
  engine=ICAP:2.0.293,Aquarius:18.0.1039,Hydra:6.0.650,FMLib:17.11.176.26
@@ -73,121 +74,122 @@ X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 bulkscore=0 mlxlo
  phishscore=0 spamscore=0 suspectscore=0 mlxscore=0 malwarescore=0
  adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
  engine=8.12.0-2404010000 definitions=main-2405060104
-X-Proofpoint-GUID: zSDxhcaeIeqhsOS9SJn9R3BfoZw3itIK
-X-Proofpoint-ORIG-GUID: zSDxhcaeIeqhsOS9SJn9R3BfoZw3itIK
+X-Proofpoint-GUID: EUZPbe49J6Tir953jrE_LS41P6_K-ZuW
+X-Proofpoint-ORIG-GUID: EUZPbe49J6Tir953jrE_LS41P6_K-ZuW
 
-Add VIRTIO_F_IN_ORDER feature support for virtqueue_flush operations.
+Add support for the VIRTIO_F_IN_ORDER feature across a variety of vhost
+devices.
 
-The goal of the virtqueue_flush operation when the VIRTIO_F_IN_ORDER
-feature has been negotiated is to write elements to the used/descriptor
-ring in-order and then update used_idx.
-
-The function iterates through the VirtQueueElement used_elems array
-in-order starting at vq->used_idx. If the element is valid (filled), the
-element is written to the used/descriptor ring. This process continues
-until we find an invalid (not filled) element.
-
-If any elements were written, the used_idx is updated.
+The inclusion of VIRTIO_F_IN_ORDER in the feature bits arrays for these
+devices ensures that the backend is capable of offering and providing
+support for this feature, and that it can be disabled if the backend
+does not support it.
 
 Tested-by: Lei Yang <leiyang@redhat.com>
+Acked-by: Eugenio Pérez <eperezma@redhat.com>
 Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
 ---
- hw/virtio/virtio.c | 75 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 74 insertions(+), 1 deletion(-)
+ hw/block/vhost-user-blk.c    | 1 +
+ hw/net/vhost_net.c           | 2 ++
+ hw/scsi/vhost-scsi.c         | 1 +
+ hw/scsi/vhost-user-scsi.c    | 1 +
+ hw/virtio/vhost-user-fs.c    | 1 +
+ hw/virtio/vhost-user-vsock.c | 1 +
+ net/vhost-vdpa.c             | 1 +
+ 7 files changed, 8 insertions(+)
 
-diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
-index 064046b5e2..0efed2c88e 100644
---- a/hw/virtio/virtio.c
-+++ b/hw/virtio/virtio.c
-@@ -1006,6 +1006,77 @@ static void virtqueue_packed_flush(VirtQueue *vq, unsigned int count)
-     }
- }
+diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
+index 9e6bbc6950..1dd0a8ef63 100644
+--- a/hw/block/vhost-user-blk.c
++++ b/hw/block/vhost-user-blk.c
+@@ -51,6 +51,7 @@ static const int user_feature_bits[] = {
+     VIRTIO_F_RING_PACKED,
+     VIRTIO_F_IOMMU_PLATFORM,
+     VIRTIO_F_RING_RESET,
++    VIRTIO_F_IN_ORDER,
+     VHOST_INVALID_FEATURE_BIT
+ };
  
-+static void virtqueue_ordered_flush(VirtQueue *vq)
-+{
-+    unsigned int i = vq->used_idx;
-+    unsigned int ndescs = 0;
-+    uint16_t old = vq->used_idx;
-+    bool packed;
-+    VRingUsedElem uelem;
-+
-+    packed = virtio_vdev_has_feature(vq->vdev, VIRTIO_F_RING_PACKED);
-+
-+    if (packed) {
-+        if (unlikely(!vq->vring.desc)) {
-+            return;
-+        }
-+    } else if (unlikely(!vq->vring.used)) {
-+        return;
-+    }
-+
-+    /* First expected in-order element isn't ready, nothing to do */
-+    if (!vq->used_elems[i].filled) {
-+        return;
-+    }
-+
-+    /* Write first expected in-order element to used ring (split VQs) */
-+    if (!packed) {
-+        uelem.id = vq->used_elems[i].index;
-+        uelem.len = vq->used_elems[i].len;
-+        vring_used_write(vq, &uelem, i);
-+    }
-+
-+    ndescs += vq->used_elems[i].ndescs;
-+    i += ndescs;
-+    if (i >= vq->vring.num) {
-+        i -= vq->vring.num;
-+    }
-+
-+    /* Search for more filled elements in-order */
-+    while (vq->used_elems[i].filled) {
-+        if (packed) {
-+            virtqueue_packed_fill_desc(vq, &vq->used_elems[i], ndescs, false);
-+        } else {
-+            uelem.id = vq->used_elems[i].index;
-+            uelem.len = vq->used_elems[i].len;
-+            vring_used_write(vq, &uelem, i);
-+        }
-+
-+        vq->used_elems[i].filled = false;
-+        ndescs += vq->used_elems[i].ndescs;
-+        i += ndescs;
-+        if (i >= vq->vring.num) {
-+            i -= vq->vring.num;
-+        }
-+    }
-+
-+    if (packed) {
-+        virtqueue_packed_fill_desc(vq, &vq->used_elems[vq->used_idx], 0, true);
-+        vq->used_idx += ndescs;
-+        if (vq->used_idx >= vq->vring.num) {
-+            vq->used_idx -= vq->vring.num;
-+            vq->used_wrap_counter ^= 1;
-+            vq->signalled_used_valid = false;
-+        }
-+    } else {
-+        vring_used_idx_set(vq, i);
-+        if (unlikely((int16_t)(i - vq->signalled_used) < (uint16_t)(i - old))) {
-+            vq->signalled_used_valid = false;
-+        }
-+    }
-+    vq->inuse -= ndescs;
-+}
-+
- void virtqueue_flush(VirtQueue *vq, unsigned int count)
- {
-     if (virtio_device_disabled(vq->vdev)) {
-@@ -1013,7 +1084,9 @@ void virtqueue_flush(VirtQueue *vq, unsigned int count)
-         return;
-     }
+diff --git a/hw/net/vhost_net.c b/hw/net/vhost_net.c
+index fd1a93701a..eb0b1c06e5 100644
+--- a/hw/net/vhost_net.c
++++ b/hw/net/vhost_net.c
+@@ -48,6 +48,7 @@ static const int kernel_feature_bits[] = {
+     VIRTIO_F_IOMMU_PLATFORM,
+     VIRTIO_F_RING_PACKED,
+     VIRTIO_F_RING_RESET,
++    VIRTIO_F_IN_ORDER,
+     VIRTIO_NET_F_HASH_REPORT,
+     VHOST_INVALID_FEATURE_BIT
+ };
+@@ -76,6 +77,7 @@ static const int user_feature_bits[] = {
+     VIRTIO_F_IOMMU_PLATFORM,
+     VIRTIO_F_RING_PACKED,
+     VIRTIO_F_RING_RESET,
++    VIRTIO_F_IN_ORDER,
+     VIRTIO_NET_F_RSS,
+     VIRTIO_NET_F_HASH_REPORT,
+     VIRTIO_NET_F_GUEST_USO4,
+diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
+index ae26bc19a4..40e7630191 100644
+--- a/hw/scsi/vhost-scsi.c
++++ b/hw/scsi/vhost-scsi.c
+@@ -38,6 +38,7 @@ static const int kernel_feature_bits[] = {
+     VIRTIO_RING_F_EVENT_IDX,
+     VIRTIO_SCSI_F_HOTPLUG,
+     VIRTIO_F_RING_RESET,
++    VIRTIO_F_IN_ORDER,
+     VHOST_INVALID_FEATURE_BIT
+ };
  
--    if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_RING_PACKED)) {
-+    if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_IN_ORDER)) {
-+        virtqueue_ordered_flush(vq);
-+    } else if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_RING_PACKED)) {
-         virtqueue_packed_flush(vq, count);
-     } else {
-         virtqueue_split_flush(vq, count);
+diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
+index a63b1f4948..1d59951ab7 100644
+--- a/hw/scsi/vhost-user-scsi.c
++++ b/hw/scsi/vhost-user-scsi.c
+@@ -36,6 +36,7 @@ static const int user_feature_bits[] = {
+     VIRTIO_RING_F_EVENT_IDX,
+     VIRTIO_SCSI_F_HOTPLUG,
+     VIRTIO_F_RING_RESET,
++    VIRTIO_F_IN_ORDER,
+     VHOST_INVALID_FEATURE_BIT
+ };
+ 
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index cca2cd41be..9243dbb128 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -33,6 +33,7 @@ static const int user_feature_bits[] = {
+     VIRTIO_F_RING_PACKED,
+     VIRTIO_F_IOMMU_PLATFORM,
+     VIRTIO_F_RING_RESET,
++    VIRTIO_F_IN_ORDER,
+ 
+     VHOST_INVALID_FEATURE_BIT
+ };
+diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
+index 9431b9792c..cc7e4e47b4 100644
+--- a/hw/virtio/vhost-user-vsock.c
++++ b/hw/virtio/vhost-user-vsock.c
+@@ -21,6 +21,7 @@ static const int user_feature_bits[] = {
+     VIRTIO_RING_F_INDIRECT_DESC,
+     VIRTIO_RING_F_EVENT_IDX,
+     VIRTIO_F_NOTIFY_ON_EMPTY,
++    VIRTIO_F_IN_ORDER,
+     VHOST_INVALID_FEATURE_BIT
+ };
+ 
+diff --git a/net/vhost-vdpa.c b/net/vhost-vdpa.c
+index 85e73dd6a7..ed3185acfa 100644
+--- a/net/vhost-vdpa.c
++++ b/net/vhost-vdpa.c
+@@ -62,6 +62,7 @@ const int vdpa_feature_bits[] = {
+     VIRTIO_F_RING_PACKED,
+     VIRTIO_F_RING_RESET,
+     VIRTIO_F_VERSION_1,
++    VIRTIO_F_IN_ORDER,
+     VIRTIO_NET_F_CSUM,
+     VIRTIO_NET_F_CTRL_GUEST_OFFLOADS,
+     VIRTIO_NET_F_CTRL_MAC_ADDR,
 -- 
 2.39.3
 

@@ -1,110 +1,115 @@
-Received: from mx0b-00069f02.pphosted.com (mx0b-00069f02.pphosted.com [205.220.177.32])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 97AA415445D
-	for <virtio-fs@lists.linux.dev>; Mon,  6 May 2024 15:04:59 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.177.32
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 0D7D11FAA
+	for <virtio-fs@lists.linux.dev>; Thu,  9 May 2024 12:33:12 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1715007901; cv=none; b=r5CdfzT6YFmCrJELBEV/5SIFdSPcH8F5iZsvhTVHNCJChxZKwidKTQktOvxluseVEH+QLsgMLM3A7+pQPbgZRv/o5jdbnxUQkgcWyQseT28qRFh2+Jj9LAnoPuGELeur8GXNMhbMfnFC9tGuFav8nCwNznOkjF4Xg1aSd419dcY=
+	t=1715257994; cv=none; b=XSFXKd4X/0uNgnG9JUBfdCXze26bIyY8RB3dpVtqzBYBbk9IeQI2lsQJ7q7Fqkh8tELrS3CgPlDPjWC514EJIeyxca9tAZOZ1KSCtRFxdjnc2GvyZVa+mAVkT77qpG2ln+UFtRs2SGlr5daS6O/ZZwltKPXYir7iLVqOSrAubiQ=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1715007901; c=relaxed/simple;
-	bh=6kX75hY/dqAFPErdJPUw89KFOEOw+AWSSVcpUiJY6z4=;
-	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
-	 MIME-Version:Content-Type; b=YanGMZHQtIbWiQ+HvsyvyrswJn7zp0toZ1gNOS8Zmucrq/qwNT3k7DQ4QiCs4RmypCJl7K5Odoh+FGX8gPIVsqNpNc5mU32a5W456yLua+FCM/jZngxLxW5ft9D/+7RJQ/dikG6gPrA/Cu0T3KvXWCdUhRbOHO+B4B54GSBX54g=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=oracle.com; spf=pass smtp.mailfrom=oracle.com; dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b=dkJGaV4S; arc=none smtp.client-ip=205.220.177.32
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=oracle.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oracle.com
+	s=arc-20240116; t=1715257994; c=relaxed/simple;
+	bh=KnxlSkJMKpq/o5qBJkVGmGEPz67emEnYhilyiFn8a6c=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=H9OdPVa6pNm/QG4MbdZIxrRPbzqsnOz7X4ip/Qilsv2FlUPCsfBxr6J+Qf4PV7H+DhmVhcuhkeF5cCk44Rpthz86h3YFL4dw0B0X0logR9c6ZxRJFV06co9s7v1kJ8fpTUPWk80f0/V9zuGfzd8+YlN/jlLHBJLCXb4lTnO2fYc=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=US/s2jDf; arc=none smtp.client-ip=170.10.129.124
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="dkJGaV4S"
-Received: from pps.filterd (m0246630.ppops.net [127.0.0.1])
-	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 446An3Em009250;
-	Mon, 6 May 2024 15:04:53 GMT
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=from : to : cc :
- subject : date : message-id : in-reply-to : references : mime-version :
- content-type : content-transfer-encoding; s=corp-2023-11-20;
- bh=f3wiEf6Vioc/85QwQtwyo5y3LFK0hoVlrmwPwiKOddE=;
- b=dkJGaV4SKFnLikMoZFqQFEIxOYtVM9fa6Ig7PWIui+lw95D+elJj2Ok6YmE2Lj/NAcsv
- PmDj/YNFitSD3yJR9rx/u04B5e8Ny7XiaJ1cPi0IQXgYnH47XjeCjmMDRr2EtXXapk3/
- sh+9dx09pxFcuPCld3eMHWi1DHgNhbCiieqyWFoZ4/HWAcKHmjjjmCSINQ29rQ9+7DSD
- 2rQuBIcEgdqcQ1H2y60b7IsoXHcbyWLIj32AvbbVHjj7HKb/+K4O4aRmwDP+UDnDtAW5
- N6RC4mCT07kIveWK4pp7eIdP5IaBvpFkAIp3kiBMqn5K/+n8DsTRRwgm67lpAqBs1xRW fw== 
-Received: from phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta02.appoci.oracle.com [147.154.114.232])
-	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3xwbeettg7-1
-	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Mon, 06 May 2024 15:04:52 +0000
-Received: from pps.filterd (phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
-	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 446DhZBY006927;
-	Mon, 6 May 2024 15:04:51 GMT
-Received: from pps.reinject (localhost [127.0.0.1])
-	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTPS id 3xwbf6rwsm-1
-	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
-	Mon, 06 May 2024 15:04:51 +0000
-Received: from phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com [127.0.0.1])
-	by pps.reinject (8.17.1.5/8.17.1.5) with ESMTP id 446F4ZlT002521;
-	Mon, 6 May 2024 15:04:50 GMT
-Received: from jonah-ol8.us.oracle.com (dhcp-10-39-221-117.vpn.oracle.com [10.39.221.117])
-	by phxpaimrmta02.imrmtpd1.prodappphxaev1.oraclevcn.com (PPS) with ESMTP id 3xwbf6rw8e-7;
-	Mon, 06 May 2024 15:04:50 +0000
-From: Jonah Palmer <jonah.palmer@oracle.com>
-To: qemu-devel@nongnu.org
-Cc: mst@redhat.com, raphael@enfabrica.net, kwolf@redhat.com, hreitz@redhat.com,
-        jasowang@redhat.com, pbonzini@redhat.com, fam@euphon.net,
-        eperezma@redhat.com, stefanha@redhat.com, qemu-block@nongnu.org,
-        schalla@marvell.com, leiyang@redhat.com, virtio-fs@lists.linux.dev,
-        si-wei.liu@oracle.com, boris.ostrovsky@oracle.com,
-        jonah.palmer@oracle.com
-Subject: [PATCH 6/6] virtio: Add VIRTIO_F_IN_ORDER property definition
-Date: Mon,  6 May 2024 11:04:28 -0400
-Message-Id: <20240506150428.1203387-7-jonah.palmer@oracle.com>
-X-Mailer: git-send-email 2.39.3
-In-Reply-To: <20240506150428.1203387-1-jonah.palmer@oracle.com>
-References: <20240506150428.1203387-1-jonah.palmer@oracle.com>
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="US/s2jDf"
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
+	s=mimecast20190719; t=1715257992;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	 content-transfer-encoding:content-transfer-encoding:
+	 in-reply-to:in-reply-to:references:references;
+	bh=aTfIGJcFdzJQwTmvkwZdfYxzltdUjfBTO20WHVEG6aI=;
+	b=US/s2jDfhXQJ2RrFJTaNVtutnDysBqCEpoW6B6jNfdQl2fyTf/g21mFswpVZuGALTXLa1b
+	zwTDaTuOi7nGgRdps4w5ZcbOo3Lnh8933+PuuVzHQDMO6X+4Z9yWtdKTN0pUc0A6ytk/80
+	JixG7xTAV/b8uPeoRdl5dSkaybpFd40=
+Received: from mail-yb1-f200.google.com (mail-yb1-f200.google.com
+ [209.85.219.200]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-375-3Cw7cAOgNRCLyzorf3F-1w-1; Thu, 09 May 2024 08:33:10 -0400
+X-MC-Unique: 3Cw7cAOgNRCLyzorf3F-1w-1
+Received: by mail-yb1-f200.google.com with SMTP id 3f1490d57ef6-de59ff8af0bso1298033276.2
+        for <virtio-fs@lists.linux.dev>; Thu, 09 May 2024 05:33:10 -0700 (PDT)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20230601; t=1715257990; x=1715862790;
+        h=content-transfer-encoding:cc:to:subject:message-id:date:from
+         :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to;
+        bh=aTfIGJcFdzJQwTmvkwZdfYxzltdUjfBTO20WHVEG6aI=;
+        b=lxONNRilOysMHKGXJIyqEfymxtoY09KS7OPp0bGiCqNfKt5wztidVxBCBd3vhG1U+T
+         88D1Yy/g1s2+lxC47fYcwXwjbazs3MmGjnu7hbOafO9tuN0v9zyUyzZlh67/Ia4k9Vd/
+         BKzyggdJLa1teg+xw0no2jVJq1AUgAWHuLpzvpfUQUG6aOMDjhzSxDg1w9od5rT+U3Lf
+         hIfQo6cNbUMQCZRjuBnyKYNO5WmVa/ThMi80GLJ7v/6z9GKZVNwcm026BeBp61zj4TTo
+         3KHZylPcumWpDpzagM624s7yoKsw92sFxNjZcbMgXUwFidQYdDUbhjZDn+MM7OIxlZ6E
+         cGNQ==
+X-Forwarded-Encrypted: i=1; AJvYcCWH6yfDs9mkUzeZzWJzXffA95VNvKWnv865w2Wo2UfYW0HwEu5Jq2sDX2H3wPlqp/yPylPzVPbrQ9qZYVjY5zlWKXRs7VzxvclX
+X-Gm-Message-State: AOJu0Yzunw6xABUoy8qniMaa8dq+rX1j4XRnIjdxOwB0B0oWWICHgbBX
+	9kM/Q7LJMi5zLzTeBm6jGwj8rTAvTgD7qKz7Gu8/QHin9suexWtuxFexXbxFJpCZTwjFfyXZCSt
+	vxPeJwZIYZEnMEyluyBsptQneoSWsoEo8cS0dMQIjdr00H2DD+s0ht86TsDL1Jb/05KIzCRRMfZ
+	3c04UT61l79KtELMg2HSkAVeLX4+w1Bw6+
+X-Received: by 2002:a25:868d:0:b0:de8:bdd3:c113 with SMTP id 3f1490d57ef6-debb9d88cebmr5104899276.25.1715257990103;
+        Thu, 09 May 2024 05:33:10 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IGHd7wVkLpRhvoT2EdR+x4C4Ic3RUl/kFAq9rPrXBfXobueUXJ7fzEZdGAgcweZtMhLXG6IqtFWL9aLe40XY9I=
+X-Received: by 2002:a25:868d:0:b0:de8:bdd3:c113 with SMTP id
+ 3f1490d57ef6-debb9d88cebmr5104857276.25.1715257988475; Thu, 09 May 2024
+ 05:33:08 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-X-Proofpoint-Virus-Version: vendor=baseguard
- engine=ICAP:2.0.293,Aquarius:18.0.1039,Hydra:6.0.650,FMLib:17.11.176.26
- definitions=2024-05-06_09,2024-05-06_02,2023-05-22_02
-X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 bulkscore=0 mlxlogscore=999
- phishscore=0 spamscore=0 suspectscore=0 mlxscore=0 malwarescore=0
- adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
- engine=8.12.0-2404010000 definitions=main-2405060104
-X-Proofpoint-GUID: eaSJjcWsNY5gItq1t-QUPGQwcdPUPaF7
-X-Proofpoint-ORIG-GUID: eaSJjcWsNY5gItq1t-QUPGQwcdPUPaF7
+References: <20240506150428.1203387-1-jonah.palmer@oracle.com> <20240506150428.1203387-2-jonah.palmer@oracle.com>
+In-Reply-To: <20240506150428.1203387-2-jonah.palmer@oracle.com>
+From: Eugenio Perez Martin <eperezma@redhat.com>
+Date: Thu, 9 May 2024 14:32:32 +0200
+Message-ID: <CAJaqyWeitQo0rqR5+q7e1OjBF=zWHpg++cwyH3dRhaNaM6bB+w@mail.gmail.com>
+Subject: Re: [PATCH 1/6] virtio: Add bool to VirtQueueElement
+To: Jonah Palmer <jonah.palmer@oracle.com>
+Cc: qemu-devel@nongnu.org, mst@redhat.com, raphael@enfabrica.net, 
+	kwolf@redhat.com, hreitz@redhat.com, jasowang@redhat.com, pbonzini@redhat.com, 
+	fam@euphon.net, stefanha@redhat.com, qemu-block@nongnu.org, 
+	schalla@marvell.com, leiyang@redhat.com, virtio-fs@lists.linux.dev, 
+	si-wei.liu@oracle.com, boris.ostrovsky@oracle.com
+X-Mimecast-Spam-Score: 0
+X-Mimecast-Originator: redhat.com
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Extend the virtio device property definitions to include the
-VIRTIO_F_IN_ORDER feature.
+On Mon, May 6, 2024 at 5:06=E2=80=AFPM Jonah Palmer <jonah.palmer@oracle.co=
+m> wrote:
+>
+> Add the boolean 'filled' member to the VirtQueueElement structure. The
+> use of this boolean will signify if the element has been written to the
+> used / descriptor ring or not. This boolean is used to support the
+> VIRTIO_F_IN_ORDER feature.
+>
+> Tested-by: Lei Yang <leiyang@redhat.com>
+> Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
+> ---
+>  include/hw/virtio/virtio.h | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+> index 7d5ffdc145..9ed9c3763c 100644
+> --- a/include/hw/virtio/virtio.h
+> +++ b/include/hw/virtio/virtio.h
+> @@ -69,6 +69,7 @@ typedef struct VirtQueueElement
+>      unsigned int ndescs;
+>      unsigned int out_num;
+>      unsigned int in_num;
+> +    bool filled;
 
-The default state of this feature is disabled, allowing it to be
-explicitly enabled where it's supported.
+in_order_filled? I cannot come with a good name for this. Maybe we can
+add a comment on top of the variable so we know what it is used for?
 
-Tested-by: Lei Yang <leiyang@redhat.com>
-Acked-by: Eugenio Pérez <eperezma@redhat.com>
-Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
----
- include/hw/virtio/virtio.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
-index 9ed9c3763c..30c23400e3 100644
---- a/include/hw/virtio/virtio.h
-+++ b/include/hw/virtio/virtio.h
-@@ -370,7 +370,9 @@ typedef struct VirtIORNGConf VirtIORNGConf;
-     DEFINE_PROP_BIT64("packed", _state, _field, \
-                       VIRTIO_F_RING_PACKED, false), \
-     DEFINE_PROP_BIT64("queue_reset", _state, _field, \
--                      VIRTIO_F_RING_RESET, true)
-+                      VIRTIO_F_RING_RESET, true), \
-+    DEFINE_PROP_BIT64("in_order", _state, _field, \
-+                      VIRTIO_F_IN_ORDER, false)
- 
- hwaddr virtio_queue_get_desc_addr(VirtIODevice *vdev, int n);
- bool virtio_queue_enabled_legacy(VirtIODevice *vdev, int n);
--- 
-2.39.3
+>      hwaddr *in_addr;
+>      hwaddr *out_addr;
+>      struct iovec *in_sg;
+> --
+> 2.39.3
+>
 

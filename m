@@ -1,73 +1,73 @@
 Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4B45A3FB96
-	for <virtio-fs@lists.linux.dev>; Wed, 22 May 2024 15:46:09 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 021A120DF7
+	for <virtio-fs@lists.linux.dev>; Wed, 22 May 2024 16:07:43 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1716392771; cv=none; b=ROtU1kZ7DMuqAxjSi791DHI/XUsq01JLOBwVrrkAFCvLbOReobyO2ps+OJgSprJ4ZplIZxnGvtk7vVs4biYs6LNCgRFQe3sL0rj0TWLR7zFf1tZlmJbnBCeIa0fnTx8whpQRxD7GSuqEE8TNbfC2HuP7SOtaF02aew0710MNf90=
+	t=1716394065; cv=none; b=Z1HwdgzbopOInieJ3gFpad2C4kVICYifh6tyHS6Ok6FXHR0soNwZdZILJUz19qYuSs6T4FvW5SnfF+AW7lYGaBHcrPaXqpDKcW/aJk4eNFp7RNpHvTjs8l2NDiuVA4H1/bw7lp4/RsDLAzMPGGZs2LsgP+i6Cf0z2cL28dGXLN4=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1716392771; c=relaxed/simple;
-	bh=JADkpMP7QlcwBGjjog2sfRVqS8qGCZhOZYFtXiOIRJI=;
+	s=arc-20240116; t=1716394065; c=relaxed/simple;
+	bh=OnCAmkW5lhWWm44QjwL3986wGNHV4wUdBJozTJnECiI=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=hmgOHN160z5YpOM334YoTFvbIeZ3ROyRphtrkJ8pyNvLlEbQj8v5JQq75hPKQAO70jB0xhw1bd3lAzXn2/hecp7PiX/qs6AGH0ti6MNBDZ1c3BLPvj79Xa9xp+OYqZyAUwbuQItLjkNZhKoXn9WynKHtf6q/oIYUw2/IQmvousk=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=AIOUvoZv; arc=none smtp.client-ip=170.10.129.124
+	 To:Cc:Content-Type; b=TibE0wOeBJn6XXwmu5VIiZrVAih5e6iwFoZ9o/ClAt2jlSCyo3w3mLW0g5FwfXonTGBlf2qVAj22PZKOLSxovD/qIEuMrAy9Cq716ccqMN4WT8yl7CQPK2x8F9zLJxw40ORc7nk/v/CzKipJGBiRDrBgPqBfRUVKA8AmQskPEM8=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=LGe2SqQP; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="AIOUvoZv"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="LGe2SqQP"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1716392769;
+	s=mimecast20190719; t=1716394062;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 content-transfer-encoding:content-transfer-encoding:
 	 in-reply-to:in-reply-to:references:references;
-	bh=dohSD+xMyXX8VQW8PMZIyNH8UCTgtLWA68tTvl5P8RA=;
-	b=AIOUvoZv2i9Q473lEBYLFyvXE2NItadXWH3US3NjcxMAVV4EHWdKUNXjASwXuHgcCW4j7U
-	7/6ZYT4h1JsKzymUKjNhYlB8FbVH6jSjXtYK/mvdrEfMkmIAvZM8XePzl5n0gMKIzTcmLz
-	qHe2awv4oLH5rk5ypBmCm0xO0omNZtU=
-Received: from mail-yb1-f200.google.com (mail-yb1-f200.google.com
- [209.85.219.200]) by relay.mimecast.com with ESMTP with STARTTLS
+	bh=zFilv3pbs+35EgsHoQGw65hmxQaAATuFuNpim+MUR0g=;
+	b=LGe2SqQPdeomLpLX4g6p60U4ikHVmw7KiZGCP/8F6LUfD200tYm9dNI/aXQ2FPrt+KEUF6
+	9TnUD78hCTqrRu/rLq/2VJNbvs/+e7nkrdhau6CJC9nlT4pG5+Ye22xblWDz06tQIofaOh
+	8KSGGsjm45Je02bzsAlTy8pZRAhTzWQ=
+Received: from mail-yb1-f198.google.com (mail-yb1-f198.google.com
+ [209.85.219.198]) by relay.mimecast.com with ESMTP with STARTTLS
  (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-101-899cLtVuNdqWKbsByWNYZg-1; Wed, 22 May 2024 11:46:07 -0400
-X-MC-Unique: 899cLtVuNdqWKbsByWNYZg-1
-Received: by mail-yb1-f200.google.com with SMTP id 3f1490d57ef6-dee902341c0so16140109276.3
-        for <virtio-fs@lists.linux.dev>; Wed, 22 May 2024 08:46:07 -0700 (PDT)
+ us-mta-313-9qTUFrO3OhmOXxek_n0MNw-1; Wed, 22 May 2024 12:07:41 -0400
+X-MC-Unique: 9qTUFrO3OhmOXxek_n0MNw-1
+Received: by mail-yb1-f198.google.com with SMTP id 3f1490d57ef6-df4d82f868bso2799434276.3
+        for <virtio-fs@lists.linux.dev>; Wed, 22 May 2024 09:07:41 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1716392767; x=1716997567;
+        d=1e100.net; s=20230601; t=1716394061; x=1716998861;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
          :subject:date:message-id:reply-to;
-        bh=dohSD+xMyXX8VQW8PMZIyNH8UCTgtLWA68tTvl5P8RA=;
-        b=lTCBk3h1oKDKDxFbPrWbxQmuQfaC7EkbB3APFRB7joVTYjNb/l8j9JbORNZ8yPrAoI
-         K682RKcZA2QF00KS+a6EZStMSi7Z61zbwjo8xrQ3PyCRJKHjW+Pm6NoiRlNNahkML2Kc
-         4V3W7wwWacoAc4vchfIBkRon9iramK6u7fsNO234Ol3zn43kp3E0Qar5s7pxuRGNyXfE
-         ApcC8mj4gTZ3Avj5IRW7sdeb3wq6kWXkzLQw2Yf1JlHJsmRODVjAxz4/JGIkrdE04rS5
-         3FPbkzFUfocEHzdR/cM3y37U9ufbynOE336QwDnSKL8Vw7AgUDLhVXvN61G7/MDaGQkS
-         CPPA==
-X-Forwarded-Encrypted: i=1; AJvYcCW5dpbsitOpU5VDA/kYFQBhObudUum0q0px5QTRuDNLM8H0dw+9CNvcd53aE7DdQPUxqlHj5+pjgDHYEseQqdojH6ymAFsXCZwB
-X-Gm-Message-State: AOJu0YwetSZbTTFQYstYW0TABkx4qAz3GfigCEsl1ECBbNvY6/wHhBBl
-	wVeZqqDAogHlE3NED2qV+ooaoBaB6IuaZG5DrvSFDj0SZGn3UKppE5vgoZ/rWZBLgd+kYv6tPX0
-	GNw+rnusnDdG2vm9CfRQ9ESciX9k6Vc5txgJN970xCiwL2wWSyogvQErSmujoWtdG38ci+y0+go
-	iR7F92/sH/UUIdlE4xDDMxkBEzeH4eFPiM
-X-Received: by 2002:a25:add5:0:b0:de0:de50:d6d4 with SMTP id 3f1490d57ef6-df4e0a6e798mr2683748276.8.1716392767241;
-        Wed, 22 May 2024 08:46:07 -0700 (PDT)
-X-Google-Smtp-Source: AGHT+IGjVEJ7I8YyfrTgHsOl3Et6/mGrY9eCItONq3gG92V0rIP1Z6NuZLnO4gcTlmJVyMvFE4mwGYr59PZjgbp9vHo=
-X-Received: by 2002:a25:add5:0:b0:de0:de50:d6d4 with SMTP id
- 3f1490d57ef6-df4e0a6e798mr2683635276.8.1716392765393; Wed, 22 May 2024
- 08:46:05 -0700 (PDT)
+        bh=zFilv3pbs+35EgsHoQGw65hmxQaAATuFuNpim+MUR0g=;
+        b=fijUQO9S/FTl+81kw2Mi7tTogm3BztumqEYmDMRDji9sRQ/T038zc3cSn+m0kOqTHL
+         GckelktrVhgbSpcLrcKnlXOzbgP2geJa7kdCknnWUfLRSQJ07OXfI/jqIaE3Hiesxhu5
+         ae+uE1o8/K5W4Z/nrv1uMmx9hX5gHAwlQnzw4T9bvhxV78IDR2g84v6yOvHFcVVmL4Bb
+         drmGEYpDhIfi16aquTDBQZn6dLxLytaoNLJyjqqvBYVIoAZBcRqMWNVxlXE8EUiou6+b
+         4QT1viSc6g+wZKM0QjWiN19CH90eGzWQ/R9UA8FaH1i5tim76iSa+cRqwehjzEzB3uNa
+         VPKA==
+X-Forwarded-Encrypted: i=1; AJvYcCV7lpP6Xvf8P5Z1P8SOJqJPwBjxQHLU4ggZbf1EG+CSWLQRtU8wPIonz8zixZjD77qSTkGX9GowKlT5lx9JuIzzQ866m6Zvn/aA
+X-Gm-Message-State: AOJu0YzqnudpP7XJ0c5e0p86ihaJ8ivwWhAlRrciSVT8TAF0MVTuKvp5
+	3hOOdU/vHPPDXpQnSnv91IbGLvlBfFWhGXjK55wsJw+g2+amS2QlXtYB4DLFNNL+s3fKY2MMDpx
+	kChSP7xDzYZBSH0/5TwRBp/HPasbO56yiCRvczY+cvZuakvcKrX0xIW4qou8NfbHmbPvAKMlTq5
+	TeXZcRP9Mo2kDy8UP53J7sbMNURr6MXcf8
+X-Received: by 2002:a5b:b49:0:b0:de4:634c:b2fb with SMTP id 3f1490d57ef6-df4e0bcafd3mr2574613276.35.1716394060657;
+        Wed, 22 May 2024 09:07:40 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IFZPsKGZkaK960aVcenANeqiEnBLvDfmpByfzVmheFQ1GplmSFQisKMFeZnFzQL6u/071hTioI1SkQfCR3LqGk=
+X-Received: by 2002:a5b:b49:0:b0:de4:634c:b2fb with SMTP id
+ 3f1490d57ef6-df4e0bcafd3mr2574581276.35.1716394060278; Wed, 22 May 2024
+ 09:07:40 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-References: <20240520130048.1483177-1-jonah.palmer@oracle.com> <20240520130048.1483177-3-jonah.palmer@oracle.com>
-In-Reply-To: <20240520130048.1483177-3-jonah.palmer@oracle.com>
+References: <20240520130048.1483177-1-jonah.palmer@oracle.com> <20240520130048.1483177-4-jonah.palmer@oracle.com>
+In-Reply-To: <20240520130048.1483177-4-jonah.palmer@oracle.com>
 From: Eugenio Perez Martin <eperezma@redhat.com>
-Date: Wed, 22 May 2024 17:45:29 +0200
-Message-ID: <CAJaqyWePFXKm9qSjczbWyacadd7Cxv2NxEvM1qT=UYNi_VW7qg@mail.gmail.com>
-Subject: Re: [PATCH v2 2/6] virtio: virtqueue_pop - VIRTIO_F_IN_ORDER support
+Date: Wed, 22 May 2024 18:07:04 +0200
+Message-ID: <CAJaqyWdxt+cPNR=unm6P1cGCKV=LwhuMYdVeQLbWF6wYLBLWKg@mail.gmail.com>
+Subject: Re: [PATCH v2 3/6] virtio: virtqueue_ordered_fill - VIRTIO_F_IN_ORDER support
 To: Jonah Palmer <jonah.palmer@oracle.com>
 Cc: qemu-devel@nongnu.org, mst@redhat.com, raphael@enfabrica.net, 
 	kwolf@redhat.com, hreitz@redhat.com, jasowang@redhat.com, pbonzini@redhat.com, 
@@ -82,84 +82,96 @@ Content-Transfer-Encoding: quoted-printable
 On Mon, May 20, 2024 at 3:01=E2=80=AFPM Jonah Palmer <jonah.palmer@oracle.c=
 om> wrote:
 >
-> Add VIRTIO_F_IN_ORDER feature support in virtqueue_split_pop and
-> virtqueue_packed_pop.
+> Add VIRTIO_F_IN_ORDER feature support for the virtqueue_fill operation.
 >
-> VirtQueueElements popped from the available/descritpor ring are added to
-> the VirtQueue's used_elems array in-order and in the same fashion as
-> they would be added the used and descriptor rings, respectively.
+> The goal of the virtqueue_ordered_fill operation when the
+> VIRTIO_F_IN_ORDER feature has been negotiated is to search for this
+> now-used element, set its length, and mark the element as filled in
+> the VirtQueue's used_elems array.
 >
-> This will allow us to keep track of the current order, what elements
-> have been written, as well as an element's essential data after being
-> processed.
+> By marking the element as filled, it will indicate that this element has
+> been processed and is ready to be flushed, so long as the element is
+> in-order.
 >
-> Tested-by: Lei Yang <leiyang@redhat.com>
 > Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
 > ---
->  hw/virtio/virtio.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
+>  hw/virtio/virtio.c | 36 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 35 insertions(+), 1 deletion(-)
 >
 > diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
-> index 893a072c9d..7456d61bc8 100644
+> index 7456d61bc8..01b6b32460 100644
 > --- a/hw/virtio/virtio.c
 > +++ b/hw/virtio/virtio.c
-> @@ -1506,7 +1506,7 @@ static void *virtqueue_alloc_element(size_t sz, uns=
-igned out_num, unsigned in_nu
+> @@ -873,6 +873,38 @@ static void virtqueue_packed_fill(VirtQueue *vq, con=
+st VirtQueueElement *elem,
+>      vq->used_elems[idx].ndescs =3D elem->ndescs;
+>  }
 >
->  static void *virtqueue_split_pop(VirtQueue *vq, size_t sz)
->  {
-> -    unsigned int i, head, max;
-> +    unsigned int i, head, max, prev_avail_idx;
->      VRingMemoryRegionCaches *caches;
->      MemoryRegionCache indirect_desc_cache;
->      MemoryRegionCache *desc_cache;
-> @@ -1539,6 +1539,8 @@ static void *virtqueue_split_pop(VirtQueue *vq, siz=
-e_t sz)
->          goto done;
->      }
->
-> +    prev_avail_idx =3D vq->last_avail_idx;
+> +static void virtqueue_ordered_fill(VirtQueue *vq, const VirtQueueElement=
+ *elem,
+> +                                   unsigned int len)
+> +{
+> +    unsigned int i, steps, max_steps;
 > +
->      if (!virtqueue_get_head(vq, vq->last_avail_idx++, &head)) {
->          goto done;
->      }
-> @@ -1630,6 +1632,12 @@ static void *virtqueue_split_pop(VirtQueue *vq, si=
-ze_t sz)
->          elem->in_sg[i] =3D iov[out_num + i];
->      }
->
-> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
+> +    i =3D vq->used_idx;
+> +    steps =3D 0;
+> +    /*
+> +     * We shouldn't need to increase 'i' by more than the distance
+> +     * between used_idx and last_avail_idx.
+> +     */
+> +    max_steps =3D (vq->last_avail_idx + vq->vring.num - vq->used_idx)
+> +                % vq->vring.num;
 
-I think vq->last_avail_idx - 1 could be more clear here.
+I may be missing something, but (+vq->vring.num) is redundant if we (%
+vq->vring.num), isn't it?
 
-Either way,
+> +
+> +    /* Search for element in vq->used_elems */
+> +    while (steps <=3D max_steps) {
+> +        /* Found element, set length and mark as filled */
+> +        if (vq->used_elems[i].index =3D=3D elem->index) {
+> +            vq->used_elems[i].len =3D len;
+> +            vq->used_elems[i].in_order_filled =3D true;
+> +            break;
+> +        }
+> +
+> +        i +=3D vq->used_elems[i].ndescs;
+> +        steps +=3D vq->used_elems[i].ndescs;
+> +
+> +        if (i >=3D vq->vring.num) {
+> +            i -=3D vq->vring.num;
+> +        }
+> +    }
+> +}
+> +
+
+Let's report an error if we finish the loop. I think:
+qemu_log_mask(LOG_GUEST_ERROR,
+              "%s: %s cannot fill buffer id %u\n",
+              __func__, vdev->name, elem->index);
+
+(or similar) should do.
+
+apart form that,
 
 Reviewed-by: Eugenio P=C3=A9rez <eperezma@redhat.com>
 
-> +        vq->used_elems[prev_avail_idx].index =3D elem->index;
-> +        vq->used_elems[prev_avail_idx].len =3D elem->len;
-> +        vq->used_elems[prev_avail_idx].ndescs =3D elem->ndescs;
-> +    }
-> +
->      vq->inuse++;
+>  static void virtqueue_packed_fill_desc(VirtQueue *vq,
+>                                         const VirtQueueElement *elem,
+>                                         unsigned int idx,
+> @@ -923,7 +955,9 @@ void virtqueue_fill(VirtQueue *vq, const VirtQueueEle=
+ment *elem,
+>          return;
+>      }
 >
->      trace_virtqueue_pop(vq, elem, elem->in_num, elem->out_num);
-> @@ -1758,6 +1766,13 @@ static void *virtqueue_packed_pop(VirtQueue *vq, s=
-ize_t sz)
->
->      elem->index =3D id;
->      elem->ndescs =3D (desc_cache =3D=3D &indirect_desc_cache) ? 1 : elem=
-_entries;
-> +
-> +    if (virtio_vdev_has_feature(vdev, VIRTIO_F_IN_ORDER)) {
-> +        vq->used_elems[vq->last_avail_idx].index =3D elem->index;
-> +        vq->used_elems[vq->last_avail_idx].len =3D elem->len;
-> +        vq->used_elems[vq->last_avail_idx].ndescs =3D elem->ndescs;
-> +    }
-> +
->      vq->last_avail_idx +=3D elem->ndescs;
->      vq->inuse +=3D elem->ndescs;
->
+> -    if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_RING_PACKED)) {
+> +    if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_IN_ORDER)) {
+> +        virtqueue_ordered_fill(vq, elem, len);
+> +    } else if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_RING_PACKED)) =
+{
+>          virtqueue_packed_fill(vq, elem, len, idx);
+>      } else {
+>          virtqueue_split_fill(vq, elem, len, idx);
 > --
 > 2.39.3
 >

@@ -1,216 +1,132 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 72DDC3C28
-	for <virtio-fs@lists.linux.dev>; Wed,  5 Jun 2024 23:35:17 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A552413A418
+	for <virtio-fs@lists.linux.dev>; Thu,  6 Jun 2024 08:39:06 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1717630519; cv=none; b=mkX0Q0RmDmVa6Tgaq03DKJ+knfkb0sXLm+o2VlarhbPWPP/+9zp9eSHa/pjOFpqGJ/IrMpcdMuVqMC7RSnXfO3aTRDExxOyQ3ghK6IgBgsHE9AEKx/EoWIEKiydoLLzqALV4kwgviBasXZd0uEbo0l4Z8TuBShI7p+O5l4uz9uI=
+	t=1717663148; cv=none; b=qbVIRqSBm6ZUeqOwZ+AmUrpHZIu3cK68ivrs2SkuJy9CWjPHICmB4qEL4wSy9b7sJoVyKB2FNkObapMJ6DJsICG9CxyuIgixnt/Qr5Wz6z6FQVI+Cl7AxaH1ozZBCXUn5+NcK43U/W9Zs74VwSfDLTAM0BeWJV44qHdxOcZk/jY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1717630519; c=relaxed/simple;
-	bh=hTnxxAgOv71dKBe2Z05pTi3xTuo2fFU4FAWeQFXISn0=;
-	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
-	 In-Reply-To:Content-Type:Content-Disposition; b=UR8covskAy9MO4XzsjBD1gGVlORivBIZhP0uTkeHB4tv5EcZeBC1LNIBvQTv3fXt9FyOn1Ogo7fPCr4C2xLQmDvEZvBKv7n7Q3Na91pWeUIPr2G5S6P8YcN5+I6LH6EndHT4q9aA0M68xl/LIiKoONMxSGxzmaDk30/16j+n7nQ=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=BzBtej76; arc=none smtp.client-ip=170.10.133.124
+	s=arc-20240116; t=1717663148; c=relaxed/simple;
+	bh=IfNjTpQj/5jUPl5M/IGOwb3Mt0RgpvWjMY5FJ09CoHA=;
+	h=MIME-Version:From:Date:Message-ID:Subject:To:Cc:Content-Type; b=UXRIvX8tgU4lGJvok6GYiQXyVJROflAO024mQ0T1Lq5PvebBLGF9yIdKIAd76GED4AK5hDyeBuHVBfOtFzAx2ZOGB/6lJMMxIID1cEwSyj/3+WGgrM11au+4dt48/60dCMO/kgNvSU6jqQiKPzqmvHWnybLWwN9kbrmaqms+qDk=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=WwUQjCEd; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="BzBtej76"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="WwUQjCEd"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1717630516;
+	s=mimecast20190719; t=1717663145;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references;
-	bh=OCCVtvSfvqBAUBpNFi/zb/m65iBLwl7XEHTViiftxcE=;
-	b=BzBtej76Q5+Qjdz79BuyPnEZRLGIZEmg2PxlXe3jlCSTcJlBKbF7d0LgLQpo6d0UgB6Knn
-	280/aWeC0LeHV5xb0cK16njkmTQBS8T/IRRl4Q9Xp+ORtXOASHKCp6Z+Yajp3VwjqminMB
-	bwExgxX2yjgN+I0BxMQObee326LSnSw=
-Received: from mail-lf1-f71.google.com (mail-lf1-f71.google.com
- [209.85.167.71]) by relay.mimecast.com with ESMTP with STARTTLS
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type;
+	bh=PrcPiljQdixba2DiD9EcpVBDB5M1HH767X6Mx2WSc60=;
+	b=WwUQjCEd/9B6bjg3zbOlrDu8AmJc0/ByDYfCsEa2nAacHWopvQsSaKOQC20UG0YV/mdINF
+	gzSu7Vu9O8MoHODMEzeQu9CsUM5SJtOyOzmAMcsOzUTzf4r+4SYen/wy1osA4ydMG69ynN
+	T7y0Rw38pz7JdCovIuLlG12kFfEExpo=
+Received: from mail-pj1-f69.google.com (mail-pj1-f69.google.com
+ [209.85.216.69]) by relay.mimecast.com with ESMTP with STARTTLS
  (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-152-FeWRoWglNyafX_xqzOmkeQ-1; Wed, 05 Jun 2024 19:35:15 -0400
-X-MC-Unique: FeWRoWglNyafX_xqzOmkeQ-1
-Received: by mail-lf1-f71.google.com with SMTP id 2adb3069b0e04-5234e83c4a6so224121e87.0
-        for <virtio-fs@lists.linux.dev>; Wed, 05 Jun 2024 16:35:14 -0700 (PDT)
+ us-mta-453-5nO0_KKINPuvo1doknsBXg-1; Thu, 06 Jun 2024 04:39:00 -0400
+X-MC-Unique: 5nO0_KKINPuvo1doknsBXg-1
+Received: by mail-pj1-f69.google.com with SMTP id 98e67ed59e1d1-2c23f2dcf46so620876a91.3
+        for <virtio-fs@lists.linux.dev>; Thu, 06 Jun 2024 01:39:00 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1717630513; x=1718235313;
-        h=in-reply-to:content-transfer-encoding:content-disposition
-         :mime-version:references:message-id:subject:cc:to:from:date
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
-        bh=OCCVtvSfvqBAUBpNFi/zb/m65iBLwl7XEHTViiftxcE=;
-        b=xLKAetgMQl5XPKsxOkZEZJ4dO+lfrqzSi+MUDclHx1K8jys9lv8b8uBxCCiwYAPiNN
-         9Y7WgaGutPre8VWi+Gi/ScrWVUdRu1uT8qNd6a9Q/d+ID/9AgosKNDfa6oJXb9MgKI6x
-         w3tGw/oaXb9z3vK8HEr2EKU5yacWOosWMjLAwk7yJ3ciWc+oVEPK5qxEX5fM60Mq+SgZ
-         OI4++PcLbZP9gHup7V3k3kGWxfCkIswjtKTz+0y2YhfDnmd8PMIO7JxuuxqpvTPrU+wq
-         QAu6e8MOB4tSAivCPsssEvExGXFaIL517n3T//YRJO5QtM/28N+Ab+X6GGRkDf19FJ3z
-         Dudg==
-X-Forwarded-Encrypted: i=1; AJvYcCUHmIonhacL7VqnSkU/LfSjOg4XLRA6uR/c89m08LYzhrMGPq+VL7CWkZUS1BsqJcxUGIo/V9uZp/3H6yjgyP9Xkn0IiZx7fBxP
-X-Gm-Message-State: AOJu0YxHZIAmKO1cNmyTqXtSB5lEP+/8KAwfidmC+Fduunn43cheHqOQ
-	ujOy1a7JpniZyNZRavLtX2WIhV1tcygKugxc3rcV7pqrydDp0krPWQcnXgbWCwAXy+34J2bZFNC
-	nj7U+AQZRZCemOqijEUUu77xGRG0jVy/012OJBhqHUQaByGT2/7siI23h2Q==
-X-Received: by 2002:ac2:4c95:0:b0:52b:797d:efd4 with SMTP id 2adb3069b0e04-52bab4dcd3emr2290615e87.16.1717630513587;
-        Wed, 05 Jun 2024 16:35:13 -0700 (PDT)
-X-Google-Smtp-Source: AGHT+IHJ1cJJUaCyUIk8ZNAMFL5MUyJsfbEE/Ub7b5mozNI9G7VXLnJ3/k/kD9XSV/i7/hLrdqpSmg==
-X-Received: by 2002:ac2:4c95:0:b0:52b:797d:efd4 with SMTP id 2adb3069b0e04-52bab4dcd3emr2290605e87.16.1717630513104;
-        Wed, 05 Jun 2024 16:35:13 -0700 (PDT)
-Received: from redhat.com ([2.55.56.67])
-        by smtp.gmail.com with ESMTPSA id 4fb4d7f45d1cf-57aae205bb0sm87994a12.67.2024.06.05.16.35.09
-        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Wed, 05 Jun 2024 16:35:12 -0700 (PDT)
-Date: Wed, 5 Jun 2024 19:35:08 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-To: qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>,
-	Jonah Palmer <jonah.palmer@oracle.com>,
-	Lei Yang <leiyang@redhat.com>,
-	Eugenio =?utf-8?B?UMOpcmV6?= <eperezma@redhat.com>,
-	Srujana Challa <schalla@marvell.com>,
-	Raphael Norwitz <raphael@enfabrica.net>,
-	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>,
-	Jason Wang <jasowang@redhat.com>,
-	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
-	Stefan Hajnoczi <stefanha@redhat.com>, qemu-block@nongnu.org,
-	virtio-fs@lists.linux.dev
-Subject: [PULL v3 08/41] vhost/vhost-user: Add VIRTIO_F_NOTIFICATION_DATA to
- vhost feature bits
-Message-ID: <9ab25321437a88267be640a7d9d01d7c6389f6ad.1717630437.git.mst@redhat.com>
-References: <cover.1717630437.git.mst@redhat.com>
+        d=1e100.net; s=20230601; t=1717663138; x=1718267938;
+        h=cc:to:subject:message-id:date:from:mime-version:x-gm-message-state
+         :from:to:cc:subject:date:message-id:reply-to;
+        bh=PrcPiljQdixba2DiD9EcpVBDB5M1HH767X6Mx2WSc60=;
+        b=LJsXkdCjBlz+7uBwGtKTuAQXpkoP7juJs6oI2rBbP9Y/2q7gd7dYcqTre+O0gqXo5Q
+         wPqpI/FgKfKrYkSoFbHfiqJyNYMAP9yA3Gz1gK112zEJWQ09TZthMWRnnAjiBFCgHIGb
+         1bkd8wWSWorX9rC3AcMRpthAN9eyP1JCcrpWi6Iq+QItA/pphErTGUpi42X3fkrmrMex
+         MbbJEJ4+UX5Es2H0jsUiAFyTu5vX9tieIO6nagcg8ck1LJsvvCWAxUmmyQkbiVYLz4zi
+         ecaa5uPZ0Cz9yMu8pFiqt3L+SSno22pQ0U6U8qJNQRNFL2QH9QEPa1xh6JMh6e0sXkhY
+         UiMg==
+X-Gm-Message-State: AOJu0Yy+zVeK/kpuWftUUohLpNNVWVOI7u/4NAT3EgDzO9GDyyIVvprF
+	+vll/oA7CeQWLyUOcC4wLVClbVsZMZ+WmgzZX+Qmc6c0rEwktm85hxvsTBxYp3r4PND72gkDJrD
+	8l2ZcG5N/kqDxflkuzW3MSMA1DcIcsdnaiafMSX4t20piScvaoZpl6d/7ci/NQcgQbZq+DdYdvn
+	YTMcV9eekGKHiIemU2YX/OlpU4nHg5gJOxh/4IYJeQb2w=
+X-Received: by 2002:a17:90b:4f8a:b0:2b2:6975:bf49 with SMTP id 98e67ed59e1d1-2c27dafd282mr4430925a91.6.1717663138114;
+        Thu, 06 Jun 2024 01:38:58 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IGcnGvJpqYIdn54/SLj9cOyKIDdhl74zABXsbSA9bkex7RoYFcrlcgvHpaIPKsULE0QPvRQcYDnyQiIu12R3Ak=
+X-Received: by 2002:a17:90b:4f8a:b0:2b2:6975:bf49 with SMTP id
+ 98e67ed59e1d1-2c27dafd282mr4430914a91.6.1717663137693; Thu, 06 Jun 2024
+ 01:38:57 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-In-Reply-To: <cover.1717630437.git.mst@redhat.com>
-X-Mailer: git-send-email 2.27.0.106.g8ac3dc51b1
-X-Mutt-Fcc: =sent
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Thu, 6 Jun 2024 10:38:46 +0200
+Message-ID: <CAOssrKeJbfjhZ1rkL=Tj+zQaYxQLQmwLYYT22Cu8nYnY8nriYA@mail.gmail.com>
+Subject: kvm crash with virtiofs
+To: virtio-fs@lists.linux.dev, QEMU Developers <qemu-devel@nongnu.org>
+Cc: Eric Sandeen <sandeen@redhat.com>
 X-Mimecast-Spam-Score: 0
 X-Mimecast-Originator: redhat.com
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="UTF-8"
 
-From: Jonah Palmer <jonah.palmer@oracle.com>
+Hi,
 
-Add support for the VIRTIO_F_NOTIFICATION_DATA feature across a variety
-of vhost devices.
+I get the below crash when running virtio-fs on fedora 39.
 
-The inclusion of VIRTIO_F_NOTIFICATION_DATA in the feature bits arrays
-for these devices ensures that the backend is capable of offering and
-providing support for this feature, and that it can be disabled if the
-backend does not support it.
+Note: weirdly this makes chrome running on the host also crash.
 
-Tested-by: Lei Yang <leiyang@redhat.com>
-Reviewed-by: Eugenio Pérez <eperezma@redhat.com>
-Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
-Message-Id: <20240315165557.26942-6-jonah.palmer@oracle.com>
-Acked-by: Srujana Challa <schalla@marvell.com>
-Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
----
- hw/block/vhost-user-blk.c    | 1 +
- hw/net/vhost_net.c           | 2 ++
- hw/scsi/vhost-scsi.c         | 1 +
- hw/scsi/vhost-user-scsi.c    | 1 +
- hw/virtio/vhost-user-fs.c    | 2 +-
- hw/virtio/vhost-user-vsock.c | 1 +
- net/vhost-vdpa.c             | 1 +
- 7 files changed, 8 insertions(+), 1 deletion(-)
+Eric Sandeen also reported some bad behavior of virtio-fs on fc39,
+which might be related.
 
-diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
-index 9e6bbc6950..bc2677dbef 100644
---- a/hw/block/vhost-user-blk.c
-+++ b/hw/block/vhost-user-blk.c
-@@ -51,6 +51,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_IOMMU_PLATFORM,
-     VIRTIO_F_RING_RESET,
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/net/vhost_net.c b/hw/net/vhost_net.c
-index fd1a93701a..18898afe81 100644
---- a/hw/net/vhost_net.c
-+++ b/hw/net/vhost_net.c
-@@ -48,6 +48,7 @@ static const int kernel_feature_bits[] = {
-     VIRTIO_F_IOMMU_PLATFORM,
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_RING_RESET,
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VIRTIO_NET_F_HASH_REPORT,
-     VHOST_INVALID_FEATURE_BIT
- };
-@@ -55,6 +56,7 @@ static const int kernel_feature_bits[] = {
- /* Features supported by others. */
- static const int user_feature_bits[] = {
-     VIRTIO_F_NOTIFY_ON_EMPTY,
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
- 
-diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
-index ae26bc19a4..3d5fe0994d 100644
---- a/hw/scsi/vhost-scsi.c
-+++ b/hw/scsi/vhost-scsi.c
-@@ -38,6 +38,7 @@ static const int kernel_feature_bits[] = {
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_SCSI_F_HOTPLUG,
-     VIRTIO_F_RING_RESET,
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
-index a63b1f4948..0b050805a8 100644
---- a/hw/scsi/vhost-user-scsi.c
-+++ b/hw/scsi/vhost-user-scsi.c
-@@ -36,6 +36,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_SCSI_F_HOTPLUG,
-     VIRTIO_F_RING_RESET,
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index cca2cd41be..ae48cc1c96 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -33,7 +33,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_IOMMU_PLATFORM,
-     VIRTIO_F_RING_RESET,
--
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
-index 9431b9792c..802b44a07d 100644
---- a/hw/virtio/vhost-user-vsock.c
-+++ b/hw/virtio/vhost-user-vsock.c
-@@ -21,6 +21,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_F_NOTIFY_ON_EMPTY,
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/net/vhost-vdpa.c b/net/vhost-vdpa.c
-index eda714d1a4..daa38428c5 100644
---- a/net/vhost-vdpa.c
-+++ b/net/vhost-vdpa.c
-@@ -62,6 +62,7 @@ const int vdpa_feature_bits[] = {
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_RING_RESET,
-     VIRTIO_F_VERSION_1,
-+    VIRTIO_F_NOTIFICATION_DATA,
-     VIRTIO_NET_F_CSUM,
-     VIRTIO_NET_F_CTRL_GUEST_OFFLOADS,
-     VIRTIO_NET_F_CTRL_MAC_ADDR,
--- 
-MST
+Versions:
+kernel-6.8.4-200.fc39.x86_64
+qemu-kvm-8.1.3-5.fc39.x86_64
+virtiofsd-1.10.1-1.fc39.x86_64
+
+Thanks,
+Miklos
+
+/usr/libexec/virtiofsd --socket-path=/tmp/vhostqemu --shared-dir /home &
+
+qemu-system-x86_64 -enable-kvm -s -serial none -parallel none -kernel
+/home/mszeredi/git/linux/arch/x86_64/boot/bzImage -drive
+format=raw,file=/home/mszeredi/root_fs,index=0,if=virtio -drive
+format=raw,file=/home/mszeredi/images/ubd1,index=1,if=virtio -chardev
+stdio,id=virtiocon0,signal=off -device virtio-serial -device
+virtconsole,chardev=virtiocon0 -cpu host -m 16G -smp 8 -object
+memory-backend-file,id=mem,size=16G,mem-path=/dev/shm,share=on -numa
+node,memdev=mem -net user -net nic,model=virtio-net-pci -fsdev
+local,security_model=none,id=fsdev0,path=/home -device virtio-rng-pci
+-chardev socket,id=char0,path=/tmp/vhostqemu -device
+vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs -device
+virtio-9p-pci,fsdev=fsdev0,mount_tag=hostshare -append "root=/dev/vda
+console=hvc0 "
+[...]
+root@kvm:~# time md5sum /host/mszeredi/images/ubd1
+error: kvm run failed Bad address
+RAX=0000000000000000 RBX=ffff888100044240 RCX=0000000000000000
+RDX=ffff888420c59ff0
+RSI=0000000000000020 RDI=ffff888420c59ff8 RBP=0000000000000000
+RSP=ffffc900016d3898
+R8 =ffff888420c59da8 R9 =0000000000000040 R10=0000000000036140
+R11=0000000000000005
+R12=ffff888420c59ff0 R13=000000000000000d R14=ffffea0010831600
+R15=ffff888420c59da8
+RIP=ffffffff82168d80 RFL=00010046 [---Z-P-] CPL=0 II=0 A20=1 SMM=0 HLT=0
+ES =0000 0000000000000000 ffffffff 00c00000
+CS =0010 0000000000000000 ffffffff 00a09b00 DPL=0 CS64 [-RA]
+SS =0018 0000000000000000 ffffffff 00c09300 DPL=0 DS   [-WA]
+DS =0000 0000000000000000 ffffffff 00c00000
+FS =0000 00007fb83cea8740 ffffffff 00c00000
+GS =0000 ffff88842fd40000 ffffffff 00c00000
+LDT=0000 0000000000000000 ffffffff 00c00000
+TR =0040 fffffe000012a000 00004087 00008b00 DPL=0 TSS64-busy
+GDT=     fffffe0000128000 0000007f
+IDT=     fffffe0000000000 00000fff
+CR0=80050033 CR2=00007f2d3bd9b0f0 CR3=00000001036ee005 CR4=00770ef0
+DR0=0000000000000000 DR1=0000000000000000 DR2=0000000000000000
+DR3=0000000000000000
+DR6=00000000ffff0ff0 DR7=0000000000000400
+EFER=0000000000000d01
+Code=90 90 90 90 48 c7 07 00 00 00 00 48 89 fa 48 8d 7f 08 31 c0 <48>
+c7 87 30 02 00 00 00 00 00 00 48 89 d1 48 83 e7 f8 48 29 f9 81 c1 40
+02 00 00 c1 e9 03
 

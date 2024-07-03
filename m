@@ -1,64 +1,64 @@
 Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 5C945282E1
-	for <virtio-fs@lists.linux.dev>; Tue,  2 Jul 2024 20:15:46 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id C3C811C68D
+	for <virtio-fs@lists.linux.dev>; Wed,  3 Jul 2024 22:44:56 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1719951348; cv=none; b=KlobNg2KrDoqd9c6L4grPFfri8heONtDzSgYJpjYraqG/4ezZsu4dvzGVqa85sGflmtqscD2VxdxHbeeF3q3EgcNiv3JVcz1Hk/LfU49dy8NsvUIqle+IP47qzp8WfTqlUjlSIOIdFkWPHtM+qUpPvT1+6mfcu4NffUOQZBzEvU=
+	t=1720046698; cv=none; b=VucAx3ny25Cq/sw+5DcrurY732dMlwbOzyEWKx2VeEXnNHGhqIHFnSiWMoDWLKAh2xFTnecnYSLW2b2GPn3svXMNv8pS3gYChmh74l0dM7DPlthDE/h81Qj2R8L5hxI77wxjyufRvZO8paWPqPWsZH2zpLesrSaC+9HQ8YaIkfY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1719951348; c=relaxed/simple;
+	s=arc-20240116; t=1720046698; c=relaxed/simple;
 	bh=hTnxxAgOv71dKBe2Z05pTi3xTuo2fFU4FAWeQFXISn0=;
 	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
-	 In-Reply-To:Content-Type:Content-Disposition; b=ebQjYREdSF6NWEztFQd43h1jqV0k17G9oALXqMNBY0H0JJvXJyTsY17pzgQ/6CsEYDNvE3JOmjRi6TvJLfK7Ol4NosNL+WpM3HozvuXFRBstYEc/5hGY/wS42FTLjSBSfd2xV4B4ouckZep3mUqn21JDw8ep6ojHf4I92k1Ki74=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=HsNlUzLt; arc=none smtp.client-ip=170.10.129.124
+	 In-Reply-To:Content-Type:Content-Disposition; b=ZaHySJ+8A34zhJs8A1gFrEUFHesXav9xTpghCbNjwOIHuo5u5j6SSxmNzbgsPTxjVtOT164AAuUl7eo9sTUQ1XA6B3MnB8tB/Mi72MY/BzlnJoctOtyiYa9H1rq7Ixj13asUPY5PeuzUceC2HNk7bd5XNuwAd7XuVyqTukb3Uz8=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=TfIY5HwW; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="HsNlUzLt"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="TfIY5HwW"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1719951346;
+	s=mimecast20190719; t=1720046695;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 content-transfer-encoding:content-transfer-encoding:
 	 in-reply-to:in-reply-to:references:references;
 	bh=OCCVtvSfvqBAUBpNFi/zb/m65iBLwl7XEHTViiftxcE=;
-	b=HsNlUzLt8Gq/kotVELS49SzD+gxAkGTjj6UNBqcVkN0RZVjqtRVNBeKR2+c427teW9HNoS
-	MVzBiGC1b2tHcyM9BOT8ipn8ZWYtqI7MqH31AvhK2FCTDpMFlrX/fRMpCIafAok3i7ak//
-	Bsf1IYW2KcFZUMMaH1CdDzW+dduTRnA=
-Received: from mail-lj1-f199.google.com (mail-lj1-f199.google.com
- [209.85.208.199]) by relay.mimecast.com with ESMTP with STARTTLS
+	b=TfIY5HwWYHpj9zPXhn2DAcPwzKY5xn1YeqxTlfykIhoFznqJ5PHOrM80q86uxIN8DNh4Ma
+	0Q0htkCktVkbjcivhvVBjDJbkPfK3kd2RQjIjAuEiZ2JeLQg0QvjQoseaW+EsHalEsiZHQ
+	Jjtj5RDXvGZzQMMXKNH67j2lnM39kQU=
+Received: from mail-ed1-f69.google.com (mail-ed1-f69.google.com
+ [209.85.208.69]) by relay.mimecast.com with ESMTP with STARTTLS
  (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-215-3LJjBnziOq62Ebr-HBcgQA-1; Tue, 02 Jul 2024 16:15:44 -0400
-X-MC-Unique: 3LJjBnziOq62Ebr-HBcgQA-1
-Received: by mail-lj1-f199.google.com with SMTP id 38308e7fff4ca-2ee7a3dd878so3158071fa.1
-        for <virtio-fs@lists.linux.dev>; Tue, 02 Jul 2024 13:15:44 -0700 (PDT)
+ us-mta-247-Phz7tq2KODWPDV5TFQ5lpQ-1; Wed, 03 Jul 2024 18:44:54 -0400
+X-MC-Unique: Phz7tq2KODWPDV5TFQ5lpQ-1
+Received: by mail-ed1-f69.google.com with SMTP id 4fb4d7f45d1cf-58d134ecd3dso667a12.1
+        for <virtio-fs@lists.linux.dev>; Wed, 03 Jul 2024 15:44:54 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1719951343; x=1720556143;
+        d=1e100.net; s=20230601; t=1720046693; x=1720651493;
         h=in-reply-to:content-transfer-encoding:content-disposition
          :mime-version:references:message-id:subject:cc:to:from:date
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
         bh=OCCVtvSfvqBAUBpNFi/zb/m65iBLwl7XEHTViiftxcE=;
-        b=K1YTka9W8uQ76PjVMZBduwiVBXXvuhMwfLbpvz2YIL7SJn9h6OkT4HoKClTvIEW4RE
-         kkbEb6sITWbpLJU44Hbi7bdAIxfW3fCtPXBX4DGZ9ck9RqyvDQuvlLR3Hbg9vLvpZuuR
-         RAiOnzQCc3635dla8V7HNQeIhruTTrqaF5c2pgfmbWwNMPFBEOQ0lMWMCsyL1wpn+dJb
-         zC4iPQ+k33Mc7v4FNE/Dtf1afts3ryIXCNouDwaibVOauXbVKoVH3UhAV6fkHR+L18Mn
-         AXsaU1EBwUcELnm2V9WNlovrh7H8GWeZjXniLbHNB9UVIT0bu34O0r8KvY89W4tu5SEO
-         xsKg==
-X-Forwarded-Encrypted: i=1; AJvYcCVuURGY78P0SkSVPVpty2LHIfpkIs6hDcaF7BRIeR0M3bW3gmX2oWPC4TXxGRaN58XIKmBPFT7Ntcdh62d3kwOD4mIr3VIXcOxO
-X-Gm-Message-State: AOJu0YxVHxgVUnj1sL4Z2CjT1os+Hscv+ier0XJ9JQZ5sJy2VbORf5ih
-	trBPHlJLTDIgoKajORL68mlTQ57sSHs3rimlQxf/syyfXgbhnT7UfKLHqWQrv2jlLltfQTIS5cS
-	aeXVfAL7aSdYHOzd1TJB5T6pEgI2FZQkMiNeoeNp7BuJ+FXwj1/UdbNCg/g==
-X-Received: by 2002:a05:651c:1593:b0:2ec:3f79:dcd5 with SMTP id 38308e7fff4ca-2ee5e6c5d5fmr31059821fa.18.1719951343421;
-        Tue, 02 Jul 2024 13:15:43 -0700 (PDT)
-X-Google-Smtp-Source: AGHT+IHCkb3qJUDpTu/nYt09lnMh4EPJw6soXZY6Wynm8Wcl0Kk/MJOFPa/p/U8mKIzRtRICLGdFmw==
-X-Received: by 2002:a05:651c:1593:b0:2ec:3f79:dcd5 with SMTP id 38308e7fff4ca-2ee5e6c5d5fmr31059621fa.18.1719951342602;
-        Tue, 02 Jul 2024 13:15:42 -0700 (PDT)
-Received: from redhat.com ([2a02:14f:1f5:eadd:8c31:db01:9d01:7604])
-        by smtp.gmail.com with ESMTPSA id 38308e7fff4ca-2ee5161f89asm17185541fa.29.2024.07.02.13.15.39
+        b=UoUoKMpz0JJY25USuhq/IyRnWc+Ul90eSuIKGoZhxjB64dNKYCGDY/J644SBe6rymf
+         URQ/wWNFVGf0/7r211Rqlmcy68NBLPDaUscDYWPaeI7ftKuI/kc4PTIDl0JhQwhu26gN
+         tYXDeKqJsIj7IV+/o+Tn0DcFnxSUD3pS1L6dDTNxdGD8GF6UwF5AWSRGpV5m4ZWZhe1u
+         nB1ShVa6zBIQapncu9vmBbMZ0oifIJEjRcKCuPNAxUkaPUZo8CCRLX4wyX+iL3wSR2Xd
+         9ulxNTMRTyfVgLkehww8w7mZi654wOJC59f47cNvKp8idcRWwTDZ25gcYL/kYeKD/G7M
+         21JA==
+X-Forwarded-Encrypted: i=1; AJvYcCU2PctpNUhFM3Xdj/NR+I82BdkNugrZndeIIRKaxs1B1RzihaKoeAg+xDCwtoK1lqSyvdw3P3+8TxEo54GzWxZDto5ZYjkhdVhc
+X-Gm-Message-State: AOJu0Yzgo6wnfJ6JKHRmC/bpJM9jXYhqhJmMrFNHI2si4CBV/KyCbSYt
+	03d+iOr1dzKCJx+Z9b4YY+QAxTjp9vQWPscaRQ6v+KBJHhbF+njj1Tl9czU85i1m/GgUdnARwTw
+	RlE54pMoZlZao0jsY+XTJKndIn8y8+hiG2ZQhfbi74acEzBKVIMCsegVRHg==
+X-Received: by 2002:a05:6402:1d4e:b0:57c:60f0:98bc with SMTP id 4fb4d7f45d1cf-5879f59bc5bmr9191122a12.11.1720046693217;
+        Wed, 03 Jul 2024 15:44:53 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IGwt0cgeX7IzE5SqJO3nOeUkZXrRoV1CshiFn78EWfICEMahzxy9ojl/p5VnzrZmp+wx076qg==
+X-Received: by 2002:a05:6402:1d4e:b0:57c:60f0:98bc with SMTP id 4fb4d7f45d1cf-5879f59bc5bmr9191098a12.11.1720046692666;
+        Wed, 03 Jul 2024 15:44:52 -0700 (PDT)
+Received: from redhat.com ([2a0d:6fc7:441:91a8:a47d:5a9:c02f:92f2])
+        by smtp.gmail.com with ESMTPSA id 4fb4d7f45d1cf-58612c835dfsm7618146a12.20.2024.07.03.15.44.49
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Tue, 02 Jul 2024 13:15:42 -0700 (PDT)
-Date: Tue, 2 Jul 2024 16:15:37 -0400
+        Wed, 03 Jul 2024 15:44:52 -0700 (PDT)
+Date: Wed, 3 Jul 2024 18:44:47 -0400
 From: "Michael S. Tsirkin" <mst@redhat.com>
 To: qemu-devel@nongnu.org
 Cc: Peter Maydell <peter.maydell@linaro.org>,
@@ -72,17 +72,17 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
 	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
 	Stefan Hajnoczi <stefanha@redhat.com>, qemu-block@nongnu.org,
 	virtio-fs@lists.linux.dev
-Subject: [PULL v2 08/88] vhost/vhost-user: Add VIRTIO_F_NOTIFICATION_DATA to
+Subject: [PULL v3 08/85] vhost/vhost-user: Add VIRTIO_F_NOTIFICATION_DATA to
  vhost feature bits
-Message-ID: <b937fa896321fb7b6d7f2205edb5490e0e5d6c69.1719951168.git.mst@redhat.com>
-References: <cover.1719951168.git.mst@redhat.com>
+Message-ID: <b937fa896321fb7b6d7f2205edb5490e0e5d6c69.1720046570.git.mst@redhat.com>
+References: <cover.1720046570.git.mst@redhat.com>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-In-Reply-To: <cover.1719951168.git.mst@redhat.com>
+In-Reply-To: <cover.1720046570.git.mst@redhat.com>
 X-Mailer: git-send-email 2.27.0.106.g8ac3dc51b1
 X-Mutt-Fcc: =sent
 X-Mimecast-Spam-Score: 0

@@ -1,62 +1,62 @@
-Received: from mail-pl1-f170.google.com (mail-pl1-f170.google.com [209.85.214.170])
+Received: from mail-pl1-f181.google.com (mail-pl1-f181.google.com [209.85.214.181])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A4BA51B0414
-	for <virtio-fs@lists.linux.dev>; Thu, 27 Mar 2025 06:43:57 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.214.170
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id D1C881B5EA4
+	for <virtio-fs@lists.linux.dev>; Thu, 27 Mar 2025 06:44:03 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.214.181
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1743057841; cv=none; b=EtxDhY6EAXKbelqz35dv8LxQ1IFVXOFi90Xe/WxTX9REAwA+JoVK6ForT+RI0RosyfQlt8V50Ij2CBch4NnSICMx1gsNSE0b74LU3lbliOrkLDq7SR98+R4OAJjkDC3MfWM2vFGE4BO93w0tak4BWIta1LyiZZFNtkkpT4SV1O8=
+	t=1743057846; cv=none; b=baqDoLio3KYHI4IMyPRcVD6x52cmtGGZzYqHeJ7l4G1v+rdJSdH1sC9thLqNFwapfQ1P8hlwpcTEDUY0F5iPi3L2XASSejzBVNHg9xigJUaeE4yh/bFQCMTaZeVTjFksj615v0nCYGlNxVEVN3tmWSIt8oCDh6TrYFn59M25sYA=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1743057841; c=relaxed/simple;
-	bh=jfjpJ9Fx8PjfE4D0M4EsD6nCm6tXwnLjZnQnMscUJU0=;
+	s=arc-20240116; t=1743057846; c=relaxed/simple;
+	bh=b5Iou63s079CIVtwWRPQjjXPx9cAv+qRj+u6W8RVC6I=;
 	h=From:To:Cc:Subject:Date:Message-ID:In-Reply-To:References:
-	 MIME-Version; b=r65CoV5lcdg8eubAsryrPLkNt+M2ynb6aZ0NXXRg1FLeK9u0dtHRRuvGM9VEUKvC1RaPu7AnBvjqY5UK34Hoe7o7Fvp0qRN2yvqLAfTePz0qmgBmFAtsyveZw9Q3C6j28uJhvxkxivlY03eXZIlBQe8fnlD70IFF2dDc8FyEyBs=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=smartx.com; spf=pass smtp.mailfrom=smartx.com; dkim=pass (2048-bit key) header.d=smartx-com.20230601.gappssmtp.com header.i=@smartx-com.20230601.gappssmtp.com header.b=vpyKIUrQ; arc=none smtp.client-ip=209.85.214.170
+	 MIME-Version; b=e5T1HTIAwQQdao3aCnp2I+7la/Y3fyFcm12G3rcux57o6MHZtGlHSRNwA+El226rtXTtvMTITtFHGGEZa0syR3q8UMOBGR9Z5/NuBg00jU0fuJG/ZD13tJBAKoNy9K7xjBiww70AwHKJZwYLBS725CwHvRhiRd0ZhooKj+JoT2c=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=smartx.com; spf=pass smtp.mailfrom=smartx.com; dkim=pass (2048-bit key) header.d=smartx-com.20230601.gappssmtp.com header.i=@smartx-com.20230601.gappssmtp.com header.b=LNPzC5sA; arc=none smtp.client-ip=209.85.214.181
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=smartx.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=smartx.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=smartx-com.20230601.gappssmtp.com header.i=@smartx-com.20230601.gappssmtp.com header.b="vpyKIUrQ"
-Received: by mail-pl1-f170.google.com with SMTP id d9443c01a7336-223f4c06e9fso11759375ad.1
-        for <virtio-fs@lists.linux.dev>; Wed, 26 Mar 2025 23:43:57 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=smartx-com.20230601.gappssmtp.com header.i=@smartx-com.20230601.gappssmtp.com header.b="LNPzC5sA"
+Received: by mail-pl1-f181.google.com with SMTP id d9443c01a7336-2254e0b4b79so17347585ad.2
+        for <virtio-fs@lists.linux.dev>; Wed, 26 Mar 2025 23:44:03 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=smartx-com.20230601.gappssmtp.com; s=20230601; t=1743057837; x=1743662637; darn=lists.linux.dev;
+        d=smartx-com.20230601.gappssmtp.com; s=20230601; t=1743057843; x=1743662643; darn=lists.linux.dev;
         h=content-transfer-encoding:mime-version:references:in-reply-to
          :message-id:date:subject:cc:to:from:from:to:cc:subject:date
          :message-id:reply-to;
-        bh=C+zfiR6YSWsh1kwihUZptaCkLfGMteo+gW0ow9r6wKY=;
-        b=vpyKIUrQwulIwHvsqd2YV7E6EVSs81GzJzFMZ/Z5Hf3dYlDvmJH60qDIi5BxI3eShx
-         X1EOw35I0TStN2CxrEI4s5jZTO6vwycc6S++0IAuJrhisFvxc01kWpEd+UQmOdyg9lqY
-         5yLcBp7kLreFDtigoK1tH11bHUr7LlTBWBb2Tp97aaLuuQknOaXdRaRaeL75ZIiNLJM9
-         AIi5XGAuDUWYZ1cFVUo3X3ieaVZZkfDvq7Hh9hM3HMuqoAQiCmPx+LQxFwB8hownDX7+
-         IP0hOBAQzYiWphWDyiCZ6dpVCVsc3yjdctkGZ8VItNm1O3t3FRKhsY42xO+hAYliainy
-         /r+g==
+        bh=T+67DiggxgIdjM5tawOq0HI43N1ZmR5vY23znSpxIlc=;
+        b=LNPzC5sAmaq8x64Ju4fWDITZZRcqT1VEDRvPQDC30GM1rgjOkNPVax3ZDcjCmPpyEV
+         0tdIRDZTiMSNaOCgUVrkLsmvXl5HX/jHS7RgZiUKvBB12evzc5+DVleGrrLorSLDO0X0
+         KQr/IvKLVXFansXtQQ8jBjpzzqBZ1kEhHwt+6r1KxFzZBYQCOC52ozyNOm2+Bkh/v4HR
+         mwNGiWWyL0ooTLRWyxENIJwO7ZgtTQZ/F16RqN6pVP8YTRH3+A7OYk1smLno1jjGybQX
+         dYCG90tY9WEx+rMDQ012W2M74uPZkMYUqQiCzdlJbAz3xMZ+0o1E2mUchUCM9Uu9JwLD
+         Zy+Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1743057837; x=1743662637;
+        d=1e100.net; s=20230601; t=1743057843; x=1743662643;
         h=content-transfer-encoding:mime-version:references:in-reply-to
          :message-id:date:subject:cc:to:from:x-gm-message-state:from:to:cc
          :subject:date:message-id:reply-to;
-        bh=C+zfiR6YSWsh1kwihUZptaCkLfGMteo+gW0ow9r6wKY=;
-        b=Jq6ffP8MA+V0zv+4R7XpCkXpwhOb7mr2bo5VIjcluKKS1gRof+xhMu8pvGWZoWmzEE
-         tNeyO+vVbg8WTUqBAEP34++yVrb9Eh+uz2rVTItQlobl0evszRWfpnsSPhGkKNht2UsR
-         0p69XY7zSamzy5vPrfsPAYvcsdx167leRF+kXyxDrYgZtRM4D3KVTBjMcldnAWBNby7v
-         Zo8SZrT3HqvFJ73QhxhpkU3UyUpxAAp60tV6mCKovpwyUtgXlobNhfmHdjdMpPsNavBt
-         I1+a/uwEboWAwMmqxh3XY42YBYGJLfrJCx2g4VKmHJSQN/heKtOWBIS+P4+tTh99Ahn0
-         GCzQ==
-X-Forwarded-Encrypted: i=1; AJvYcCWmza0OLliw88PrGc8YQ2eAjYYFgl3StQHUcPTbOdomh5TKA0jvQa1pD94zNDv8p8wHOidsEO60IgQ=@lists.linux.dev
-X-Gm-Message-State: AOJu0YwwIoHN2p2/We1Lq9vukOkOAnyd5D8+R8w6AclFv6cfSFYQaAsC
-	ys5o0IIJGtm1xOpGmK7mEATt4DVyFZJ2TGtIsCjPzXJkD+S29ilU/iIn8BnDe3k=
-X-Gm-Gg: ASbGncv8+skmgw+Ew0dtN+9XQq12R1ljdiKSbkmXjtVhImTn5et4I0PjdTYYqcSlwow
-	h4b35lab2Te0un+iPXrVwg5QG8JFpGJbA+RzZ7D5EAygA66L7rAOLYIRlu3tbjKqThO4dng21Cr
-	xazRuSz0qppvM8Y7KgCybobiNy6MWjVrp+uUkM5fJ4RU3ZZtGlJONAl7qcqTp5TbX26bXjVMWT4
-	qXnUR27tD3KkTJ9DjkB1e5o+bpI9/kMlrTHvnVNr2Kk65FBtRgrHLTGEF4SNF8Cq2jxCyTnb+IF
-	3xggRkqcCmyY0ClRprtYwUVmfUOF5g4wn8bNDlfrhA==
-X-Google-Smtp-Source: AGHT+IEieRCHW4TwTVVXc4ir3LRkvx9yWwzXIHRYWzATDJCO+YtsxOOyxsQ+3EIIOu/npBDkBI6Fog==
-X-Received: by 2002:a17:902:dac8:b0:226:194f:48ef with SMTP id d9443c01a7336-227efb00eafmr95433845ad.13.1743057836599;
-        Wed, 26 Mar 2025 23:43:56 -0700 (PDT)
+        bh=T+67DiggxgIdjM5tawOq0HI43N1ZmR5vY23znSpxIlc=;
+        b=N5dx+7y4PAjDHm19aH9VvOmBqzZXbzHJrciEPCKzV+2BeBeQrSQ+y1lREV3Mc3p1mi
+         OJYzJaY/wcOxgcfLkHNhd2OuxfiZ4TADbKhcLHmxHRJxmhD6D9so2b87lOOLdzWsAANA
+         gMOGNJGt/pXYupO/pfew3aOXi+3C314M2INb9XQFNIB0P7ZfcRdIpzmEUv06R8M7uYUO
+         JUsGmsFYozxYBWoJZ6GBIw+DNnjsSxKG2UfxVlh9AU6Wyp7lQVVTpJOA9eL8EZ1K56yj
+         aFCjvxae26CsFf0dNEcmAl37/7WQSX/aRfg6iwBhBIY86jQTSP0TNdYFRv3bUW7tf//l
+         aD7Q==
+X-Forwarded-Encrypted: i=1; AJvYcCUMLekjiHZ7R8KBCAwMzUevS2tPeQsJZn+q710VIjLQqmmxAHBsroPnjEiBucmDnTqxdiujlsepIck=@lists.linux.dev
+X-Gm-Message-State: AOJu0Yzf9r9ffspvf5DsSJ8mZyld0kywfPVTt7JnnwTxmALCeSA6cVDK
+	p8KV5HJi1ANSGp2r6LAhxGQbRJD2UGmPKB3gIEOakBXsFxyVtUzLEQdAvfl43GI=
+X-Gm-Gg: ASbGncv90FagO55rxTAFKwdoCltErsKW3DzfFCVTwoZAhLqXkHG9iSdyad3Gc3L3qb8
+	WTBwb1jbry4lQjPSHTRvONobxvaP165Z65MuS2Y8GcfuS3Ssb8S6EJv9C3F5KGBnMkN2zlsnHIK
+	7Di1aTvAPqmYYRUSQYBczQUSe0DTrKShqVdXz7r4RLg+qp3/MzYhSwgkPNc7+pRAaG8qhrN4sPx
+	lNIfKTQwLmexx4rMJ6B03O9BZdc5NNNj7Z6kWNYYNd0xEEMl40IbT2uJnq4frco8EMD0fm+iDGr
+	UowE27S3C0IEvSMo2h4ZWKiPopUV+9I=
+X-Google-Smtp-Source: AGHT+IG7KJAQwi5C0OCk+jMqyGFT559CtjYlfnBa4Wx9AdEfgB+GFcFCIkMgn1ZMTn+o/+5XsmjbWg==
+X-Received: by 2002:a17:903:2348:b0:224:f12:3734 with SMTP id d9443c01a7336-22804869745mr35714265ad.30.1743057842717;
+        Wed, 26 Mar 2025 23:44:02 -0700 (PDT)
 Received: from fedora.smartx.com ([2001:df0:a640:1::4])
-        by smtp.gmail.com with ESMTPSA id d9443c01a7336-22780f4599fsm121983015ad.67.2025.03.26.23.43.51
+        by smtp.gmail.com with ESMTPSA id d9443c01a7336-22780f4599fsm121983015ad.67.2025.03.26.23.43.57
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Wed, 26 Mar 2025 23:43:56 -0700 (PDT)
+        Wed, 26 Mar 2025 23:44:02 -0700 (PDT)
 From: Haoqian He <haoqian.he@smartx.com>
 To: qemu-devel@nongnu.org,
 	sgarzare@redhat.com,
@@ -84,12 +84,13 @@ Cc: fengli@smartx.com,
 	Richard Henderson <richard.henderson@linaro.org>,
 	qemu-block@nongnu.org (open list:Block layer core),
 	virtio-fs@lists.linux.dev (open list:virtiofs)
-Subject: [PATCH v3 0/3] vhost: fix the IO error after live migration
-Date: Thu, 27 Mar 2025 02:43:44 -0400
-Message-ID: <20250327064348.3595732-1-haoqian.he@smartx.com>
+Subject: [PATCH v3 1/3] system/runstate: add VM state change cb with return value
+Date: Thu, 27 Mar 2025 02:43:45 -0400
+Message-ID: <20250327064348.3595732-2-haoqian.he@smartx.com>
 X-Mailer: git-send-email 2.44.0
-In-Reply-To: <20250314101535.1059308-1-haoqian.he@smartx.com>
+In-Reply-To: <20250327064348.3595732-1-haoqian.he@smartx.com>
 References: <20250314101535.1059308-1-haoqian.he@smartx.com>
+ <20250327064348.3595732-1-haoqian.he@smartx.com>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -98,68 +99,298 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 
-At the end of the VM live migration, the vhost device will be stopped.
-Currently, if the vhost-user backend crashes, vhost device's set_status()
-would not return failure, live migration won't perceive the disconnection
-with the backend. After the live migration is successful, the stale inflight
-IO will be submitted to the migration target host, which may be leading to
-the IO error.
+This patch adds the new VM state change cb type `VMChangeStateHandlerWithRet`,
+which has return value for `VMChangeStateEntry`.
 
-The following patch series fixes the issue by making the live migration
-aware of the loss of connection with the vhost-user backend and aborting
-the live migration.
+Thus, we can register a new VM state change cb with return value for device.
+Note that `VMChangeStateHandler` and `VMChangeStateHandlerWithRet` are mutually
+exclusive and cannot be provided at the same time.
 
+This patch is the pre patch for 'vhost-user: return failure if backend crashes
+when live migration', which makes the live migration aware of the loss of
+connection with the vhost-user backend and aborts the live migration.
+
+Virtio device will use VMChangeStateHandlerWithRet.
+
+Signed-off-by: Haoqian He <haoqian.he@smartx.com>
 ---
-  v1 ... v2
-    1. Fix some grammar issues in commit message.
-    2. Remove assert in vhost_scsi_common_stop and return error upwards.
+ hw/block/virtio-blk.c             |  2 +-
+ hw/core/vm-change-state-handler.c | 18 ++++++++++------
+ hw/scsi/scsi-bus.c                |  2 +-
+ hw/vfio/migration.c               |  2 +-
+ hw/virtio/virtio.c                |  2 +-
+ include/system/runstate.h         | 13 +++++++++---
+ system/cpus.c                     |  8 +++++--
+ system/runstate.c                 | 35 ++++++++++++++++++++++++++-----
+ 8 files changed, 62 insertions(+), 20 deletions(-)
 
-  v2 ... v3
-    1. Added more detailed comments and commit message.
-    2. Change the newly added type name and parameter name.
-    3. Remove set_status_ext, change the return type of set_status to int.
-
-Haoqian He (3):
-  system/runstate: add VM state change cb with return value
-  vhost: return failure if stop virtqueue failed in vhost_dev_stop
-  vhost-user: return failure if backend crash when live migration
-
- backends/vhost-user.c                  | 20 +++++++--------
- hw/block/vhost-user-blk.c              | 27 +++++++++++---------
- hw/block/virtio-blk.c                  |  7 +++---
- hw/char/virtio-serial-bus.c            |  3 ++-
- hw/core/vm-change-state-handler.c      | 18 ++++++++-----
- hw/display/vhost-user-gpu.c            | 12 ++++++---
- hw/input/virtio-input.c                |  3 ++-
- hw/net/virtio-net.c                    |  3 ++-
- hw/scsi/scsi-bus.c                     |  2 +-
- hw/scsi/vhost-scsi-common.c            | 13 +++++-----
- hw/scsi/vhost-scsi.c                   |  5 ++--
- hw/scsi/vhost-user-scsi.c              | 18 +++++++------
- hw/vfio/migration.c                    |  2 +-
- hw/virtio/vdpa-dev.c                   |  5 ++--
- hw/virtio/vhost-user-base.c            | 23 ++++++++++-------
- hw/virtio/vhost-user-fs.c              | 23 ++++++++++-------
- hw/virtio/vhost-user-scmi.c            | 27 ++++++++++++--------
- hw/virtio/vhost-user-vsock.c           | 15 +++++++----
- hw/virtio/vhost-vsock-common.c         | 12 ++++-----
- hw/virtio/vhost-vsock.c                | 11 ++++----
- hw/virtio/vhost.c                      | 23 +++++++++--------
- hw/virtio/virtio-balloon.c             |  3 ++-
- hw/virtio/virtio-crypto.c              |  3 ++-
- hw/virtio/virtio-iommu.c               |  3 ++-
- hw/virtio/virtio-rng.c                 |  5 ++--
- hw/virtio/virtio.c                     | 23 +++++++++++------
- include/hw/virtio/vhost-scsi-common.h  |  2 +-
- include/hw/virtio/vhost-vsock-common.h |  2 +-
- include/hw/virtio/vhost.h              |  8 +++---
- include/hw/virtio/virtio.h             |  2 +-
- include/system/runstate.h              | 13 +++++++---
- include/system/vhost-user-backend.h    |  2 +-
- system/cpus.c                          |  8 ++++--
- system/runstate.c                      | 35 ++++++++++++++++++++++----
- 34 files changed, 239 insertions(+), 142 deletions(-)
-
+diff --git a/hw/block/virtio-blk.c b/hw/block/virtio-blk.c
+index 5077793e5e..458871ea2b 100644
+--- a/hw/block/virtio-blk.c
++++ b/hw/block/virtio-blk.c
+@@ -1802,7 +1802,7 @@ static void virtio_blk_device_realize(DeviceState *dev, Error **errp)
+      * called after ->start_ioeventfd() has already set blk's AioContext.
+      */
+     s->change =
+-        qdev_add_vm_change_state_handler(dev, virtio_blk_dma_restart_cb, s);
++        qdev_add_vm_change_state_handler(dev, virtio_blk_dma_restart_cb, NULL, s);
+ 
+     blk_ram_registrar_init(&s->blk_ram_registrar, s->blk);
+     blk_set_dev_ops(s->blk, &virtio_block_ops, s);
+diff --git a/hw/core/vm-change-state-handler.c b/hw/core/vm-change-state-handler.c
+index 7064995578..99c642b558 100644
+--- a/hw/core/vm-change-state-handler.c
++++ b/hw/core/vm-change-state-handler.c
+@@ -40,6 +40,7 @@ static int qdev_get_dev_tree_depth(DeviceState *dev)
+  * qdev_add_vm_change_state_handler:
+  * @dev: the device that owns this handler
+  * @cb: the callback function to be invoked
++ * @cb_ret: the callback function with return value to be invoked
+  * @opaque: user data passed to the callback function
+  *
+  * This function works like qemu_add_vm_change_state_handler() except callbacks
+@@ -50,25 +51,30 @@ static int qdev_get_dev_tree_depth(DeviceState *dev)
+  * controller's callback is invoked before the children on its bus when the VM
+  * starts running.  The order is reversed when the VM stops running.
+  *
++ * Note that the parameter `cb` and `cb_ret` are mutually exclusive.
++ *
+  * Returns: an entry to be freed with qemu_del_vm_change_state_handler()
+  */
+ VMChangeStateEntry *qdev_add_vm_change_state_handler(DeviceState *dev,
+                                                      VMChangeStateHandler *cb,
++                                                     VMChangeStateHandlerWithRet *cb_ret,
+                                                      void *opaque)
+ {
+-    return qdev_add_vm_change_state_handler_full(dev, cb, NULL, opaque);
++    assert(!cb || !cb_ret);
++    return qdev_add_vm_change_state_handler_full(dev, cb, NULL, cb_ret, opaque);
+ }
+ 
+ /*
+  * Exactly like qdev_add_vm_change_state_handler() but passes a prepare_cb
+- * argument too.
++ * and the cb_ret arguments too.
+  */
+ VMChangeStateEntry *qdev_add_vm_change_state_handler_full(
+-    DeviceState *dev, VMChangeStateHandler *cb,
+-    VMChangeStateHandler *prepare_cb, void *opaque)
++    DeviceState *dev, VMChangeStateHandler *cb, VMChangeStateHandler *prepare_cb,
++    VMChangeStateHandlerWithRet *cb_ret, void *opaque)
+ {
+     int depth = qdev_get_dev_tree_depth(dev);
+ 
+-    return qemu_add_vm_change_state_handler_prio_full(cb, prepare_cb, opaque,
+-                                                      depth);
++    assert(!cb || !cb_ret);
++    return qemu_add_vm_change_state_handler_prio_full(cb, prepare_cb, cb_ret,
++                                                      opaque, depth);
+ }
+diff --git a/hw/scsi/scsi-bus.c b/hw/scsi/scsi-bus.c
+index ece1107ee8..4fa0d9769a 100644
+--- a/hw/scsi/scsi-bus.c
++++ b/hw/scsi/scsi-bus.c
+@@ -400,7 +400,7 @@ static void scsi_qdev_realize(DeviceState *qdev, Error **errp)
+         return;
+     }
+     dev->vmsentry = qdev_add_vm_change_state_handler(DEVICE(dev),
+-            scsi_dma_restart_cb, dev);
++            scsi_dma_restart_cb, NULL, dev);
+ }
+ 
+ static void scsi_qdev_unrealize(DeviceState *qdev)
+diff --git a/hw/vfio/migration.c b/hw/vfio/migration.c
+index fbff46cfc3..42948dffc5 100644
+--- a/hw/vfio/migration.c
++++ b/hw/vfio/migration.c
+@@ -1014,7 +1014,7 @@ static int vfio_migration_init(VFIODevice *vbasedev)
+                      vfio_vmstate_change_prepare :
+                      NULL;
+     migration->vm_state = qdev_add_vm_change_state_handler_full(
+-        vbasedev->dev, vfio_vmstate_change, prepare_cb, vbasedev);
++        vbasedev->dev, vfio_vmstate_change, prepare_cb, NULL, vbasedev);
+     migration_add_notifier(&migration->migration_state,
+                            vfio_migration_state_notifier);
+ 
+diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
+index 85110bce37..202a052053 100644
+--- a/hw/virtio/virtio.c
++++ b/hw/virtio/virtio.c
+@@ -3489,7 +3489,7 @@ void virtio_init(VirtIODevice *vdev, uint16_t device_id, size_t config_size)
+         vdev->config = NULL;
+     }
+     vdev->vmstate = qdev_add_vm_change_state_handler(DEVICE(vdev),
+-            virtio_vmstate_change, vdev);
++            virtio_vmstate_change, NULL, vdev);
+     vdev->device_endian = virtio_default_endian();
+     vdev->use_guest_notifier_mask = true;
+ }
+diff --git a/include/system/runstate.h b/include/system/runstate.h
+index bffc3719d4..fdd5c4a517 100644
+--- a/include/system/runstate.h
++++ b/include/system/runstate.h
+@@ -12,6 +12,7 @@ bool runstate_needs_reset(void);
+ void runstate_replay_enable(void);
+ 
+ typedef void VMChangeStateHandler(void *opaque, bool running, RunState state);
++typedef int VMChangeStateHandlerWithRet(void *opaque, bool running, RunState state);
+ 
+ VMChangeStateEntry *qemu_add_vm_change_state_handler(VMChangeStateHandler *cb,
+                                                      void *opaque);
+@@ -20,21 +21,27 @@ VMChangeStateEntry *qemu_add_vm_change_state_handler_prio(
+ VMChangeStateEntry *
+ qemu_add_vm_change_state_handler_prio_full(VMChangeStateHandler *cb,
+                                            VMChangeStateHandler *prepare_cb,
++                                           VMChangeStateHandlerWithRet *cb_ret,
+                                            void *opaque, int priority);
+ VMChangeStateEntry *qdev_add_vm_change_state_handler(DeviceState *dev,
+                                                      VMChangeStateHandler *cb,
++                                                     VMChangeStateHandlerWithRet *cb_ret,
+                                                      void *opaque);
+ VMChangeStateEntry *qdev_add_vm_change_state_handler_full(
+-    DeviceState *dev, VMChangeStateHandler *cb,
+-    VMChangeStateHandler *prepare_cb, void *opaque);
++    DeviceState *dev, VMChangeStateHandler *cb, VMChangeStateHandler *prepare_cb,
++    VMChangeStateHandlerWithRet *cb_ret, void *opaque);
+ void qemu_del_vm_change_state_handler(VMChangeStateEntry *e);
+ /**
+  * vm_state_notify: Notify the state of the VM
+  *
+  * @running: whether the VM is running or not.
+  * @state: the #RunState of the VM.
++ *
++ * Return the result of the callback which has return value.
++ * If no callback has return value, still return 0 and the
++ * upper layer should not do additional processing.
+  */
+-void vm_state_notify(bool running, RunState state);
++int vm_state_notify(bool running, RunState state);
+ 
+ static inline bool shutdown_caused_by_guest(ShutdownCause cause)
+ {
+diff --git a/system/cpus.c b/system/cpus.c
+index 2cc5f887ab..d16b0dff98 100644
+--- a/system/cpus.c
++++ b/system/cpus.c
+@@ -299,14 +299,18 @@ static int do_vm_stop(RunState state, bool send_stop)
+         if (oldstate == RUN_STATE_RUNNING) {
+             pause_all_vcpus();
+         }
+-        vm_state_notify(0, state);
++        ret = vm_state_notify(0, state);
+         if (send_stop) {
+             qapi_event_send_stop();
+         }
+     }
+ 
+     bdrv_drain_all();
+-    ret = bdrv_flush_all();
++    /*
++     * Even if vm_state_notify() return failure,
++     * it would be better to flush as before.
++     */
++    ret |= bdrv_flush_all();
+     trace_vm_stop_flush_all(ret);
+ 
+     return ret;
+diff --git a/system/runstate.c b/system/runstate.c
+index 272801d307..de74d962bc 100644
+--- a/system/runstate.c
++++ b/system/runstate.c
+@@ -297,6 +297,7 @@ void qemu_system_vmstop_request(RunState state)
+ struct VMChangeStateEntry {
+     VMChangeStateHandler *cb;
+     VMChangeStateHandler *prepare_cb;
++    VMChangeStateHandlerWithRet *cb_ret;
+     void *opaque;
+     QTAILQ_ENTRY(VMChangeStateEntry) entries;
+     int priority;
+@@ -320,14 +321,15 @@ static QTAILQ_HEAD(, VMChangeStateEntry) vm_change_state_head =
+ VMChangeStateEntry *qemu_add_vm_change_state_handler_prio(
+         VMChangeStateHandler *cb, void *opaque, int priority)
+ {
+-    return qemu_add_vm_change_state_handler_prio_full(cb, NULL, opaque,
+-                                                      priority);
++    return qemu_add_vm_change_state_handler_prio_full(cb, NULL, NULL,
++                                                      opaque, priority);
+ }
+ 
+ /**
+  * qemu_add_vm_change_state_handler_prio_full:
+  * @cb: the main callback to invoke
+  * @prepare_cb: a callback to invoke before the main callback
++ * @cb_ret: the main callback to invoke with return value
+  * @opaque: user data passed to the callbacks
+  * @priority: low priorities execute first when the vm runs and the reverse is
+  *            true when the vm stops
+@@ -344,6 +346,7 @@ VMChangeStateEntry *qemu_add_vm_change_state_handler_prio(
+ VMChangeStateEntry *
+ qemu_add_vm_change_state_handler_prio_full(VMChangeStateHandler *cb,
+                                            VMChangeStateHandler *prepare_cb,
++                                           VMChangeStateHandlerWithRet *cb_ret,
+                                            void *opaque, int priority)
+ {
+     VMChangeStateEntry *e;
+@@ -352,6 +355,7 @@ qemu_add_vm_change_state_handler_prio_full(VMChangeStateHandler *cb,
+     e = g_malloc0(sizeof(*e));
+     e->cb = cb;
+     e->prepare_cb = prepare_cb;
++    e->cb_ret = cb_ret;
+     e->opaque = opaque;
+     e->priority = priority;
+ 
+@@ -379,9 +383,10 @@ void qemu_del_vm_change_state_handler(VMChangeStateEntry *e)
+     g_free(e);
+ }
+ 
+-void vm_state_notify(bool running, RunState state)
++int vm_state_notify(bool running, RunState state)
+ {
+     VMChangeStateEntry *e, *next;
++    int ret = 0;
+ 
+     trace_vm_state_notify(running, state, RunState_str(state));
+ 
+@@ -393,7 +398,17 @@ void vm_state_notify(bool running, RunState state)
+         }
+ 
+         QTAILQ_FOREACH_SAFE(e, &vm_change_state_head, entries, next) {
+-            e->cb(e->opaque, running, state);
++            if (e->cb) {
++                e->cb(e->opaque, running, state);
++            } else if (e->cb_ret) {
++                /*
++                 * Here ignore the return value of cb_ret because
++                 * we only care about the stopping the device during
++                 * the VM live migration to indicate whether the
++                 * connection between qemu and backend is normal.
++                 */
++                e->cb_ret(e->opaque, running, state);
++            }
+         }
+     } else {
+         QTAILQ_FOREACH_REVERSE_SAFE(e, &vm_change_state_head, entries, next) {
+@@ -403,9 +418,19 @@ void vm_state_notify(bool running, RunState state)
+         }
+ 
+         QTAILQ_FOREACH_REVERSE_SAFE(e, &vm_change_state_head, entries, next) {
+-            e->cb(e->opaque, running, state);
++            if (e->cb) {
++                e->cb(e->opaque, running, state);
++            } else if (e->cb_ret) {
++                /*
++                 * We should execute all registered callbacks even if
++                 * one of them returns failure, otherwise, some cleanup
++                 * work of the device will be skipped.
++                 */
++                ret |= e->cb_ret(e->opaque, running, state);
++            }
+         }
+     }
++    return ret;
+ }
+ 
+ static ShutdownCause reset_requested;
 -- 
 2.44.0
 

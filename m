@@ -1,176 +1,105 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+Received: from mail-qt1-f174.google.com (mail-qt1-f174.google.com [209.85.160.174])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id CBF4825A645
-	for <virtio-fs@lists.linux.dev>; Wed, 20 Aug 2025 08:34:14 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 9F6784AEE2
+	for <virtio-fs@lists.linux.dev>; Tue,  9 Sep 2025 15:54:24 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.160.174
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1755678856; cv=none; b=Qdpeq59WVZ+hE8ABmnXw0TSnl3+Q7TceqjdG+A0i/rBkM6hV8whhcTKekB720jLLwqNn1GTJZbttrJPCdVuMOhiHl7EkJEmCNrjrq1JGEtn5FMT+JY3E7OQZ2M+7IDVsZXnAceUTeFMFtLAqy3JeclgtJUjeZO/Co25L9Vl3ruo=
+	t=1757433266; cv=none; b=GpAtKevgjkQBT4an0Gu4PgB4TtDKrNi1Ngs2nizwQBhk5DH2zBKAYVYMtjkWSrMq+uNt2Q5EIrZeQgZpKj24W2qxBaMOyUncmfB9DkmW7hY7Yfwvb8BFPbVRdIFcx/C7Q6vnhXV6sVpbvhPAiHC8jsIfwzNK9yUDIS3T9ChI3cQ=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1755678856; c=relaxed/simple;
-	bh=9KE2ug4oxCPsR8eMe2INNLHczHWzbVhiVhMzZbJ9z1U=;
-	h=Message-ID:Date:MIME-Version:Subject:To:References:From:
-	 In-Reply-To:Content-Type; b=Kt+MxkOSOhKDJNV6SqIKz48GUAFzTaJHWdOiaNTuf52mDqhxrDdZoFav0U77iSsdfd1iIM8LAkRzxfUuBMEkM/7opGS5gx+XOzsSuNqckbNZOdPA5iPz1RSZiW2BNkMhLWatPZ+Ee7X7nB+mv4GUT4aJHphV853ysrIom+mvf7Q=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=G3emfKzV; arc=none smtp.client-ip=170.10.129.124
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
+	s=arc-20240116; t=1757433266; c=relaxed/simple;
+	bh=zBxD/WgCU5wbpv7e0FRBV95KjhkMpdvOcHaWXJaFOWo=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=EHNGsyLoSaIwrr/Y02lZztXCvxXCbuiFMCWTr84EZrGpIYA98y3fPpFww8GVTEHMvlOeR9FP0X/yE5R+gyhDjRGJnHxNKtOS/Z7iArUOYSDlOEJ4qUJ8KbR3Cnz8y52XKPFXTyeGVOsSz4AEu87kTiuYK8VlKZnTnGBkv2hMqhc=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com; spf=pass smtp.mailfrom=google.com; dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b=vMTDqR8C; arc=none smtp.client-ip=209.85.160.174
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=google.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="G3emfKzV"
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1755678853;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:mime-version:mime-version:content-type:content-type:
-	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references;
-	bh=WadwIMrASvYO6tUJ3jzoio/88Ha9SRjKdt5QKCkvtzc=;
-	b=G3emfKzV1U4cQINE3CZmgDZLBGj3gIhWapB7uBOUavjdgKd7yCjRRJoIHmLpT9nk84A1Y1
-	D4WBGwCsOWYRAVoCoFjTGX7NhW8FsuXQi5TsWk5lknAGGkHDqYuO+3RblfdfvcVHUa5vis
-	7THKDHwMYRj6HFNL14v2DFYaoZq0+1w=
-Received: from mail-wm1-f71.google.com (mail-wm1-f71.google.com
- [209.85.128.71]) by relay.mimecast.com with ESMTP with STARTTLS
- (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-677-eKDLKltUNqyT0i9fTW8EXw-1; Wed, 20 Aug 2025 04:34:12 -0400
-X-MC-Unique: eKDLKltUNqyT0i9fTW8EXw-1
-X-Mimecast-MFC-AGG-ID: eKDLKltUNqyT0i9fTW8EXw_1755678851
-Received: by mail-wm1-f71.google.com with SMTP id 5b1f17b1804b1-45a1ac1bf0dso4077755e9.0
-        for <virtio-fs@lists.linux.dev>; Wed, 20 Aug 2025 01:34:12 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b="vMTDqR8C"
+Received: by mail-qt1-f174.google.com with SMTP id d75a77b69052e-4b5d6ce4ed7so1367031cf.0
+        for <virtio-fs@lists.linux.dev>; Tue, 09 Sep 2025 08:54:24 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=google.com; s=20230601; t=1757433263; x=1758038063; darn=lists.linux.dev;
+        h=content-transfer-encoding:cc:to:subject:message-id:date:from
+         :in-reply-to:references:mime-version:from:to:cc:subject:date
+         :message-id:reply-to;
+        bh=VqGZ99/taR9w+xuAip1KMNcoTr4YDAyDRTxmqZoXxuI=;
+        b=vMTDqR8CIGv5xMtQ/Rk/OCrrKMESbNsBTxSUO85uUFVeVIBbbHdY/4xFhgDFE13D+h
+         KVAIEIWbIoHfcl7Ftxwk4/Wppp71M/DFQ6EDSTeKTBEO1LqQd+vbCKnt4J0fGyKljyg0
+         pD7dtYX9SHR986PfEryRGJ5SmsgnC1n2LTpK6zzNt8M/ncaQcrt/502vJL+LpvJaT5dV
+         tkAuFmCI7DafgsFp75Bd2lOoyUlaAMMByVOYFOKHbm14QZk7kV1uheMo11aEaRV3zJKn
+         3IUFrl3FVvPiIfwpXBCRnMrHDA/AVbn0GeRgDKZH8cGz4RgfgVIVGsE2/86SwgULpR6s
+         BNpw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1755678851; x=1756283651;
-        h=content-transfer-encoding:in-reply-to:from:content-language
-         :references:to:subject:user-agent:mime-version:date:message-id
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
-        bh=WadwIMrASvYO6tUJ3jzoio/88Ha9SRjKdt5QKCkvtzc=;
-        b=MbkUwCWtTlH7wrzqVvWBf5w/Cupl87ldD3RpZY0z0nR7ZI9M4x05ZkIZuE/A5hkThX
-         rav82g779ZglHOjdXZ7w1w3POVRoYP+ZPtUuPzs/C3Kg9q0EI56xI+WLe/OrQ+TE4xtJ
-         iDgiT5KMoMLqlwerXWnpLEbYV+SYAnvWXDbjEg9kIST2GabCdz79kx0x+BMfDhcRENiB
-         q30zCHzZqqHv3YlUxmKXz74XB6dGWpQULAEMiEocbfM0dJdwtzmr1fgLivkzHXzTx5RE
-         cgRludSCmqvxyFk3XebUg0KHCOrgCectvZA1pk0Q3F2wyhARziyXzDrxC3sVc/FUe489
-         OEeQ==
-X-Forwarded-Encrypted: i=1; AJvYcCWTC66Nx5VrlzUxag/kXOrfvza+DeT+iYYbLVnKaFmCwU2M7cYaIRXlAjMAOoS9OR54fOK61ht0v9c=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yy5sC3nGQRYbNBtUEvh/KAfvLMBZv91DkWKaY38IQEXG8SMA+sn
-	sqm2zXqIVpIiMssjDME3GQWJLtXsxP6Ge0ra1xLzDnKICLyvlDsX3sQesWKkKfLLmTeuDq8OhLB
-	dxckil1MLAXjhVyuK9MVeMrK/JsuG1/Xwyhx+ZJq9iHllNhqK5znDQCzDH95cyQ==
-X-Gm-Gg: ASbGncuw8i8M88kizbOUhpDuCQM+kKTc/H28TVO9sSwGhh/GEfnQcm/VI+B4WurrukQ
-	SXajXhoiR7KPThuxCu/1Q7WOpfohAr21A2YQA4a7Ep3bPPtQgIV+cWZyAtnHSdpMqqfZkg7qc+t
-	UQ1Xqp6GKk3MHETo/vKPFVdKrcN/TNjAT9FOb+IDJyBgnUE2qh5IhUbXSgYg9d4oSlLt8xEWJ+s
-	5kngCxF1z+Sr3QDLstfx/ePb8AAqqeuAgUZWwnzXjzsq/jZiwsrx2JEcKCa/OwbVr55dV+BRG+R
-	kWHcryPzPhpQUnJbp4vQpEwCEvlpTMJOS+SOuW0jUVzxwsleU8023WthWtENWEw395EcvW+zebB
-	ocR2cIXEBUjA3UUFWR7QDwzKjvsgrEmvyDTjWsTMib1hB96jfp27c4XpKDqTBs4+x8Jg=
-X-Received: by 2002:a05:600c:c494:b0:459:e39e:e5a5 with SMTP id 5b1f17b1804b1-45b4743654emr17038275e9.5.1755678850860;
-        Wed, 20 Aug 2025 01:34:10 -0700 (PDT)
-X-Google-Smtp-Source: AGHT+IHIBe1ofv9h7wEdg4lov7XOR2BU1XZJnS5qzEUa2SGJghzgqGJFlTJZVe+M6UaNHw3/WJsh8g==
-X-Received: by 2002:a05:600c:c494:b0:459:e39e:e5a5 with SMTP id 5b1f17b1804b1-45b4743654emr17038005e9.5.1755678850414;
-        Wed, 20 Aug 2025 01:34:10 -0700 (PDT)
-Received: from ?IPV6:2003:cf:d715:682a:c369:ef79:c58d:f183? (p200300cfd715682ac369ef79c58df183.dip0.t-ipconnect.de. [2003:cf:d715:682a:c369:ef79:c58d:f183])
-        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-3c0748797a1sm6478382f8f.5.2025.08.20.01.34.09
-        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Wed, 20 Aug 2025 01:34:09 -0700 (PDT)
-Message-ID: <9783ed13-6628-42ac-b82e-92ff489ff367@redhat.com>
-Date: Wed, 20 Aug 2025 10:34:08 +0200
+        d=1e100.net; s=20230601; t=1757433263; x=1758038063;
+        h=content-transfer-encoding:cc:to:subject:message-id:date:from
+         :in-reply-to:references:mime-version:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to;
+        bh=VqGZ99/taR9w+xuAip1KMNcoTr4YDAyDRTxmqZoXxuI=;
+        b=cmvh/n2fc7ueoM+8XX/EHqlsoc+sFSm9ePngjfw0IYGNQQPEEWi9+B0vsd657fzEGP
+         ez8G8f2V3H9Abmhrw+69hHy3vYfAJjyunyfYhKsn91hTyxGwEAvE3HFAqWZn1QTWf4pV
+         3pBXyPA2nV9iYNWsCxAfZLV2aJCSZMoevCDCkp6PGlaOcDDqT2dvHeVfaKijAA0pbH/o
+         nBJEigMrHRNJfSoJvt3oDkicL/VYGdNrLRvDWYknaA54G88Tt/NQzIEd4RuHFD+w0DCs
+         mzZWWRLxwSQAfKq9EAJwEW5ZBk2R610w4uW154N9svstjUeI3buU21I+4PY3dVPEC2qQ
+         e+eg==
+X-Gm-Message-State: AOJu0YwRSThUXbCMi3c0oACCyK0GJgKAYuNmA1rA4ZtATKTjSTYMvlnf
+	kFLqz+Gt6Dw9ldMV4lftNTUw/hNLDaUm7eMSDdiyNFwO5vzBGu0fhY+wmgWrIjWsSMfI/R/aHUM
+	a72gLIhcy0I7K3iIPbqAil5Yl3fYd4fIjJhdA+/pc
+X-Gm-Gg: ASbGncvQk9zY55Bznc9Y5FFgLdD55CVJOBFd+gDoSUFXE+2IBe2OzOYechEPC513+0J
+	ZNrSY7MB2aMYL7Rk0racq9SXR9EQmIQyFqZsJLx6SBBQYPpVUAD5yW/HtL4zKp5RE8aMfACpqn/
+	/YxMLKQb8aOyyi3IEYdwHUchhr69KSq0IKMQbE3+FbVmGny1luUpnpR3NHQUe6IqIjNlnupOsI3
+	LFxqgQw5zPx8NZANG53d1QX0doM6c9bAtuR1/ufD8hvkK+92UFNVXlNzzM=
+X-Google-Smtp-Source: AGHT+IHYBtAdKdGsn2IZKcWxWelKeCDWj57fHYGEHDuhCYbehbrTT6GiRS2PIeYSy6/Nq9K+EIFXD+6dTMiwhsN+L6Y=
+X-Received: by 2002:ac8:59c9:0:b0:4b3:8ee:521b with SMTP id
+ d75a77b69052e-4b5f6d1d109mr18601991cf.0.1757433263056; Tue, 09 Sep 2025
+ 08:54:23 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: DAX support in virtiofsd
-To: Jeremy Bongio <jbongio@google.com>, virtio-fs@lists.linux.dev,
- German Maglione <gmaglione@redhat.com>
 References: <CAOvQCn5H3Xpn3RJbMyE6=BkcbgBPrjap6mDbRYJ3wayiV_yGGA@mail.gmail.com>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <CAOvQCn5H3Xpn3RJbMyE6=BkcbgBPrjap6mDbRYJ3wayiV_yGGA@mail.gmail.com>
-X-Mimecast-Spam-Score: 0
-X-Mimecast-MFC-PROC-ID: ps9g84krnh6noshlBRb7IDXraE6H-McqQHimivq58M0_1755678851
-X-Mimecast-Originator: redhat.com
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
+ <9783ed13-6628-42ac-b82e-92ff489ff367@redhat.com>
+In-Reply-To: <9783ed13-6628-42ac-b82e-92ff489ff367@redhat.com>
+From: Jeremy Bongio <jbongio@google.com>
+Date: Tue, 9 Sep 2025 08:54:11 -0700
+X-Gm-Features: AS18NWCIFcCrvlKObGfroopFtUPqQg7_EOIYy_6QpzhNjHUPrhndXoUEAN6u-OE
+Message-ID: <CAOvQCn7fjO=P2pAi7rcRsLD6Eit_rxFq8T867WektwDv2XDt+A@mail.gmail.com>
+Subject: Re: DAX support in virtiofsd
+To: Hanna Czenczek <hreitz@redhat.com>
+Cc: virtio-fs@lists.linux.dev, German Maglione <gmaglione@redhat.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-On 19.08.25 23:13, Jeremy Bongio wrote:
-> Hello,
+> Does that mean you already have code for read-only DAX in virtiofsd?
+We have been using the DAX that was implemented in virtiofsd and
+vhost-user rust crate but later removed.
 
-Hi!
+Our vhost-user implementation is for an internal VMM.
 
-> My team has been using DAX w/ virtiofsd for read-only devices.
+> I don=E2=80=99t think there=E2=80=99s a strict order here; if you want to=
+ implement
+> write access, that solution probably has to be found, so delaying it
+> until after the rest may not be ideal.  On the other hand, we=E2=80=99d a=
+lready
+> be happy with just read-only DAX, too.  (And steps 1 through 4 may need
+> to be done simultaneously as a proof of concept, to show that potential
+> vhost-user spec changes make sense.)
+I will start with read-only as we haven't solved the write limitations yet.
 
-Does that mean you already have code for read-only DAX in virtiofsd?
 
-(FWIW, we were considering this specific case too, because it wouldn’t 
-have the post-EOF access problem.)
+> There is absolutely no resistance to this work, German Maglione and me
+> (virtiofsd maintainers) would be more than happy to assist.
+Wonderful, thank you!
 
-> We are
-> interested in continuing this use case, but support has been removed
-> upstream for
->
-> * setup/remove mapping in vhost-user rust crate.
-> https://github.com/rust-vmm/vhost/commit/569ef077facafe21f16c0e65ff826b26d3c9a0b3
-> discussion: https://github.com/rust-vmm/vhost/issues/213
->
-> * as a consequence, setupmapping/removemapping in virtiofsd.
-> https://gitlab.com/virtio-fs/virtiofsd/-/commit/87f67e84cb032e6f4ce4a9f408b6305f33d2d041
->
-> The virtio spec already/still contains support for DAX.
->
-> The primary reasons for removing support for this feature in vhost and
-> virtiofsd appear to be that it is not in the vhost-user spec
-> (https://www.qemu.org/docs/master/interop/vhost-user.html) and there
-> are major edge cases not dealt with, so DAX can't be safely used if
-> the backing store can change in size.
->
-> Some of the major technical challenges to supporting DAX were
-> discussed in: https://lore.kernel.org/virtio-fs/ZGaAalXSMhPb3eqe@redhat.com/
->      ...
-> Specifically:
->> 1. How to inject SIGBUS when the guest accesses a page that's beyond
->> the end-of-file.
->> 2. Implementing the vhost-user messages for mapping ranges of files to
->> the vhost-user frontend.
-> I expect the steps to support DAX in virtiofsd are:
->
-> 1. add the necessary vhost-user messages for mapping ranges to the
-> spec ... What is the RFC process for modifying the vhost standard?
-> What mailing list should I use?
 
-The specification is part of QEMU, so the mailing list is 
-qemu-devel@nongnu.org.
-
-Generally, you just send a patch to the specification 
-(docs/interop/vhost-user.rst in QEMU) to propose additions to the 
-standard.  If possible and reasonable, it’s good to accompany it by code 
-that would implement that (in QEMU, and e.g. a link to a private 
-repository of a vhost-user back-end with that implemented).
-
-> 2. re-implement vhost-user messages in the vhost-user rust crate
->
-> 3. re-implement setup/remove mapping in virtiofsd.
->
-> 4. implement new vhost-user messages in qemu?
->
-> 5. find solution for safely handling page faults beyond EOF.
-
-I don’t think there’s a strict order here; if you want to implement 
-write access, that solution probably has to be found, so delaying it 
-until after the rest may not be ideal.  On the other hand, we’d already 
-be happy with just read-only DAX, too.  (And steps 1 through 4 may need 
-to be done simultaneously as a proof of concept, to show that potential 
-vhost-user spec changes make sense.)
-
-> Can you offer comments, guidance, opinions? Is there resistance to
-> this work or is it that no one was interested enough to complete it?
-
-There is absolutely no resistance to this work, German Maglione and me 
-(virtiofsd maintainers) would be more than happy to assist.
-
-FWIW, there’s a virtiofsd “community” call (usually just German and me, 
-hence the quotation marks) every two weeks on Wednesdays 10 am ET (i.e. 
-currently EDT, so 2 pm GMT), including today, on 
-https://meet.google.com/bsx-qnxz-ifz (notes on 
-https://etherpad.opendev.org/p/virtiofs-external-meeting).  We’re happy 
-to discuss anything you’d like there, too.
-
-(The next call after today would be on Sep 3, but due to KVM Forum, I 
-think it will be skipped.)
-
-Hanna
-
+> FWIW, there=E2=80=99s a virtiofsd =E2=80=9Ccommunity=E2=80=9D call (usual=
+ly just German and me,
+> hence the quotation marks) every two weeks on Wednesdays 10 am ET (i.e.
+> currently EDT, so 2 pm GMT), including today, on
+> https://meet.google.com/bsx-qnxz-ifz (notes on
+> https://etherpad.opendev.org/p/virtiofs-external-meeting).  We=E2=80=99re=
+ happy
+> to discuss anything you=E2=80=99d like there, too.
+I plan to join the next call, Sept 17.

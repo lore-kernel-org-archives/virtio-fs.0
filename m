@@ -1,239 +1,161 @@
-Received: from mail-wm1-f47.google.com (mail-wm1-f47.google.com [209.85.128.47])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 74BC22FB0B2
-	for <virtio-fs@lists.linux.dev>; Wed, 22 Oct 2025 08:09:46 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.128.47
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 54D5834677B
+	for <virtio-fs@lists.linux.dev>; Wed, 22 Oct 2025 12:50:11 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1761120588; cv=none; b=um+yOxw8RDq+ncFxh2csxVE5CaCnK6Yy/Tnpet19OyIowefLAzjFTCjSSuzg8RVvKfQYyoOjWbCM7D9OsUkQqjdYEHXUiWXCpc/+MJMXLnhcMMXFxHRmfnV6KJcMqs28IhkDPshVE0Mjnh2L40sVTuEg4I+xy+pY/+PBGG6JECQ=
+	t=1761137416; cv=none; b=Bq/Lquyx7DGYRFcIQ3yo+fayPaEphYdsHkyNKdBfiKiDyQvn40GXY/KyN/Q8wO5eGC7tuoJDSMn4MVLWRBrPlYFscIdwjkIPTQAnHw2qSinKEyaEVyBsrwvdsiIbl61HrEjI53YsDas7g1iT9fPKTB+kBoqKDHj1iT+e/Bc81zA=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1761120588; c=relaxed/simple;
-	bh=JZGioFCRnZhnVYXnYyEgwnlO0wpgmU74OVJ3g/yF9Fg=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=ejYBOvHp20XIGa4NYWBqh4G6kHO8Mt0ZX6VfnRXfwZYRMHglD/AYA3tyz/XLO8VlcGoFR72fNluWYhTCKG1s0kOLyPyY7snPXdTuzyoHWdT7IoEqJrxgPBOXTefvTR6pzPjjaBSUkGF0VI4FwHN0DiN3CX04Qre11i6jKlkcKvo=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=linaro.org; spf=pass smtp.mailfrom=linaro.org; dkim=pass (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b=mojlTO1p; arc=none smtp.client-ip=209.85.128.47
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=linaro.org
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=linaro.org
+	s=arc-20240116; t=1761137416; c=relaxed/simple;
+	bh=cyh9GNwkSeiWX8VVWJet6cmrStrv1Y1BhHYKMAKCy08=;
+	h=From:To:Cc:Subject:Date:Message-ID:In-Reply-To:References:
+	 MIME-Version:content-type; b=jYpikvh4g8HRzEdnl4ng92CfAb1eysJxuoeQiHfExjkvBH98DT93hvmxPepk8oRzjeQJogL6JGVR8Knj1UeEsLchszkLjQRT1NVunmZgGps+pfpHEJiuPvJy3n7ddd1TohjKwCpjnyfrSbDaw5T7/Rovp+ravJX5cBO/uEmha4I=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=aAilEOob; arc=none smtp.client-ip=170.10.133.124
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="mojlTO1p"
-Received: by mail-wm1-f47.google.com with SMTP id 5b1f17b1804b1-4711810948aso45686475e9.2
-        for <virtio-fs@lists.linux.dev>; Wed, 22 Oct 2025 01:09:46 -0700 (PDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=linaro.org; s=google; t=1761120585; x=1761725385; darn=lists.linux.dev;
-        h=content-transfer-encoding:in-reply-to:from:references:cc:to
-         :content-language:subject:user-agent:mime-version:date:message-id
-         :from:to:cc:subject:date:message-id:reply-to;
-        bh=r5W3vw0dKWSTSqpjqiTpD1sBd7qgaB5sDy0DD3Bgxoo=;
-        b=mojlTO1pHGHIvSV0+Fda2Zo9NYaxfeEN9rkW6r7gGhcoXLS4+7dqpSyakzCF4+u6Bj
-         49GEuInfomZbH4mxcNuRh1jJwSYIU+HLE2vB0EUsugytMGHWHHO/LtQB/CNs+rHArtXU
-         v4bJ7zNuy5WS4PtCo8WUGgvthZTREGaoxCwkDi3+o6ngHGxA4JP6H55ErKQx5kzIfMmP
-         tyCoudZ4+t/6rgVh63O62B40+l2ui+5XkXhhjoKVSnSEiBadncFB+wokcP/MZkqKEyu2
-         cVbjPzkIGrj2CboZHXO+max8hckt955962kBy2sloC2GCKEfb7yf8A9OH27agygVI5iP
-         REPw==
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="aAilEOob"
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
+	s=mimecast20190719; t=1761137401;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	 content-transfer-encoding:content-transfer-encoding:
+	 in-reply-to:in-reply-to:references:references;
+	bh=cyh9GNwkSeiWX8VVWJet6cmrStrv1Y1BhHYKMAKCy08=;
+	b=aAilEOob8MMVFEkWURHCW9Vwkf2sd7OjrJ1WBZhbJ5MOrijxW6XleAuN0uUYh39DCDFF6w
+	VFGLafRZMzWkZ37yctTzF1dU5+T9XI6+FZG7N5Fg6cQpvKYr+kQfa/3tqOIkpCMr95mT6X
+	7n618B45nYcBF5hk8SmrWh2zc5/yd8s=
+Received: from mail-wm1-f72.google.com (mail-wm1-f72.google.com
+ [209.85.128.72]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-296-faP4oqg1PYS7Qx4drQrSkQ-1; Wed, 22 Oct 2025 08:50:00 -0400
+X-MC-Unique: faP4oqg1PYS7Qx4drQrSkQ-1
+X-Mimecast-MFC-AGG-ID: faP4oqg1PYS7Qx4drQrSkQ_1761137399
+Received: by mail-wm1-f72.google.com with SMTP id 5b1f17b1804b1-47111dc7bdbso52552225e9.0
+        for <virtio-fs@lists.linux.dev>; Wed, 22 Oct 2025 05:50:00 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1761120585; x=1761725385;
-        h=content-transfer-encoding:in-reply-to:from:references:cc:to
-         :content-language:subject:user-agent:mime-version:date:message-id
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;
-        bh=r5W3vw0dKWSTSqpjqiTpD1sBd7qgaB5sDy0DD3Bgxoo=;
-        b=j2iPImpUCfderuh/14uUvrYqhDtOnwwAEXh8kwPFq/8/62AYCoNJ006ioBqNJqbW76
-         VromoZBl0T6ZQkhKLu3jk/irjV2j6zfMLiyrfrszw/PYuTRsU8vtaWWYKHuQbghyZhmv
-         DFeXPTJ9ac94Z4u6GxVeGyJtHWFlAXYvrZkOrN8x3+YfaMZtpI2z3BtX4XdlxWrJZlb0
-         ENQWJ1WzFp13Tt4xmZAtCCTHeOA/ZzUDP25ZxxUll1ud81UXtnWzn+bFrk6AL0ZI6hJO
-         hoxLKrLCoCTn9QytBlpm5Vhimd3egWM4YtFwovjP4LvGIzyhzYJqwwgJAHdjNWmWOgZQ
-         rDyQ==
-X-Forwarded-Encrypted: i=1; AJvYcCVmiePZzz6HVedTJXWLbyskckq9TUaPINXyEZvhBPTE/DT/Fr7QHltvzl43cuNB26PYyfkWw1GngY8=@lists.linux.dev
-X-Gm-Message-State: AOJu0YxCWvuiwulbhgNGpphiDvcuwP7X448ZgL6jC7Fu4jvQSfFBOkpD
-	QtuRroXVjmbme/sPnVQXEkQxn1WVRr0a0Lu5MBHgpwgaEKOrEZOB83d05+Jgdh6K7W4=
-X-Gm-Gg: ASbGncucuLszGOQKgV7NQ0kUJt//ZPfqsNv8bJaVBxGQ0RWi4IyRcd53pGakizeAPy6
-	LFIT5XmZGdl8mbSasMRYWkNw17mSGmM8D3tKEVJ24K9PG6aIrU7SIzUuPgZTD66PykQb/VN7fjb
-	F1Iz4EaMo/TqMQ2MkeQRFFAliBGnmtbf49BN/lDshf94Ce+m/rMsqo3LMOMvoeQUDv43SIcneGk
-	1qLSXKUQj7kksnbQyEzIUPXQOgY0RLp7tKPmQQlivrbrJiNVfI3lsQkuU3/XpBZv84CF4o7PfD3
-	tnzqF7BPLx3N2QOY5h/oE9/IlZ4RWZJNBVlZusb3SieS/lEdkeD/t8ndVvU3UadweSRDBvm1UYf
-	pca/WtDl0rjowrOkapx6yolpV02xjaoWyIcRVVFZDvOcZCkrI4u9LbTleRptp+6v0gEAs0r0c2V
-	fZ0dqKWBOhYrNR/dkQZfNsGB8QSmmHC+bJr2tZOPKziOG9qCWLE+ez3WDDJDgOy32K
-X-Google-Smtp-Source: AGHT+IG5BpeXiJ6nHMocdx8fLCUYDlkFMY0PuWuFCGQMHFAZ8n3dQ7nToTymecUtEebWDB9IZS4Cfw==
-X-Received: by 2002:a05:600c:3149:b0:470:bcc4:b0a0 with SMTP id 5b1f17b1804b1-47117925919mr168171395e9.34.1761120584565;
-        Wed, 22 Oct 2025 01:09:44 -0700 (PDT)
-Received: from [192.168.69.221] (88-187-86-199.subs.proxad.net. [88.187.86.199])
-        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-427f00b985esm24733044f8f.34.2025.10.22.01.09.41
-        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Wed, 22 Oct 2025 01:09:43 -0700 (PDT)
-Message-ID: <36b8e200-10ab-48b0-beda-9ca2c42f2b48@linaro.org>
-Date: Wed, 22 Oct 2025 10:09:40 +0200
+        d=1e100.net; s=20230601; t=1761137399; x=1761742199;
+        h=content-transfer-encoding:mime-version:references:in-reply-to
+         :message-id:date:subject:cc:to:from:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to;
+        bh=cyh9GNwkSeiWX8VVWJet6cmrStrv1Y1BhHYKMAKCy08=;
+        b=xAMJyeJ+xWs1/lkLElujd4w4hpClzyT9HpvA6YzbbKiXrN4MD7Q2Az+JFvrNZi3fLd
+         75yD/CIrlcj+SHE3AWhClSS9uoBkbBqTQQZk7eeHsnLqmTZLaUYXnhkhpZQoQlDpLoBo
+         35RsumRax/1G0P7Ovezl9L6wlCUd9Py8F4T1sa2L+ArzX5G/MJL96EI1oqRAINGqcfCj
+         IcU00m1F2/mdlYjF9NIKDYp65c40eFBJ9ntxcjc6pVsRmXTzFzquPitj93EAy15gfXEH
+         qMxsDVLi4c1g6DZ6ScKhnOelVn7zVJs8JskVlIMtSL9Qz6WkCgGqXMSR+GnK5pau5yQ0
+         //jA==
+X-Forwarded-Encrypted: i=1; AJvYcCWHHXFhpMH2S3EKDiPxAK82hlZEE4JA97AcxrI2J80v1kYAP0rno0x/+mEWNHZ+jm5BlS4BBZsZr24=@lists.linux.dev
+X-Gm-Message-State: AOJu0YxpnKeKTSnth/NQcedgUqBNZi/8t90rO07O++rL4ex+JIXYIBoH
+	Atj0DvWgntperMVNwssgPh5f/Hi+DyPFtZQ5iurOFA32EZBcsTmFe6m+sdFRD5/OG5LWePzVEH3
+	dajA6f3hrXZb8fUimsxs3R3k7dhfxJn0WC+4+oyXP6l3maxUodTHvSkyYLEkqgg==
+X-Gm-Gg: ASbGnctw3XQ7zdBtMEpvdQFU3cOKJ4N/b3W9QJH27LbkqjJaDFkHxZmvvvTP264A6XA
+	ZcMioj0sRMFMSAl14IabmcL3OrpLHo2g0YWGAsyd2Sr7h0CForWjbU+vZ74P/MhR+P4NIVEKtZU
+	U66vH40KgYodRZz0aBIwMNocG/ld2MEMGqvQt24U9aa20Ye+CG7rXhn92NJsgI0Zgk6uqGljouZ
+	Lv0rb8wr+Iolv0b6+HLPbXXlgUuolClJd9ewunMjZ/dNce7WBLvKbaRT0J1h1KGiUzCXjIQk2qR
+	PjTpGQ8wYeuwu3GSVjVuhwnL2updTqFz5T1YjqJ3QAhmwHmKoEGr3uwS2kCx7Mn5ACQrWy9i2r6
+	isk+R7pb9vB1WeQi/h+MuZTS9rU6hgpNuP7ycIrKB27ki7iUju6LsscyDmf1kiUWaa/H5iNz6oE
+	jbhQ==
+X-Received: by 2002:a05:600c:3e07:b0:468:7a5a:1494 with SMTP id 5b1f17b1804b1-4711787350dmr122417205e9.1.1761137399215;
+        Wed, 22 Oct 2025 05:49:59 -0700 (PDT)
+X-Google-Smtp-Source: AGHT+IH/Hm2BY761ErfCQAW9TWE1D63G3DyFVH54t8V55V0H1jT6mBT86okovR2Of93UGrtI6FGtKQ==
+X-Received: by 2002:a05:600c:3e07:b0:468:7a5a:1494 with SMTP id 5b1f17b1804b1-4711787350dmr122416435e9.1.1761137398787;
+        Wed, 22 Oct 2025 05:49:58 -0700 (PDT)
+Received: from [192.168.10.48] ([151.61.22.175])
+        by smtp.gmail.com with ESMTPSA id 5b1f17b1804b1-475c428a534sm50029055e9.6.2025.10.22.05.49.55
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Wed, 22 Oct 2025 05:49:57 -0700 (PDT)
+From: Paolo Bonzini <pbonzini@redhat.com>
+To: marcandre.lureau@redhat.com
+Cc: qemu-devel@nongnu.org,
+	Gonglei <arei.gonglei@huawei.com>,
+	Zhenwei Pi <pizhenwei@bytedance.com>,
+	"Michael S . Tsirkin" <mst@redhat.com>,
+	Stefano Garzarella <sgarzare@redhat.com>,
+	Laurent Vivier <lvivier@redhat.com>,
+	Amit Shah <amit@kernel.org>,
+	Stefan Berger <stefanb@linux.vnet.ibm.com>,
+	=?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
+	=?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@linaro.org>,
+	Peter Maydell <peter.maydell@linaro.org>,
+	Igor Mitsyanko <i.mitsyanko@gmail.com>,
+	=?UTF-8?q?Cl=C3=A9ment=20Chigot?= <chigot@adacore.com>,
+	Frederic Konrad <konrad.frederic@yahoo.fr>,
+	Alberto Garcia <berto@igalia.com>,
+	Thomas Huth <huth@tuxfamily.org>,
+	Halil Pasic <pasic@linux.ibm.com>,
+	Christian Borntraeger <borntraeger@linux.ibm.com>,
+	Jason Herne <jjherne@linux.ibm.com>,
+	Yoshinori Sato <yoshinori.sato@nifty.com>,
+	Magnus Damm <magnus.damm@gmail.com>,
+	Nicholas Piggin <npiggin@gmail.com>,
+	Harsh Prateek Bora <harshpb@linux.ibm.com>,
+	"Collin L . Walling" <walling@linux.ibm.com>,
+	Stefano Stabellini <sstabellini@kernel.org>,
+	Anthony PERARD <anthony@xenproject.org>,
+	Paul Durrant <paul@xen.org>,
+	"Edgar E . Iglesias" <edgar.iglesias@gmail.com>,
+	Alistair Francis <alistair@alistair23.me>,
+	=?UTF-8?q?Daniel=20P=20=2E=20Berrang=C3=A9?= <berrange@redhat.com>,
+	Eduardo Habkost <eduardo@habkost.net>,
+	Richard Henderson <richard.henderson@linaro.org>,
+	Helge Deller <deller@gmx.de>,
+	Corey Minyard <minyard@acm.org>,
+	Paul Burton <paulburton@kernel.org>,
+	Aleksandar Rikalo <arikalo@gmail.com>,
+	Aurelien Jarno <aurelien@aurel32.net>,
+	Palmer Dabbelt <palmer@dabbelt.com>,
+	Weiwei Li <liwei1518@gmail.com>,
+	Daniel Henrique Barboza <dbarboza@ventanamicro.com>,
+	Liu Zhiwei <zhiwei_liu@linux.alibaba.com>,
+	Samuel Thibault <samuel.thibault@ens-lyon.org>,
+	Michael Rolnik <mrolnik@gmail.com>,
+	Antony Pavlov <antonynpavlov@gmail.com>,
+	Joel Stanley <joel@jms.id.au>,
+	Vijai Kumar K <vijai@behindbytes.com>,
+	Samuel Tardieu <sam@rfc1149.net>,
+	Gustavo Romero <gustavo.romero@linaro.org>,
+	Raphael Norwitz <raphael@enfabrica.net>,
+	Stefan Hajnoczi <stefanha@redhat.com>,
+	"reviewer : vhost-user-scmi" <mzamazal@redhat.com>,
+	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>,
+	Dmitry Osipenko <dmitry.osipenko@collabora.com>,
+	Fabiano Rosas <farosas@suse.de>,
+	Markus Armbruster <armbru@redhat.com>,
+	"Dr . David Alan Gilbert" <dave@treblig.org>,
+	Zhang Chen <zhangckid@gmail.com>,
+	Li Zhijian <lizhijian@fujitsu.com>,
+	Jason Wang <jasowang@redhat.com>,
+	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
+	Max Filippov <jcmvbkbc@gmail.com>,
+	Lukas Straub <lukasstraub2@web.de>,
+	"open list : Sharp SL-5500 Co . . ." <qemu-arm@nongnu.org>,
+	"open list : S390 SCLP-backed . . ." <qemu-s390x@nongnu.org>,
+	"open list : sPAPR pseries" <qemu-ppc@nongnu.org>,
+	"open list : X86 Xen CPUs" <xen-devel@lists.xenproject.org>,
+	"open list : RISC-V TCG CPUs" <qemu-riscv@nongnu.org>,
+	"open list : virtiofs" <virtio-fs@lists.linux.dev>,
+	"open list : Rust-related patc . . ." <qemu-rust@nongnu.org>
+Subject: Re: [PATCH v2] char: rename CharBackend->CharFrontend
+Date: Wed, 22 Oct 2025 14:49:51 +0200
+Message-ID: <20251022124952.3691010-1-pbonzini@redhat.com>
+X-Mailer: git-send-email 2.51.0
+In-Reply-To: <20251022074612.1258413-1-marcandre.lureau@redhat.com>
+References: 
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH v2] char: rename CharBackend->CharFrontend
-Content-Language: en-US
-To: marcandre.lureau@redhat.com, qemu-devel@nongnu.org
-Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>,
- Zhenwei Pi <pizhenwei@bytedance.com>, "Michael S. Tsirkin" <mst@redhat.com>,
- Stefano Garzarella <sgarzare@redhat.com>, Laurent Vivier
- <lvivier@redhat.com>, Amit Shah <amit@kernel.org>,
- Stefan Berger <stefanb@linux.vnet.ibm.com>,
- Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?Q?Alex_Benn=C3=A9e?=
- <alex.bennee@linaro.org>, Peter Maydell <peter.maydell@linaro.org>,
- Igor Mitsyanko <i.mitsyanko@gmail.com>, =?UTF-8?Q?Cl=C3=A9ment_Chigot?=
- <chigot@adacore.com>, Frederic Konrad <konrad.frederic@yahoo.fr>,
- Alberto Garcia <berto@igalia.com>, Thomas Huth <huth@tuxfamily.org>,
- Halil Pasic <pasic@linux.ibm.com>,
- Christian Borntraeger <borntraeger@linux.ibm.com>,
- Jason Herne <jjherne@linux.ibm.com>,
- Yoshinori Sato <yoshinori.sato@nifty.com>,
- Magnus Damm <magnus.damm@gmail.com>, Nicholas Piggin <npiggin@gmail.com>,
- Harsh Prateek Bora <harshpb@linux.ibm.com>,
- "Collin L. Walling" <walling@linux.ibm.com>,
- Stefano Stabellini <sstabellini@kernel.org>,
- Anthony PERARD <anthony@xenproject.org>, Paul Durrant <paul@xen.org>,
- "Edgar E. Iglesias" <edgar.iglesias@gmail.com>,
- Alistair Francis <alistair@alistair23.me>,
- =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>,
- Eduardo Habkost <eduardo@habkost.net>,
- Richard Henderson <richard.henderson@linaro.org>,
- Helge Deller <deller@gmx.de>, Corey Minyard <minyard@acm.org>,
- Paul Burton <paulburton@kernel.org>, Aleksandar Rikalo <arikalo@gmail.com>,
- Aurelien Jarno <aurelien@aurel32.net>, Palmer Dabbelt <palmer@dabbelt.com>,
- Weiwei Li <liwei1518@gmail.com>,
- Daniel Henrique Barboza <dbarboza@ventanamicro.com>,
- Liu Zhiwei <zhiwei_liu@linux.alibaba.com>,
- Samuel Thibault <samuel.thibault@ens-lyon.org>,
- Michael Rolnik <mrolnik@gmail.com>, Antony Pavlov <antonynpavlov@gmail.com>,
- Joel Stanley <joel@jms.id.au>, Vijai Kumar K <vijai@behindbytes.com>,
- Samuel Tardieu <sam@rfc1149.net>, Gustavo Romero
- <gustavo.romero@linaro.org>, Raphael Norwitz <raphael@enfabrica.net>,
- Stefan Hajnoczi <stefanha@redhat.com>,
- "reviewer:vhost-user-scmi" <mzamazal@redhat.com>,
- Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>,
- Dmitry Osipenko <dmitry.osipenko@collabora.com>,
- Fabiano Rosas <farosas@suse.de>, Markus Armbruster <armbru@redhat.com>,
- "Dr. David Alan Gilbert" <dave@treblig.org>, Zhang Chen
- <zhangckid@gmail.com>, Li Zhijian <lizhijian@fujitsu.com>,
- Jason Wang <jasowang@redhat.com>,
- Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
- Max Filippov <jcmvbkbc@gmail.com>, Lukas Straub <lukasstraub2@web.de>,
- "open list:Sharp SL-5500 Co..." <qemu-arm@nongnu.org>,
- "open list:S390 SCLP-backed..." <qemu-s390x@nongnu.org>,
- "open list:sPAPR (pseries)" <qemu-ppc@nongnu.org>,
- "open list:X86 Xen CPUs" <xen-devel@lists.xenproject.org>,
- "open list:RISC-V TCG CPUs" <qemu-riscv@nongnu.org>,
- "open list:virtiofs" <virtio-fs@lists.linux.dev>,
- "open list:Rust-related patc..." <qemu-rust@nongnu.org>
-References: <20251022074612.1258413-1-marcandre.lureau@redhat.com>
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=C3=A9?= <philmd@linaro.org>
-In-Reply-To: <20251022074612.1258413-1-marcandre.lureau@redhat.com>
-Content-Type: text/plain; charset=UTF-8; format=flowed
+X-Mimecast-Spam-Score: 0
+X-Mimecast-MFC-PROC-ID: 8yzXB1h-iTehb2lgfgc9-7CA6c0loWvKcqURFmSWyro_1761137399
+X-Mimecast-Originator: redhat.com
 Content-Transfer-Encoding: 8bit
+content-type: text/plain; charset="US-ASCII"; x-default=true
 
-On 22/10/25 09:46, marcandre.lureau@redhat.com wrote:
-> From: Marc-André Lureau <marcandre.lureau@redhat.com>
-> 
-> The actual backend is "Chardev", CharBackend is the frontend side of
-> it (whatever talks to the backend), let's rename it for readability.
-> 
-> Signed-off-by: Marc-André Lureau <marcandre.lureau@redhat.com>
-> ---
->   chardev/chardev-internal.h           |  12 +-
->   include/chardev/char-fe.h            |  67 +++++----
->   include/chardev/char.h               |   4 +-
-...
+Queued, thanks.
 
-> diff --git a/chardev/chardev-internal.h b/chardev/chardev-internal.h
-> index 9752dd75f7..8ea10414ab 100644
-> --- a/chardev/chardev-internal.h
-> +++ b/chardev/chardev-internal.h
-> @@ -37,9 +37,9 @@
->   struct MuxChardev {
->       Chardev parent;
->       /* Linked frontends */
-> -    CharBackend *backends[MAX_MUX];
-> -    /* Linked backend */
-> -    CharBackend chr;
-> +    CharFrontend *frontends[MAX_MUX];
-> +    /* frontend of the underlying muxed chardev */
-> +    CharFrontend chr;
->       unsigned long mux_bitset;
->       int focus;
->       bool term_got_escape;
-> diff --git a/include/chardev/char-fe.h b/include/chardev/char-fe.h
-> index 8ef05b3dd0..7901856f95 100644
-> --- a/include/chardev/char-fe.h
-> +++ b/include/chardev/char-fe.h
-> @@ -8,12 +8,12 @@ typedef void IOEventHandler(void *opaque, QEMUChrEvent event);
->   typedef int BackendChangeHandler(void *opaque);
->   
->   /**
-> - * struct CharBackend - back end as seen by front end
-> + * struct CharFrontend - Chardev as seen by front end
->    * @fe_is_open: the front end is ready for IO
->    *
->    * The actual backend is Chardev
->    */
-> -struct CharBackend {
-> +struct CharFrontend {
->       Chardev *chr;
->       IOEventHandler *chr_event;
->       IOCanReadHandler *chr_can_read;
-> @@ -27,53 +27,52 @@ struct CharBackend {
->   /**
->    * qemu_chr_fe_init:
->    *
-> - * Initializes a front end for the given CharBackend and
-> - * Chardev. Call qemu_chr_fe_deinit() to remove the association and
-> - * release the driver.
-> + * Initializes the frontend @c for the given Chardev backend @s. Call
-> + * qemu_chr_fe_deinit() to remove the association and release the backend.
->    *
->    * Returns: false on error.
->    */
-> -bool qemu_chr_fe_init(CharBackend *b, Chardev *s, Error **errp);
-> +bool qemu_chr_fe_init(CharFrontend *c, Chardev *s, Error **errp);
+Paolo
 
-IMO even clearer for this API would be to use:
-
-   bool qemu_chr_fe_init(CharFrontend *fe, Chardev *be, Error **errp);
-
-and update documentation accordingly.
-
->   
->   /**
->    * qemu_chr_fe_deinit:
-> - * @b: a CharBackend
-> + * @c: a CharFrontend
->    * @del: if true, delete the chardev backend
->   *
-> - * Dissociate the CharBackend from the Chardev.
-> + * Dissociate the CharFrontend from the Chardev.
->    *
->    * Safe to call without associated Chardev.
->    */
-> -void qemu_chr_fe_deinit(CharBackend *b, bool del);
-> +void qemu_chr_fe_deinit(CharFrontend *c, bool del);
->   
->   /**
->    * qemu_chr_fe_get_driver:
->    *
-> - * Returns: the driver associated with a CharBackend or NULL if no
-> + * Returns: the driver associated with a CharFrontend or NULL if no
->    * associated Chardev.
->    * Note: avoid this function as the driver should never be accessed directly,
->    *       especially by the frontends that support chardevice hotswap.
->    *       Consider qemu_chr_fe_backend_connected() to check for driver existence
->    */
-> -Chardev *qemu_chr_fe_get_driver(CharBackend *be);
-> +Chardev *qemu_chr_fe_get_driver(CharFrontend *c);
->   
->   /**
->    * qemu_chr_fe_backend_connected:
->    *
-> - * Returns: true if there is a chardevice associated with @be.
-> + * Returns: true if there is a backend associated with @c.
->    */
-> -bool qemu_chr_fe_backend_connected(CharBackend *be);
-> +bool qemu_chr_fe_backend_connected(CharFrontend *c);
-
-LGTM otherwise!

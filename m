@@ -1,126 +1,147 @@
-Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+Received: from mail-pf1-f175.google.com (mail-pf1-f175.google.com [209.85.210.175])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 017C1254AFF
-	for <virtio-fs@lists.linux.dev>; Thu, 23 Oct 2025 05:59:07 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 880AB350282
+	for <virtio-fs@lists.linux.dev>; Tue, 28 Oct 2025 20:03:29 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.210.175
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1761199150; cv=none; b=J1p1ksnyc96Q1UUt513+YIJ6noFEDx8jJeeShtUKrVWD8E1+ei3GxD3BVzqt0DtVrNyDUVd3r7t6I6QmuMfgOzwsivqSxZRUe8GOA2JK0f6rN9Pws/s8R1qxuy/15FBg6JE79duhBQtZf8bMlxZnDFPkfxku4mLkB2YpWrGuQDY=
+	t=1761681811; cv=none; b=JQL79RVsFo/Tdr0Ts5z7PGnmhIm7Uj+/CWhbji7ZDMZfq76ODpb0wk7bdK/jC8VlktMQ67pWSRrkp9+oU6s2jMnXZZDz3hlILbUhSYRXM1ILfUB4Hz8l/hhw3jkNXJyo7GN8k6t8Qf43cc1iiEHbi2S2xBRBZRh0K5AzK9JkvDY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1761199150; c=relaxed/simple;
-	bh=tepaATtw0XT93rQ5brSE+qYaF/UwhP80XyLYpdl85Bg=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=VOjyYjyIdlLbP+JrZTtuxWLt/Yg8w+TOtQ49xsr51cbxcgkCQmmMIZJ9AwyECER1eeF9KkwzRZiz9SFkCrm8gUAJkLSKAxb87tVglgZMzgLY07/n1KzKHxzH/J7SZkDCtbOxrZZbIJhFQz2++Yt/CKhp740zFwxHS51PpsY+EnQ=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=fail (0-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=jF3ibRwZ reason="key not found in DNS"; arc=none smtp.client-ip=49.212.243.89
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
+	s=arc-20240116; t=1761681811; c=relaxed/simple;
+	bh=BDUaSKODNKtMq7VQYWR0GriGBCfWmxRXz2MCLuAhAaw=;
+	h=From:To:Cc:Subject:Date:Message-ID:MIME-Version; b=orve4FJmenVf6d3Vdb1co1kohwwZPrlANGVKbYEy/qOa0co0NFf5ALOwAjjSqJ9ZW04Bis8bgdIWNgT1KkI2MnOgh4TmHzvYZqFSJFals/xp3HEZw+xgEqFsNsNuR8pDvOe7SCCz8ap+DJuKEdyuWmrOUw8Xvqw4FIEvuVQ3p6o=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=fzhzgkeg; arc=none smtp.client-ip=209.85.210.175
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="jF3ibRwZ"
-Received: from [133.11.54.205] (h205.csg.ci.i.u-tokyo.ac.jp [133.11.54.205])
-	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 59N4q3NC011817
-	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Thu, 23 Oct 2025 13:52:03 +0900 (JST)
-	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=9xxZpM2nB0o+d7uobfPXc5xWQTeCnn5dD9HEOV+8JfY=;
-        c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
-        h=Message-ID:Date:Subject:To:From;
-        s=rs20250326; t=1761195124; v=1;
-        b=jF3ibRwZ1YpqgeWufdnW0Y13nquI1Pea9esn0iH0zkCtqnmwPs1Eo+EIEzahu4CA
-         WSZw53qbYxw0m3aVhmM+IPEFlo3TK+WItwGjAu0w7UJBltEaTmKC/DBhm09vQrLP
-         dQ60t2nVw4sKFpv0ZPMZgjsDXfh3C2YvmsortOrOECMXVacOfWd1lT1uiVuqJNw2
-         CSo6ZLtKggBnJn9SwpJYLxiv2CdD41GR2cHL3JnOehfoid2t0C2gwIkAicEOk0Z9
-         nLwg0jqOUASUxIa5ejAJzD0x32S4I5/GL0PnYUXui+XlkKiJeSOQBLhxxCFKomD3
-         GRrKSSfXhFwFh2hp75ZadQ==
-Message-ID: <f4547020-0df2-40a7-a625-7628ae36db02@rsg.ci.i.u-tokyo.ac.jp>
-Date: Thu, 23 Oct 2025 13:52:02 +0900
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="fzhzgkeg"
+Received: by mail-pf1-f175.google.com with SMTP id d2e1a72fcca58-7a213c3c3f5so8341184b3a.3
+        for <virtio-fs@lists.linux.dev>; Tue, 28 Oct 2025 13:03:29 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20230601; t=1761681809; x=1762286609; darn=lists.linux.dev;
+        h=content-transfer-encoding:mime-version:message-id:date:subject:cc
+         :to:from:from:to:cc:subject:date:message-id:reply-to;
+        bh=H8joGPkRS7NaA/SU5NP/PHmANMNfQZvGYAt78YOV8B8=;
+        b=fzhzgkeg4981XtDrVE/sXnlhkXWzzFFqPuhQXEI4Zu5Sal3AYHUEssBAbOj4+wVpUl
+         JLIHjIVYrrSc5Uj5JjQIQzqZfQeRVMqssDYWYIYzjY9s/bPGAyCIFq93iLSxMnpFjPUV
+         DdocZK3e6JbuNMCmAjEpUWU6CdOKGdstr+/RmfoK9a0kldZFKzkP1Ns4oWmjAToe2pf6
+         YbF0apnlQW/eUSUeGt4OopJDxIT6X5Xjca2rYVkWqw76mY+JIdoTA+Ny+nRwdWQVS7ij
+         MM15lQbGSFiRDBLQnMeyshoWnKTwXbod2O144Pn7i4GFtMpjJF9687slNF10XYxUoiZN
+         Bcow==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20230601; t=1761681809; x=1762286609;
+        h=content-transfer-encoding:mime-version:message-id:date:subject:cc
+         :to:from:x-gm-message-state:from:to:cc:subject:date:message-id
+         :reply-to;
+        bh=H8joGPkRS7NaA/SU5NP/PHmANMNfQZvGYAt78YOV8B8=;
+        b=OUiR+iJ5hxyeK3W1MhCAldZcS4uCRf0qkYwzn2vZdUyl9/3H65ivGmwUZwCThrzkXO
+         rlmlK+XMTurBbe6Ebu7VTvvVTdEaSzwC45nXRT+WcNeTpRyCcKQBRyejIB3XEXAXPivJ
+         YGmp0e2DiL5NLiHb+LZ1eqF1H53nOTcn8gTwb+wKvh2u/hWYdrZb3C4eqhn8/PLVtdPT
+         CTdFKicQV7xxaG0hpIEh3kn04p8qK9BckPgTZXXr3T0ZTrdaatSFTUefx+paxBqqR5DR
+         kFQRb8NOrfNOgyffAyH8d0hqZRJFcMT79haOu66ufB0pc1HxoWPjQC1VL8/6rElpddnb
+         7OMw==
+X-Forwarded-Encrypted: i=1; AJvYcCUkA7kwH4LAOys8cJtu5ouIy8ME1Q6mXN/G2rWUlcS92wcHugk7st0BMW2CTy4pXb3kSOO4kM8iSUA=@lists.linux.dev
+X-Gm-Message-State: AOJu0YyIEfDYKmTItCFo1HHROg5GRzXNTSoFgo6zEtpS+w5Qz0yi3RlY
+	5Kq4WQcrHqMrjw6So4wgbo4zFm39iYZIa8xb76tNFK3yw03r4feJVEU+
+X-Gm-Gg: ASbGnct3lg5+y8pGttq7aAKsFK4zNhoRAXBzj3xWYlx2apM7oiRy6ar554GCkr9HvGN
+	IJaDo5WaRnUIRVpNM5gMdjhkuibdoqEpsau6QUWSrxW6U9kPas1ft61I6nPHcMEt0Ro/uQ6zxSy
+	aNKKSKoWZjTAo7/iYLC2gPCe0LaGXU+BdBceGek20C0hAlMHAsIqW1rL6uM1hJUJVpfetbJbKYw
+	0BoF69ssLeqZbYt6ULJkG7KZm4eRmCt779pzEsRJFwkSnabYEV/Zg7KXM/0kUFWFlDs1u8AwoQ9
+	kHQ43KyHrPPNTIANkQdtQok2Q/FsNl6t5V+IoLZM7o6kKXUamo40QqPkNCllsnfaQoy/Pz27Dj3
+	vT0cPsHj2fnkAZFImJbF9f9zG+esqUVeUmkQg1XqDvYwcOwNwi6g5McMSz6D7bReeicxCAhhw+E
+	6b2xkWrpWzOKYPraYyx4nZCC8GxgaSAvXvIbpvZw==
+X-Google-Smtp-Source: AGHT+IFax4JLp6peVjA4GRSNGg+x5gUWORdeMvPmm1KtEIj6rMAl9UjikOCZ4H3Vmq+EX50VwOXgvg==
+X-Received: by 2002:a17:903:1c2:b0:294:def6:bc1e with SMTP id d9443c01a7336-294def6bd88mr4468365ad.15.1761681808551;
+        Tue, 28 Oct 2025 13:03:28 -0700 (PDT)
+Received: from brajesh.. ([2401:4900:78f2:772b:141e:4f0f:8f8f:6f84])
+        by smtp.gmail.com with ESMTPSA id d9443c01a7336-29498d4254asm128996765ad.82.2025.10.28.13.03.23
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Tue, 28 Oct 2025 13:03:28 -0700 (PDT)
+From: Brajesh Patil <brajeshpatil11@gmail.com>
+To: miklos@szeredi.hu,
+	stefanha@redhat.com,
+	vgoyal@redhat.com,
+	eperezma@redhat.com
+Cc: virtualization@lists.linux.dev,
+	virtio-fs@lists.linux.dev,
+	linux-fsdevel@vger.kernel.org,
+	linux-kernel@vger.kernel.org,
+	skhan@linuxfoundation.org,
+	linux-kernel-mentees@lists.linux.dev,
+	david.hunter.linux@gmail.com,
+	khalid@kernel.org,
+	Brajesh Patil <brajeshpatil11@gmail.com>
+Subject: [PATCH] fuse: virtio_fs: add checks for FUSE protocol compliance
+Date: Wed, 29 Oct 2025 01:33:11 +0530
+Message-ID: <20251028200311.40372-1-brajeshpatil11@gmail.com>
+X-Mailer: git-send-email 2.43.0
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH v2] char: rename CharBackend->CharFrontend
-To: marcandre.lureau@redhat.com, qemu-devel@nongnu.org
-Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>,
-        Zhenwei Pi <pizhenwei@bytedance.com>,
-        "Michael S. Tsirkin" <mst@redhat.com>,
-        Stefano Garzarella <sgarzare@redhat.com>,
-        Laurent Vivier
- <lvivier@redhat.com>, Amit Shah <amit@kernel.org>,
-        Stefan Berger <stefanb@linux.vnet.ibm.com>,
-        Paolo Bonzini <pbonzini@redhat.com>,
-        =?UTF-8?Q?Alex_Benn=C3=A9e?=
- <alex.bennee@linaro.org>,
-        =?UTF-8?Q?Philippe_Mathieu-Daud=C3=A9?=
- <philmd@linaro.org>,
-        Peter Maydell <peter.maydell@linaro.org>,
-        Igor Mitsyanko <i.mitsyanko@gmail.com>,
-        =?UTF-8?Q?Cl=C3=A9ment_Chigot?=
- <chigot@adacore.com>,
-        Frederic Konrad <konrad.frederic@yahoo.fr>,
-        Alberto Garcia <berto@igalia.com>, Thomas Huth <huth@tuxfamily.org>,
-        Halil Pasic <pasic@linux.ibm.com>,
-        Christian Borntraeger <borntraeger@linux.ibm.com>,
-        Jason Herne <jjherne@linux.ibm.com>,
-        Yoshinori Sato <yoshinori.sato@nifty.com>,
-        Magnus Damm <magnus.damm@gmail.com>,
-        Nicholas Piggin <npiggin@gmail.com>,
-        Harsh Prateek Bora <harshpb@linux.ibm.com>,
-        "Collin L. Walling" <walling@linux.ibm.com>,
-        Stefano Stabellini <sstabellini@kernel.org>,
-        Anthony PERARD <anthony@xenproject.org>, Paul Durrant <paul@xen.org>,
-        "Edgar E. Iglesias" <edgar.iglesias@gmail.com>,
-        Alistair Francis <alistair@alistair23.me>,
-        =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>,
-        Eduardo Habkost <eduardo@habkost.net>,
-        Richard Henderson <richard.henderson@linaro.org>,
-        Helge Deller <deller@gmx.de>, Corey Minyard <minyard@acm.org>,
-        Paul Burton <paulburton@kernel.org>,
-        Aleksandar Rikalo <arikalo@gmail.com>,
-        Aurelien Jarno <aurelien@aurel32.net>,
-        Palmer Dabbelt <palmer@dabbelt.com>, Weiwei Li <liwei1518@gmail.com>,
-        Daniel Henrique Barboza <dbarboza@ventanamicro.com>,
-        Liu Zhiwei <zhiwei_liu@linux.alibaba.com>,
-        Samuel Thibault <samuel.thibault@ens-lyon.org>,
-        Michael Rolnik <mrolnik@gmail.com>,
-        Antony Pavlov <antonynpavlov@gmail.com>, Joel Stanley <joel@jms.id.au>,
-        Vijai Kumar K <vijai@behindbytes.com>,
-        Samuel Tardieu <sam@rfc1149.net>,
-        Gustavo Romero
- <gustavo.romero@linaro.org>,
-        Raphael Norwitz <raphael@enfabrica.net>,
-        Stefan Hajnoczi <stefanha@redhat.com>,
-        "reviewer:vhost-user-scmi" <mzamazal@redhat.com>,
-        Dmitry Osipenko <dmitry.osipenko@collabora.com>,
-        Fabiano Rosas <farosas@suse.de>, Markus Armbruster <armbru@redhat.com>,
-        "Dr. David Alan Gilbert" <dave@treblig.org>,
-        Zhang Chen
- <zhangckid@gmail.com>, Li Zhijian <lizhijian@fujitsu.com>,
-        Jason Wang <jasowang@redhat.com>,
-        Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
-        Max Filippov <jcmvbkbc@gmail.com>, Lukas Straub <lukasstraub2@web.de>,
-        "open list:Sharp SL-5500 Co..." <qemu-arm@nongnu.org>,
-        "open list:S390 SCLP-backed..." <qemu-s390x@nongnu.org>,
-        "open list:sPAPR (pseries)" <qemu-ppc@nongnu.org>,
-        "open list:X86 Xen CPUs" <xen-devel@lists.xenproject.org>,
-        "open list:RISC-V TCG CPUs" <qemu-riscv@nongnu.org>,
-        "open list:virtiofs" <virtio-fs@lists.linux.dev>,
-        "open list:Rust-related patc..." <qemu-rust@nongnu.org>
-References: <20251022074612.1258413-1-marcandre.lureau@redhat.com>
-Content-Language: en-US
-From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20251022074612.1258413-1-marcandre.lureau@redhat.com>
-Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 8bit
 
-On 2025/10/22 16:46, marcandre.lureau@redhat.com wrote:
-> From: Marc-André Lureau <marcandre.lureau@redhat.com>
-> 
-> The actual backend is "Chardev", CharBackend is the frontend side of
-> it (whatever talks to the backend), let's rename it for readability.
-> 
-> Signed-off-by: Marc-André Lureau <marcandre.lureau@redhat.com>
+Add validation in virtio-fs to ensure the server follows the FUSE
+protocol for response headers, addressing the existing TODO for
+verifying protocol compliance.
 
-Reviewed-by: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
+Add checks for fuse_out_header to verify:
+ - oh->unique matches req->in.h.unique
+ - FUSE_INT_REQ_BIT is not set
+ - error codes are valid
+ - oh->len does not exceed the expected size
+
+Signed-off-by: Brajesh Patil <brajeshpatil11@gmail.com>
+---
+ fs/fuse/virtio_fs.c | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 6bc7c97b017d..52e8338bf436 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -764,14 +764,34 @@ static void virtio_fs_request_complete(struct fuse_req *req,
+ {
+ 	struct fuse_args *args;
+ 	struct fuse_args_pages *ap;
+-	unsigned int len, i, thislen;
++	struct fuse_out_header *oh;
++	unsigned int len, i, thislen, expected_len = 0;
+ 	struct folio *folio;
+ 
+-	/*
+-	 * TODO verify that server properly follows FUSE protocol
+-	 * (oh.uniq, oh.len)
+-	 */
++	oh = &req->out.h;
++
++	if (oh->unique == 0)
++		pr_warn_once("notify through fuse-virtio-fs not supported");
++
++	if ((oh->unique & ~FUSE_INT_REQ_BIT) != req->in.h.unique)
++		pr_warn_ratelimited("virtio-fs: unique mismatch, expected: %llu got %llu\n",
++				    req->in.h.unique, oh->unique & ~FUSE_INT_REQ_BIT);
++
++	WARN_ON_ONCE(oh->unique & FUSE_INT_REQ_BIT);
++
++	if (oh->error <= -ERESTARTSYS || oh->error > 0)
++		pr_warn_ratelimited("virtio-fs: invalid error code from server: %d\n",
++				    oh->error);
++
+ 	args = req->args;
++
++	for (i = 0; i < args->out_numargs; i++)
++		expected_len += args->out_args[i].size;
++
++	if (oh->len > sizeof(*oh) + expected_len)
++		pr_warn("FUSE reply too long! got=%u expected<=%u\n",
++			oh->len, (unsigned int)(sizeof(*oh) + expected_len));
++
+ 	copy_args_from_argbuf(args, req);
+ 
+ 	if (args->out_pages && args->page_zeroing) {
+-- 
+2.43.0
+

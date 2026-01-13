@@ -1,103 +1,163 @@
-Received: from forwardcorp1d.mail.yandex.net (forwardcorp1d.mail.yandex.net [178.154.239.200])
+Received: from forwardcorp1b.mail.yandex.net (forwardcorp1b.mail.yandex.net [178.154.239.136])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4128335A956
-	for <virtio-fs@lists.linux.dev>; Tue, 13 Jan 2026 06:49:24 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=178.154.239.200
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 61E37389DF3
+	for <virtio-fs@lists.linux.dev>; Tue, 13 Jan 2026 09:58:36 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=178.154.239.136
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1768286970; cv=none; b=scu2DcazdAcvipqpcPuPPSlFelnL+eokAXWsOtdiaKOoXkgPa2bCYm5rCu8K76xmILyiKUqU3uXT8ZozPAVNGJd0L06neEd09Y6AGh4yXoPNRLGnNRNlLTT4dZYQ6yBHEFLQ63bwwi1dT0gmJ3jO7IEgzIP2zFBR9/btv4P3K5o=
+	t=1768298323; cv=none; b=tJJtogkuaNNq+IP/37Nh6U1EZFGqoUX4RsjfUjV3cAUXXgijHRNW5OOaTy/DdDo7qGq6kZmp/TsHjk4QJbiEvLnq70dLBFYwc84IKoA3IV2S8s7TnJWeob5/uP0c6hXS4w0oAk/PGpvH8p1t8L9d89oQ1eSTOrmm4pG56+QRgIs=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1768286970; c=relaxed/simple;
-	bh=OJ31QzpOjyjcwuFCCatnuDMd9CY2dJkpGEoufhKATS4=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=MRh/aTktPEBQ07J7XOZ2RKF+1tMo6qIipWJaeEiF/JlOL/Q8yAmXywzzAvdYeoCvZs8f/+uPaS9G+2hERQ6IodIhOvhOUPt+0SuSFZi54RbEmUm03it+TJpTgkSaYqAm/bsJUvUspebaeYQqpu97TJqoVsS8OVDnxCLjXkc1se0=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=WXitobGY; arc=none smtp.client-ip=178.154.239.200
+	s=arc-20240116; t=1768298323; c=relaxed/simple;
+	bh=uE50NyGX6jApW2OzizJ8iRr1KdAjR0BmX+x3VPOX8EQ=;
+	h=From:To:Cc:Subject:Date:Message-Id:MIME-Version; b=WfcLFBl7wcFJU90UU9KNFEJCJwb8azyYprDZMs50dkkBQ6d1HzSvtR9lWAyFelIaf7TubTD5m+U6EXKrxQNyRI22CDCAXCoYoJAPwe5cEP3TElpk7H+Vy9IKwxwxV/60WY0qSape++Rwrv4OyBolR16spSZ0aIwL26HJDwh3Kcc=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=mlKUzVEd; arc=none smtp.client-ip=178.154.239.136
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="WXitobGY"
-Received: from mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net (mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net [IPv6:2a02:6b8:c42:65a0:0:640:e1de:0])
-	by forwardcorp1d.mail.yandex.net (Yandex) with ESMTPS id 3ADC3807A6;
-	Tue, 13 Jan 2026 09:49:23 +0300 (MSK)
-Received: from [IPV6:2a02:6bf:803e:400:93c4:8e38:1f90:3c73] (unknown [2a02:6bf:803e:400:93c4:8e38:1f90:3c73])
-	by mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net (smtpcorp/Yandex) with ESMTPSA id KnM80u4Ae0U0-VhpsuKWX;
-	Tue, 13 Jan 2026 09:49:22 +0300
+	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="mlKUzVEd"
+Received: from mail-nwsmtp-smtp-corp-main-34.sas.yp-c.yandex.net (mail-nwsmtp-smtp-corp-main-34.sas.yp-c.yandex.net [IPv6:2a02:6b8:c24:fa2:0:640:41ee:0])
+	by forwardcorp1b.mail.yandex.net (Yandex) with ESMTPS id 37E6A807E3;
+	Tue, 13 Jan 2026 12:58:29 +0300 (MSK)
+Received: from dtalexundeer-nx.yandex.net (unknown [2a02:6bf:803e:400:93c4:8e38:1f90:3c73])
+	by mail-nwsmtp-smtp-corp-main-34.sas.yp-c.yandex.net (smtpcorp/Yandex) with ESMTPSA id KwPsag5AAiE0-D4R8sXnp;
+	Tue, 13 Jan 2026 12:58:28 +0300
 Precedence: bulk
 X-Yandex-Fwd: 1
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
-	s=default; t=1768286962;
-	bh=TZ8mu0WBWMfswijbT+e0w17mPBYTxGyZIFriIAz1Nrw=;
-	h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
-	b=WXitobGYAL7gMAU136XVxcq4dI5F8CErFnHBHnE1JEb9nDW4IUsERGIoaqX+E+JLE
-	 VpNydObfjJNqGSZGi1VgwsFUD8eWzk0BWvtwSHwNbU0Y2v/7Kk4oP1wSjs9OkTw6p5
-	 UZB7qtgjDlAkFQE0Pknptb0+s/pTcy721IH48KFI=
-Authentication-Results: mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net; dkim=pass header.i=@yandex-team.ru
-Message-ID: <f1fcd806-f391-47a4-821d-2d15882cd645@yandex-team.ru>
-Date: Tue, 13 Jan 2026 11:49:20 +0500
+	s=default; t=1768298308;
+	bh=u96MYXjKn1tbR5PxTRXl/KG/FGQ8toKgH93GjHPUBM4=;
+	h=Message-Id:Date:Cc:Subject:To:From;
+	b=mlKUzVEdUKOLU0nxcUREarRPwyeqdbPEx0iUpxkpapZX8j5Fru7U2dXzxIG3U+3yw
+	 UTG/BiU7iJTBuIfPc/PkfouAPRQDLiSXk6WaFFjk1ldrlt4YEMu94DCmo6WuPPFbM/
+	 hDYUXt3UztiJ2Lqrym297vDniq3Cnzdjj5s7corY=
+Authentication-Results: mail-nwsmtp-smtp-corp-main-34.sas.yp-c.yandex.net; dkim=pass header.i=@yandex-team.ru
+From: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
+To: qemu-devel@nongnu.org
+Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>,
+	Zhenwei Pi <pizhenwei@bytedance.com>,
+	"Michael S. Tsirkin" <mst@redhat.com>,
+	Stefano Garzarella <sgarzare@redhat.com>,
+	Raphael Norwitz <raphael@enfabrica.net>,
+	Kevin Wolf <kwolf@redhat.com>,
+	Hanna Reitz <hreitz@redhat.com>,
+	Jason Wang <jasowang@redhat.com>,
+	Paolo Bonzini <pbonzini@redhat.com>,
+	Fam Zheng <fam@euphon.net>,
+	=?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
+	Stefan Hajnoczi <stefanha@redhat.com>,
+	mzamazal@redhat.com,
+	Peter Xu <peterx@redhat.com>,
+	Fabiano Rosas <farosas@suse.de>,
+	qemu-block@nongnu.org,
+	virtio-fs@lists.linux.dev,
+	"yc-core@yandex-team.ru" <yc-core@yandex-team.ru>,
+	Eric Blake <eblake@redhat.com>,
+	Markus Armbruster <armbru@redhat.com>,
+	Alexandr Moshkov <dtalexundeer@yandex-team.ru>
+Subject: [PATCH v6 0/5] support inflight migration
+Date: Tue, 13 Jan 2026 14:58:09 +0500
+Message-Id: <20260113095813.134810-1-dtalexundeer@yandex-team.ru>
+X-Mailer: git-send-email 2.34.1
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH v5 5/5] vhost-user-blk: support inter-host inflight
- migration
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
- Zhenwei Pi <pizhenwei@bytedance.com>, "Michael S. Tsirkin" <mst@redhat.com>,
- Stefano Garzarella <sgarzare@redhat.com>,
- Raphael Norwitz <raphael@enfabrica.net>, Kevin Wolf <kwolf@redhat.com>,
- Hanna Reitz <hreitz@redhat.com>, Jason Wang <jasowang@redhat.com>,
- Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
- =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>, mzamazal@redhat.com,
- Peter Xu <peterx@redhat.com>, Fabiano Rosas <farosas@suse.de>,
- qemu-block@nongnu.org, virtio-fs@lists.linux.dev,
- "yc-core@yandex-team.ru" <yc-core@yandex-team.ru>,
- Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>
-References: <20260112114503.1174330-1-dtalexundeer@yandex-team.ru>
- <20260112114503.1174330-6-dtalexundeer@yandex-team.ru>
- <20260112181917.GE462084@fedora>
-Content-Language: en-US
-From: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
-In-Reply-To: <20260112181917.GE462084@fedora>
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
+Content-Transfer-Encoding: 8bit
 
+v6:
+- fix documentation about new protocol feature
+- add check to ensure that inflight buffer subsection has been successfully loaded
+- disable support for the new feature if in-flight or inflight migration is not supported.
 
-On 1/12/26 23:19, Stefan Hajnoczi wrote:
-> On Mon, Jan 12, 2026 at 04:45:03PM +0500, Alexandr Moshkov wrote:
->> During inter-host migration, waiting for disk requests to be drained
->> in the vhost-user backend can incur significant downtime.
->>
->> This can be avoided if QEMU migrates the inflight region in
->> vhost-user-blk.
->> Thus, during the qemu migration, with feature flag the vhost-user
->> back-end can immediately stop vrings, so all in-flight requests will be
->> migrated to another host.
->>
->> Signed-off-by: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
->> ---
->>   hw/block/vhost-user-blk.c          | 28 ++++++++++++++++++++++++++++
->>   include/hw/virtio/vhost-user-blk.h |  1 +
->>   2 files changed, 29 insertions(+)
->>
->> diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
->> index a8fd90480a..5e44f6253c 100644
->> --- a/hw/block/vhost-user-blk.c
->> +++ b/hw/block/vhost-user-blk.c
->> @@ -656,6 +656,28 @@ static struct vhost_dev *vhost_user_blk_get_vhost(VirtIODevice *vdev)
->>       return &s->dev;
->>   }
->>   
->> +static bool vhost_user_blk_inflight_needed(void *opaque)
->> +{
->> +    struct VHostUserBlk *s = opaque;
->> +
->> +    bool inflight_drain = vhost_dev_has_feature(&s->dev,
->> +                        VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT);
-> VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT must only be negotiated
-> when inflight_migration is enabled. Otherwise the backend will use this
-> feature even though vhost_user_blk_inflight_needed() skips migrating the
-> in-flight region.
-Oh, I understand now. I'll fix this too, thanks!
+v5:
+Make protocol feature flag instead of GET_VRING_BASE msg parameter,
+so all changes in other devices is no longer needed.
+Now back-end may set this feature for QEMU. This feature must be set
+with in-flight migration parameter in vhost-user-blk.
+
+v4:
+While testing inflight migration, I notices a problem with the fact that
+GET_VRING_BASE is needed during migration, so the back-end stops
+dirtying pages and synchronizes `last_avail` counter with QEMU. So after
+migration in-flight I/O requests will be looks like resubmited on destination vm.
+
+However, in new logic, we no longer need to wait for in-flight requests
+to be complete at GET_VRING_BASE message. So support new parameter
+`should_drain` in the GET_VRING_BASE to allow back-end stop vrings
+immediately without waiting for in-flight I/O requests to complete.
+
+Also:
+- modify vhost-user rst
+- refactor on vhost-user-blk.c, now `should_drain` is based on
+  device parameter `inflight-migration`
+
+v3:
+- use pre_load_errp instead of pre_load in vhost.c
+- change vhost-user-blk property to
+  "skip-get-vring-base-inflight-migration"
+- refactor vhost-user-blk.c, by moving vhost_user_blk_inflight_needed() higher
+
+v2:
+- rewrite migration using VMSD instead of qemufile API
+- add vhost-user-blk parameter instead of migration capability
+
+I don't know if VMSD was used cleanly in migration implementation, so
+feel free for comments.
+
+Based on Vladimir's work:
+[PATCH v2 00/25] vhost-user-blk: live-backend local migration
+  which was based on:
+    - [PATCH v4 0/7] chardev: postpone connect
+      (which in turn is based on [PATCH 0/2] remove deprecated 'reconnect' options)
+    - [PATCH v3 00/23] vhost refactoring and fixes
+    - [PATCH v8 14/19] migration: introduce .pre_incoming() vmsd handler
+
+Based-on: <20250924133309.334631-1-vsementsov@yandex-team.ru>
+Based-on: <20251015212051.1156334-1-vsementsov@yandex-team.ru>
+Based-on: <20251015145808.1112843-1-vsementsov@yandex-team.ru>
+Based-on: <20251015132136.1083972-15-vsementsov@yandex-team.ru>
+Based-on: <20251016114104.1384675-1-vsementsov@yandex-team.ru>
+
+---
+
+Hi!
+
+During inter-host migration, waiting for disk requests to be drained
+in the vhost-user backend can incur significant downtime.
+
+This can be avoided if QEMU migrates the inflight region in
+vhost-user-blk.
+Thus, during the qemu migration, with protocol feature flag the vhost-user
+back-end can immediately stop vrings, so all in-flight requests will be
+migrated to another host.
+
+At first, I tried to implement migration for all vhost-user devices that support inflight at once,
+but this would require a lot of changes both in vhost-user-blk (to transfer it to the base class) and
+in the vhost-user-base base class (inflight implementation and remodeling + a large refactor).
+
+Therefore, for now I decided to leave this idea for later and
+implement the migration of the inflight region first for vhost-user-blk.
+
+Alexandr Moshkov (5):
+  vhost-user.rst: specify vhost-user back-end action on GET_VRING_BASE
+  vhost-user: introduce protocol feature for skip drain on
+    GET_VRING_BASE
+  vmstate: introduce VMSTATE_VBUFFER_UINT64
+  vhost: add vmstate for inflight region with inner buffer
+  vhost-user-blk: support inter-host inflight migration
+
+ docs/interop/vhost-user.rst        | 56 ++++++++++++++++++-----------
+ hw/block/vhost-user-blk.c          | 28 +++++++++++++++
+ hw/virtio/vhost-user.c             |  5 +++
+ hw/virtio/vhost.c                  | 57 ++++++++++++++++++++++++++++++
+ include/hw/virtio/vhost-user-blk.h |  1 +
+ include/hw/virtio/vhost-user.h     |  2 ++
+ include/hw/virtio/vhost.h          |  6 ++++
+ include/migration/vmstate.h        | 10 ++++++
+ 8 files changed, 145 insertions(+), 20 deletions(-)
+
+-- 
+2.34.1
+

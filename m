@@ -1,92 +1,94 @@
-Received: from mail-oo1-f53.google.com (mail-oo1-f53.google.com [209.85.161.53])
+Received: from mail-oa1-f51.google.com (mail-oa1-f51.google.com [209.85.160.51])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 43E2229A9C9
-	for <virtio-fs@lists.linux.dev>; Fri, 16 Jan 2026 19:50:57 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.161.53
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id E36D5242D83
+	for <virtio-fs@lists.linux.dev>; Mon, 19 Jan 2026 23:15:14 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.51
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1768593058; cv=pass; b=uzMNWc/BETxOXYtcIsvflZiJdDh3/pGiTMBb+WK/AbzOL6WKqq7tuhE9lIymGSxLJLavRTVl1sHfyiTB6zteM0AwFAQHUI90rSGV+WyyYjGaegG1KfkSTJCtDUJDgjYQoyy7AInTW/9qp5wpPkcG/2w56pAwOjd3vcQnckheis0=
+	t=1768864516; cv=pass; b=max5xRKssxIj0mBJqKK/fJ4XWgIVuOTReYHXkxx9D53AlGBLqm9KG79W8SB4tjL8diIYanFPyVOQBgRsPaBdNuzI5BKdYf8GrsQYljTqfzZSzyi6aMoaId+kD4+DaGrjF5wilrobEQJ+kHCfym6kpUm+e35N0BdcfivoTZ7U6Vk=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1768593058; c=relaxed/simple;
-	bh=MSOvt3C4S9YqtmMDRBthcUWP1pPAo5gHCqlBJ8nPqSo=;
+	s=arc-20240116; t=1768864516; c=relaxed/simple;
+	bh=eFZIwCf77If2flfxd0cDBvQhwy3gflhjkZ8sEbYaVrU=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=gSUSKqEpKdcQ9nx0OHJ6eVfxd/bj0C2q7gJUMd9jxAaGY0gzCLX/XXTpguaDwCnXhapLNahKwVhvX75rLpgolJCyQgWFMM+cgaFvOgzxdYdWe7S9HwYzyVvQZApzpw0wHttD3lheO1Eq66Hx1Te+z4ow0BT7e78AfrYm+iNczfs=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=mJXdFboA; arc=pass smtp.client-ip=209.85.161.53
+	 To:Cc:Content-Type; b=KFy7GZ/xaRHnSvzXCUvxXgxuRqf2jT+zIxAeWtFlaknUVmRUryqbM9zeJBNZXwBcsDHmW1AVduRAuBJ0lISod0HSeiP23qh7a+X03K79O3GZ6GD1Hp/lPEshlEM8NIGllC5LTfdkSGemFXP/P5q12/AR1LmXGncioCW9eUAoU3E=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=d92JqzIc; arc=pass smtp.client-ip=209.85.160.51
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="mJXdFboA"
-Received: by mail-oo1-f53.google.com with SMTP id 006d021491bc7-65f59501dacso1779239eaf.0
-        for <virtio-fs@lists.linux.dev>; Fri, 16 Jan 2026 11:50:57 -0800 (PST)
-ARC-Seal: i=1; a=rsa-sha256; t=1768593056; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="d92JqzIc"
+Received: by mail-oa1-f51.google.com with SMTP id 586e51a60fabf-4045e70f36eso2132519fac.1
+        for <virtio-fs@lists.linux.dev>; Mon, 19 Jan 2026 15:15:14 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1768864513; cv=none;
         d=google.com; s=arc-20240605;
-        b=QBqm2hBpf9w0pmHqYo+b/JeGE/Wwy/KphUj6P2ztmM6CwQYTbuwK+YWwrCjRzKYBWE
-         x09LewCspJ93gyUWKsRVNWjAAyhgDyxmbA0FA3NNsUOS/Fl96QESvqPgOMcmVTl5AwkA
-         K/+AZMfi9gi5JiDPKWcE2PDa9r3ZpwrRbwmtQN7ZV391bUeFI5JtcDBZaH6ZSvJtGl+B
-         FJRHsKhP//pE3gUh6ys6t3VWuvSZ6zrQPYRYOqzE9ykCQdvwbZT0GeubWTq264TUgyC3
-         5RC5nDuVlvYDT05eUkOzsxkd2wJlYCx9vGNnuZEVFMQmr57blvOai/ntmupFwB+wjdaU
-         QumA==
+        b=ZFRclSX6b+6yJ7/YQW+TNmafYQl0cu5dS82Y9YMIFGMF7Aj7jO82zykNo2DGXsLliG
+         FrtgaE1PiJ0I1oZEX6S0rP/2PwxZ0C02rTLRQFz0HOXwlRAW0mAS3AZkqeFrFr4Si1z8
+         fKYA7SRfCLh87BX3fsvM0CoMK5OuNg+nhayHbTs12+zQw9eNRwbWaOkHSLquBM+KatyK
+         KI/MFG1QqHbGHHwDuiOhqo5ipKFLzCG95DCWtKcbDz8RUEkH7RezdDL6EtNBh+YOMJPz
+         4Syargc9fcQNCZ4hhq1eFyBXlrbHcFrquLc31xWeLCohQdJ0/9yP3ytu6Mt7pg/xis7U
+         js3g==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=teDDPgMWHLMcsEK7YMG91On4831FNcIesgnPi/nB9tM=;
-        fh=RfqPH14tyzz0+HRLAnk0+NVlygzVXKr/pbE2heinTd0=;
-        b=RntbJxIthNE0iNHn1kIwIfo/5bg1vpSDejupdSoKqei1i4Q9fsSpMsR8yfH/jKKhWg
-         d04oVhStgjA76gVtr/Bb5hcZOpj81JSVhA4WmPuRKTF2SKQxyt0SPBAvZHnkiiUiGlT1
-         7UIxGwB+ViZdlN/51iILdt/GeMrtT3OGHscK2mJRlWNY6+bhr0KBqNgmd5PHtvLcgqtL
-         +TvtLSKui6mSwp9tAEorHIUlkW+FAAu9Gttng4ksqIGR0zGl+N/8/BdXJtXGw1ZShCXB
-         JNt8kqz7XKS/MqxnPM/M0WkQhIsibRY/mzNeFRsSJgXZ+u4QLDVzptgL7KDAWYvAxN/E
-         uzbg==;
+        bh=b+Hd3Asq8WC9ZEPhp/CLp9qzeOTiNgZr6eSimimG1rw=;
+        fh=umbK4uKqecMgIJFW38sS0j0QUbsVxRk3UxDkXGSQfw8=;
+        b=FC2mNTG2y74Yn+d5p6F5Cww5bZLqUkC6i06RQNTgew9MVKKceEf5D5psXy4umg2o5b
+         yTZfxDU6P95sd/J0rbIqL5MZfNlZtcMyT//l+XLy0uzcImE4FA2dSnNCzAeqn2z7WFKB
+         SNRyyEmbFOCAcJc9ss37UrCaTGmZNzsUeyxkRFfJbx0dDTG+Gnwn0aLvVJlFgXivyOya
+         +DGfNslZ2mNTjhlxiJTZFG76+xDPOscPojgB0xvOXmkcomu1Pi7XtBd9D61CUiaMzwrx
+         CNleCX/Wcy+p8p0NVXcwXpZL/7FRLAs21SxGKeXBL58jNdgC8tl5LNxEv99CGxVhzgsp
+         f0XQ==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20230601; t=1768593056; x=1769197856; darn=lists.linux.dev;
+        d=gmail.com; s=20230601; t=1768864513; x=1769469313; darn=lists.linux.dev;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:from:to:cc:subject:date
          :message-id:reply-to;
-        bh=teDDPgMWHLMcsEK7YMG91On4831FNcIesgnPi/nB9tM=;
-        b=mJXdFboA3Uyxb0EWSBwEj9GvIfc7qJNa0W2yIFAgY6H6iOo/38Ns66YVX7gtVjijJt
-         NoT0rpAEK4jrctb9JeLUBwKZAVm1mdKLy5mM6VhRNzBYlgSR663QZq4DRsddcPCAG8SD
-         nC85fAfwiz3wUsgRBqy5qJL5TWnH99UiNc7mgtrUxMqoXD54ukEJYaZNOHX879EIx0C5
-         nB0SDdAIy+ij25+tfRX6KaUgQ7kDgtVy9ROqOKFhq+0a1TTgpnrYD3bcPcDqm77/jCPf
-         26bYASjeOWz/r0cqbUie376+gnZzN81neW+h7jO9Cx2SkbnMjefhKmOKoSQfbVW7u8lv
-         YQ2w==
+        bh=b+Hd3Asq8WC9ZEPhp/CLp9qzeOTiNgZr6eSimimG1rw=;
+        b=d92JqzIcFohDqC9IlcIbViQP+Z9e6BZwpF96a35okf9qyHwGmkTTjk2DUj+F4AqBDO
+         VJJqPbwILT83z+ktgdYR0GwJXB5aXogb0FULaSU5POOWkGBbJBBYu9Dkc+rYuLsu1aC6
+         xLSZXKgWV+ovpN+0XI0AzL4Jmnt5G0GkEcUCL/4smYR7LdkzXcLGd/WGg7+2COEp9C6u
+         W1OhboB4uU+MBDYxAltHMt4kdfkb+c350CfmaPDY3XhFEf3lPCtHoLqpmqCnyT0Ny24F
+         +z+CZZQQbIAmkMyMRz9GaEikPKzaZgX6KR1cq606pmNBylpf+pA+5Zw/YjenvODrjSVW
+         UEWg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1768593056; x=1769197856;
+        d=1e100.net; s=20230601; t=1768864513; x=1769469313;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:x-gm-gg:x-gm-message-state:from
          :to:cc:subject:date:message-id:reply-to;
-        bh=teDDPgMWHLMcsEK7YMG91On4831FNcIesgnPi/nB9tM=;
-        b=AVrnbzABPf/lFy2ws5MccJMlxy7DOzC0O/aPerVe/j7HSz9fQsqy72FfEDOn16vXKb
-         EK2G2i6XI1y745rXczFPGN72HQYG6itU22LJf3lhH4NVep78JW0kEMjz5W+sUzQksegO
-         qOk7QAorbXt3TW4FzjShHQEavGFHasEXg6DAGnKgLzPdOKuaY1be3fHPlA6dM800XtIx
-         FpPCaRi3TcDttSq3qaVLUUIX+CNm7Fu4ppvBSYyrwn3lFTs9Egzl0EFBjyIDNTZmzaQ/
-         7xv2R9wvPuZv9NLDnu2Ao0vjc+hkh9UQ9GLqF7bHyIio+/RjeB9qG8J3fg7CflKe5dgJ
-         2/rw==
-X-Forwarded-Encrypted: i=1; AJvYcCXpruifT+et/IAuzeiUO4vlaC9WZvf2DTZEX0BBZuFE3l7osrJdGLg6iRra3cR2pq/5oErvINeAcnM=@lists.linux.dev
-X-Gm-Message-State: AOJu0YxIHHXLHOaqTvKmfe3mnOXzxBC+llcra0A+EhgdNxm2JYzozzg7
-	UEZ3sXRuBcB0MUBj4dPkRHoU+c6HvSt4p3DMYg74JfLYLN0KuPzXpPMUeamsb69J/3mEOewCkhf
-	PKpn4eCO1mlqxbjkTYWiyfXr4eCeIwnw=
-X-Gm-Gg: AY/fxX5Wj3o0WoHKu2trvijhH5EmTS9I0dKfidRGzIznDsoZgLQpI2ClDVYgcTzifrS
-	bdIKLvRZ0HCUtWI/0Zwn0lfsHIVDHj6KxoZOwMzMRfnqJ39kPvV0qAhj2meEHlj2qRxHD4H1WTn
-	Xm6cnK4da5pnaIpfZcHmLMv14s/yESMxnIhQIPXB0hJAR8PUIBJXK0dooqMFjnPETx3FZw3V/JG
-	qJwSeuYR9ticdRKh1ukiE/+k+3M3aiPrLDkJVO9UoBp1VLaiSHB0tRGxk+VopHS+ob7hAzFD+mI
-	sZF0DkPLXF/NlIsHGZ6yR4XYDA==
-X-Received: by 2002:a05:6820:174a:b0:65e:f37f:93a4 with SMTP id
- 006d021491bc7-66117959c64mr1764198eaf.8.1768593056108; Fri, 16 Jan 2026
- 11:50:56 -0800 (PST)
+        bh=b+Hd3Asq8WC9ZEPhp/CLp9qzeOTiNgZr6eSimimG1rw=;
+        b=swppmZCT+1mmagWRY8I+bZV305rhi5FD+etqJXhNJQ8DObds4evjWlA9h+O4aV9ra1
+         efUKNLxxDW8vNgUTbkljwEmugTRrOAHVP9YGe3c+QPBYvkB8YKU8M0JJwmhw5u74o5cD
+         e3gKlwgOWr54nJZ76qSFQVZqfA3pKtKPDAffQHvniVSvuF//qW+a3hJAtNV7+GclAn9o
+         p+w+rzSqmAk7QlxfW2PmA17GRyPceK6O8VtJOiNZHiYAeR+p7Iw/PRScQhJYWIxNV//+
+         BLSGgGmypaz5QmrRiodwidQPYfDK3bJXmZoxOUR1fDmRaVJ8WC0wVMp6OWp+nUwkv6w0
+         9cZw==
+X-Forwarded-Encrypted: i=1; AJvYcCUAxL/tJEOTbUIHMZ8eC7HZ7+7QxTwGdH4CXqJqsGAMtfbTHXnIv9KD54V07Dnw+zXP8r5myuewoPg=@lists.linux.dev
+X-Gm-Message-State: AOJu0YwPqft74EoVQiD649lbSmuUeGMBGT7Oj0EbIGwnRjdsOTJdFPDz
+	JVOn46sRjkW76Pfgi4CckA5SRgM4PXkcoKdDq6M3euwaDnxebb7QMw5pD6E1xbKzZcEt+LoUoDh
+	67MBCzxAXD6xHyvCOKTPQD6qNtgl4WAY=
+X-Gm-Gg: AY/fxX7rt9n6r4KFJJTo6R7S1YlwgYDJ8BIJUgqIszPXph8SnV2UJIo7318oYi74/13
+	OR855W/DohZ/e1lVv0mqKMsNhxu8i5uwTqjGgz8R5Re5NPp2wbrH3FResSwpxcRtAkVM1JImlsi
+	anA2B+KlNH011pYhmg28Y6anY73a1h9NQ58jwsXeX2yyHecBFd5QQXGBe50hKODcqp8/HHbj4NJ
+	zv2M25oQU+xt89OyzpJpNTIPwtppeV1YBi7cjaH5JFt8XYMm5HGxmcSoZW2ztplQ/b3huV1BsyT
+	sfJChl7i3aMB20Rr4XWAZBjRkfE=
+X-Received: by 2002:a4a:dc0b:0:b0:65f:5bc0:7b2f with SMTP id
+ 006d021491bc7-662b00414afmr2947eaf.46.1768864513559; Mon, 19 Jan 2026
+ 15:15:13 -0800 (PST)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-References: <20260115081103.655749-1-dtalexundeer@yandex-team.ru> <20260115081103.655749-6-dtalexundeer@yandex-team.ru>
-In-Reply-To: <20260115081103.655749-6-dtalexundeer@yandex-team.ru>
+References: <20260115081103.655749-1-dtalexundeer@yandex-team.ru>
+ <20260115081103.655749-6-dtalexundeer@yandex-team.ru> <CAFubqFtKrsPn++kMPEAOO2LdygY9BZyDmzb0nU7YbK1on2GNCw@mail.gmail.com>
+ <947c2ef9-dbd8-46ea-b61d-1817fb4c33aa@yandex-team.ru>
+In-Reply-To: <947c2ef9-dbd8-46ea-b61d-1817fb4c33aa@yandex-team.ru>
 From: Raphael Norwitz <raphael.s.norwitz@gmail.com>
-Date: Fri, 16 Jan 2026 14:50:45 -0500
-X-Gm-Features: AZwV_QiMN4DGVtzxgAKEZgmhbOBLU-3A6_s5nR0j38K8nCOVb7nHf8zJ0wBplr8
-Message-ID: <CAFubqFtKrsPn++kMPEAOO2LdygY9BZyDmzb0nU7YbK1on2GNCw@mail.gmail.com>
+Date: Mon, 19 Jan 2026 18:15:02 -0500
+X-Gm-Features: AZwV_Qh8KYBBkrQiABxnWQx3jgc2uhAUOJxN0j2UCDiP1lqDbBfjpRSSaBdlLX8
+Message-ID: <CAFubqFuNAMVsVn47AjUGDi6mRCxKRwvnchmCHbZSEY7HgtG54w@mail.gmail.com>
 Subject: Re: [PATCH v7 5/5] vhost-user-blk: support inter-host inflight migration
 To: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
 Cc: qemu-devel@nongnu.org, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
@@ -102,26 +104,44 @@ Cc: qemu-devel@nongnu.org, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-Apologies if I've missed something obvious here - what actually skips
-the GET_VRING_BASE operation here? I was expecting something like:
+ACK on your explanation. Then for the series:
 
---- a/hw/block/vhost-user-blk.c
-+++ b/hw/block/vhost-user-blk.c
-@@ -221,8 +221,9 @@ static int vhost_user_blk_stop(VirtIODevice *vdev)
-         return 0;
-     }
+Reviewed-by: Raphael Norwitz <raphael.s.norwitz@gmail.com>
 
--    force_stop =3D s->skip_get_vring_base_on_force_shutdown &&
--                 qemu_force_shutdown_requested();
-+    force_stop =3D (s->skip_get_vring_base_on_force_shutdown &&
-+                 qemu_force_shutdown_requested()) ||
-+                 s->inflight_migration; // FIXME: runstate check?
-
-Without setting force_stop in vhost_user_blk_stop() I don't see how
-the GET_VRING_BASE operation would be skipped.
-
-On Thu, Jan 15, 2026 at 3:13=E2=80=AFAM Alexandr Moshkov
+On Mon, Jan 19, 2026 at 1:44=E2=80=AFAM Alexandr Moshkov
 <dtalexundeer@yandex-team.ru> wrote:
+>
+>
+> On 1/17/26 00:50, Raphael Norwitz wrote:
+>
+> Apologies if I've missed something obvious here - what actually skips
+> the GET_VRING_BASE operation here? I was expecting something like:
+>
+> --- a/hw/block/vhost-user-blk.c
+> +++ b/hw/block/vhost-user-blk.c
+> @@ -221,8 +221,9 @@ static int vhost_user_blk_stop(VirtIODevice *vdev)
+>          return 0;
+>      }
+>
+> -    force_stop =3D s->skip_get_vring_base_on_force_shutdown &&
+> -                 qemu_force_shutdown_requested();
+> +    force_stop =3D (s->skip_get_vring_base_on_force_shutdown &&
+> +                 qemu_force_shutdown_requested()) ||
+> +                 s->inflight_migration; // FIXME: runstate check?
+>
+> Without setting force_stop in vhost_user_blk_stop() I don't see how
+> the GET_VRING_BASE operation would be skipped.
+>
+> Nothing skip GET_VRING_BASE) In the first versions of the patch, this was=
+ done, but then I realized that this was the wrong way, because the last_av=
+ail_idx and avail_idx counters may be incorrect after migration.
+>
+> Therefore, it is now implemented that on GET_VRING_BASE the backend needs=
+ to either wait for all in-flight requests or not (depending on protocol_fe=
+ature).
+>
+> On Thu, Jan 15, 2026 at 3:13=E2=80=AFAM Alexandr Moshkov
+> <dtalexundeer@yandex-team.ru> wrote:
 >
 > During inter-host migration, waiting for disk requests to be drained
 > in the vhost-user backend can incur significant downtime.

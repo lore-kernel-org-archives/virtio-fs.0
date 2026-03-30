@@ -1,36 +1,36 @@
 Received: from forwardcorp1a.mail.yandex.net (forwardcorp1a.mail.yandex.net [178.154.239.72])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4F6633B27D3
-	for <virtio-fs@lists.linux.dev>; Mon, 30 Mar 2026 09:52:44 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 117FA3AEF2E
+	for <virtio-fs@lists.linux.dev>; Mon, 30 Mar 2026 09:52:41 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=178.154.239.72
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1774864366; cv=none; b=nxa9lW9YitVjWAT0UW4WYy5tt++lroqyDq8qlyj5IS7DPnhbobLL6/Ei68VfyT3sVDrKgNGXWwnPcO/UHzm+SM05Jrj+et/nPlSu/9dbUQ4dsn1TGjMRFI4w63c1zzHb930rorTKfdn6dEh6UZlzunQtSFoPtm+/FqmNj9d3qTw=
+	t=1774864366; cv=none; b=hBzOIYFptwbAxASj2gce03BNKm4j25Ka7DbG2eJCa6aL4I6Qu/oaSIkraDT0pUXRikKbm41ITpoMDCtdWk6cEIs8e2hA5lK2KjTYZmbYhAJ3KjqTkgmiGT6G+xiKM9uFYFcFZ1taZKq1t2xkNMvVZzgqJgZ6icAcO+ZYwDq/vvg=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
 	s=arc-20240116; t=1774864366; c=relaxed/simple;
-	bh=hBpvkpl2Obr+2aeu0/4RxGbHTzlkDEkHO85r00U5/oI=;
+	bh=FLFXc1TuP8wKdrMdDK37T++xtPa20WW4olm1TGajA1Y=;
 	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
-	 MIME-Version; b=F+aYODG9sU7xjNQoF4AepMq/LFpwrxqWdmN7ycZQQ1HId2ZJ2L4WsJBkrm9DdxMVI9Kzs/dFq5xSMKGP7hilLrzRLkJ/WYC6HNHdsF2CERLp4AhxKhqxXMR7dJlCYS8m3/CjMUm6Nb4KUKSEW5Vco4v9RLWVaQVVtNtHJqCKeV0=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=Y7StvfMd; arc=none smtp.client-ip=178.154.239.72
+	 MIME-Version; b=ggKpnDwL4ZKLox3K0t/A2L8huQg3jDhgSl8DF5EFlBjYkTM+bYA8ETgx2WYU+/rdiMi7Qm0Y/Oy/0fVLivTRtz0BPmMFHCKwJuNCC0XI1Passjzffjx8721ADzRHGUnVU4RVJgBIXimLuV0mpfRmOFqItjCusk7cSLOXsB2qVoU=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=ZKUQHXLH; arc=none smtp.client-ip=178.154.239.72
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="Y7StvfMd"
+	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="ZKUQHXLH"
 Received: from mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net (mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net [IPv6:2a02:6b8:c2d:3530:0:640:eca4:0])
-	by forwardcorp1a.mail.yandex.net (Yandex) with ESMTPS id 346B6C01FC;
-	Mon, 30 Mar 2026 12:52:37 +0300 (MSK)
+	by forwardcorp1a.mail.yandex.net (Yandex) with ESMTPS id 2869AC0200;
+	Mon, 30 Mar 2026 12:52:40 +0300 (MSK)
 Received: from dtalexundeer-nx.yandex-team.ru (unknown [2a02:6bf:8080:78d::1:13])
-	by mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net (smtpcorp/Yandex) with ESMTPSA id QqVNFG1Af4Y0-8tPIkIoj;
-	Mon, 30 Mar 2026 12:52:36 +0300
+	by mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net (smtpcorp/Yandex) with ESMTPSA id QqVNFG1Af4Y0-NyqoIar9;
+	Mon, 30 Mar 2026 12:52:39 +0300
 Precedence: bulk
 X-Yandex-Fwd: 1
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
-	s=default; t=1774864356;
-	bh=tvpetmyA7aRUautwgNAeiVLIXNe7ZPT4ooJEso7UfBg=;
+	s=default; t=1774864359;
+	bh=cM/Vyd4WfmKyR8Aw4O7A4tlOTXfmYaFOA9HmSDbiY40=;
 	h=Message-Id:Date:In-Reply-To:Cc:Subject:References:To:From;
-	b=Y7StvfMdG2Y6ODvynRtmLOJJ7PI6ce07buwgUWgk8gxCFTlT0iKv59ZpsTAr32DFQ
-	 2/L49NLbuwLuULrj2TAvCl2Tvh3fgZRadSVs++ACmgwjh+Rmew01tDqUrxHLpYgCHs
-	 DjjkY9wWZaSRmYddF1IAbhjXpWGtHGfKWLegbY0k=
+	b=ZKUQHXLHo2yvTB/D1//L80K+DCIDC4YhX3BOIYaiQnYJgdX9Z0ROKUXhgZzxHRv62
+	 61u5kZZh7j43/8yk0VBSpPDmzcleK7YnjoJ24V9xg3u52qH1AEmH4QKFQcTuuqx1Kd
+	 Kxnc+vwbz2DR0lHjNE7KJygen5TvUD02xVYRONgQ=
 Authentication-Results: mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net; dkim=pass header.i=@yandex-team.ru
 From: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
 To: qemu-devel@nongnu.org
@@ -51,10 +51,11 @@ Cc: "Gonglei (Arei)" <arei.gonglei@huawei.com>,
 	"yc-core@yandex-team.ru" <yc-core@yandex-team.ru>,
 	Kevin Wolf <kwolf@redhat.com>,
 	Stefan Hajnoczi <stefanha@redhat.com>,
-	Alexandr Moshkov <dtalexundeer@yandex-team.ru>
-Subject: [PATCH v3 2/5] vhost-user-blk: make inflight-migration prop mutable
-Date: Mon, 30 Mar 2026 14:52:23 +0500
-Message-Id: <20260330095226.158386-3-dtalexundeer@yandex-team.ru>
+	Alexandr Moshkov <dtalexundeer@yandex-team.ru>,
+	Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>
+Subject: [PATCH v3 4/5] vhost-user-blk: move inflight_needed higher
+Date: Mon, 30 Mar 2026 14:52:25 +0500
+Message-Id: <20260330095226.158386-5-dtalexundeer@yandex-team.ru>
 X-Mailer: git-send-email 2.34.1
 In-Reply-To: <20260330095226.158386-1-dtalexundeer@yandex-team.ru>
 References: <20260330095226.158386-1-dtalexundeer@yandex-team.ru>
@@ -66,48 +67,53 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 
-Now this property can be turned on or off using the qom-set
+Will be used in future commits for adding skip_drain param
 
+Reviewed-by: Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>
 Signed-off-by: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
 ---
- hw/block/vhost-user-blk.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ hw/block/vhost-user-blk.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
 diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
-index c151e83677..179f027cb4 100644
+index 718fc94a29..a3ecd83f54 100644
 --- a/hw/block/vhost-user-blk.c
 +++ b/hw/block/vhost-user-blk.c
-@@ -603,6 +603,8 @@ static const VMStateDescription vmstate_vhost_user_blk = {
-     }
+@@ -130,6 +130,17 @@ const VhostDevConfigOps blk_ops = {
+     .vhost_dev_config_notifier = vhost_user_blk_handle_config_change,
  };
  
-+static PropertyInfo vhost_user_blk_inflight_migration_prop;
++static bool vhost_user_blk_inflight_needed(void *opaque)
++{
++    struct VHostUserBlk *s = opaque;
 +
- static const Property vhost_user_blk_properties[] = {
-     DEFINE_PROP_CHR("chardev", VHostUserBlk, chardev),
-     DEFINE_PROP_UINT16("num-queues", VHostUserBlk, num_queues,
-@@ -616,8 +618,9 @@ static const Property vhost_user_blk_properties[] = {
-                       VIRTIO_BLK_F_WRITE_ZEROES, true),
-     DEFINE_PROP_BOOL("skip-get-vring-base-on-force-shutdown", VHostUserBlk,
-                      skip_get_vring_base_on_force_shutdown, false),
--    DEFINE_PROP_BOOL("inflight-migration", VHostUserBlk,
--                     inflight_migration, false),
-+    DEFINE_PROP("inflight-migration", VHostUserBlk, inflight_migration,
-+                vhost_user_blk_inflight_migration_prop, bool,
-+                .set_default = true, .defval.u = false),
- };
- 
- static void vhost_user_blk_class_init(ObjectClass *klass, const void *data)
-@@ -649,6 +652,9 @@ static const TypeInfo vhost_user_blk_info = {
- 
- static void virtio_register_types(void)
++    bool inflight_migration = virtio_has_feature(s->dev.protocol_features,
++                               VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT);
++
++    return inflight_migration;
++}
++
++
+ static int vhost_user_blk_start(VirtIODevice *vdev, Error **errp)
  {
-+    vhost_user_blk_inflight_migration_prop = qdev_prop_bool;
-+    vhost_user_blk_inflight_migration_prop.realized_set_allowed = true;
-+
-     type_register_static(&vhost_user_blk_info);
+     VHostUserBlk *s = VHOST_USER_BLK(vdev);
+@@ -569,16 +580,6 @@ static struct vhost_dev *vhost_user_blk_get_vhost(VirtIODevice *vdev)
+     return &s->dev;
  }
  
+-static bool vhost_user_blk_inflight_needed(void *opaque)
+-{
+-    struct VHostUserBlk *s = opaque;
+-
+-    bool inflight_migration = virtio_has_feature(s->dev.protocol_features,
+-                               VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT);
+-
+-    return inflight_migration;
+-}
+-
+ static const VMStateDescription vmstate_vhost_user_blk_inflight = {
+     .name = "vhost-user-blk/inflight",
+     .version_id = 1,
 -- 
 2.34.1
 

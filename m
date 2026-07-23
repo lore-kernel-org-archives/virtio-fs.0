@@ -1,67 +1,68 @@
-Received: from mail-yw1-f178.google.com (mail-yw1-f178.google.com [209.85.128.178])
+Received: from mail-yw1-f172.google.com (mail-yw1-f172.google.com [209.85.128.172])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id CA2F33D47C5
-	for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 22:31:12 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.128.178
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 589D43D0939
+	for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 22:31:16 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.128.172
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1784845874; cv=none; b=YWbXc01J62aCsZbrH51byJKWqHcieUZb7BBM7d7y0dnb4QvljPyDE/ld0z5Z1B2W+GRQ4kuwzKdG8Ypag7+DErAw7f0Ax/e9yds70Ahv7pc1mt1yIsRIXKE86SAla9PB64oczXJEcC9Lg98uBjC7pE81xyNR67fUz//sgmpxJqM=
+	t=1784845877; cv=none; b=Pkntd1Y0InIb5E3d/PIOxAnKHZ6BG/SYU7xca5q0NcyOxlpoQH97dw8GCkvbyTcuM9F2Z+Wa0rA6p8KDLwTgAjgma6aTq/yatut+7goKBQR8XqG+prnGyidQHf3yVWfh+z0dhjvJuLe1gUt19yZl03tKipleqICS2LTbzccb6dY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1784845874; c=relaxed/simple;
-	bh=BA6x/hUTVMBTeCNDEULOcGlNa3xXcwfyjSTX82F/bvE=;
+	s=arc-20240116; t=1784845877; c=relaxed/simple;
+	bh=jUAZQS3R6KxjXedQOFVXhZurjmT2dN3NOYDdWrU4F2s=;
 	h=From:Date:Subject:MIME-Version:Content-Type:Message-Id:References:
-	 In-Reply-To:To:Cc; b=CL3vfX9aW1aFCe93z70lF57uQHCnNAfMKyF0hdbtzFX06YILankIbquYZLZfs1caT9mEPztQZDU9ztbcodrJLn90InKbUaIisJC6+s+zcYZbC2A1Fkp9q4cmYXGMwgAQDVOEoKxVCDoHbPKU0BffqkWbx+jTjtW/lnvyZ0nzlnE=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=ap73a0e8; arc=none smtp.client-ip=209.85.128.178
+	 In-Reply-To:To:Cc; b=o+Ietki5mFilsjJVBZ7mnTtM7hOs1HIGxHCtRAKuDgamsYfMqKxYgEnuC15i9/KvfTi+uovH6dB077pmxUIPE2fLf/k+6rGezffrQHPpDrVRFDt/9AiJy9wOo6w8CmNAq88x4XWY/3P578HEvcIs2Mou8PHLWVsetl47eI3j9qw=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=BeGcrr73; arc=none smtp.client-ip=209.85.128.172
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ap73a0e8"
-Received: by mail-yw1-f178.google.com with SMTP id 00721157ae682-8114a4542b2so11613437b3.1
-        for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 15:31:12 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BeGcrr73"
+Received: by mail-yw1-f172.google.com with SMTP id 00721157ae682-81ec29f1d07so9904967b3.1
+        for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 15:31:16 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1784845872; x=1785450672; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1784845875; x=1785450675; darn=lists.linux.dev;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:from:to:cc:subject:date
          :message-id:reply-to:content-type;
-        bh=ylndD1RfSjtAui3jJeAFAbrXgRT2PYj5papIJW82wSE=;
-        b=ap73a0e81tF1rtjxFBw6f8JhF0QkUAdD14JR43ClyozuMI6LMQl1vyewarGN014csU
-         NdJxkUr/J/Y35WA6wLt3lMrC7ZZ4VmriArlj6pKwrB5K00XMb7yeVOESWNkE7+POv25o
-         zI6dc5UgTXu0YHdHPKOykbhdCqAGWf63HGvkPLFyHG9DCAC45hieaFRrpyluOapOJdtK
-         lMgNLaDVAh8DC3CQ2wDYHhCSgXf4ZOrHj4Kp/6ZI77HusuYIt68VmEwfR/1Cj8yOKNGS
-         CkSAAgrvurBIF9uFwJtBxOzNjJ88IRmY69s0FHYCRqAIApZf4EqJWTWjzLOmfz6gX13l
-         Th9g==
+        bh=3daCLJ1kp7Y+iaqF144Ru8UeiZ4TA3+qTjsGJpJy0rA=;
+        b=BeGcrr73eLnRX2hnBQTCpv/XmuMRWgM/S9FFFXU7R8Vg0W/OTWgJLYS0oDFBM0uHdw
+         st0s9rUz/9o5xZeIfjum+LcwjdZfwiHns7ZZAf5juMK/1AscB0/dS1Mv9cthuUh3I52B
+         U6K4u9naCfTXVwguH7LhXJGRx82xYZu8FTYI8c9Fb4J1n/QhE1ywMnxVU8mbA6M4mv28
+         FV4FqUVRmf8AhR2X9Z/t4mN2N6+e6akuvy9wfX97ypkAuPUbVb2Djhe3j8tWueirqoxg
+         ZAYgp/m3sNsAN/4XT7n/5nVjSHakOdIOa9+gUReSGUA+hE/BJGCwQ76pQ4hHcdvgq5P2
+         o4xA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1784845872; x=1785450672;
+        d=1e100.net; s=20251104; t=1784845875; x=1785450675;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=ylndD1RfSjtAui3jJeAFAbrXgRT2PYj5papIJW82wSE=;
-        b=Q4nFOKHcu7xFeZcNW7l11T33SaAuUOy4B6WBBFgqbKy8kQhG/k6AEyBtKkJEVarNdT
-         msnOfBIwdYQxyQHNMi3O5sZ5MujNWbXicgQTJdIZ7OtNfcaiXwoW++QGa+4mk8YKuHKO
-         dhLFFug3ss5KOEdTS9hv85i8a5hBfwA8MtM0EY6meZ+SEscidvfJuwkXSqJxpfV/T/1y
-         BVbIn5aP8xwMYT1h8meVmlstAceUSHfmdh3x5u05Wli1CfpASwhHLlcks1GxM6cZHK2D
-         tuNH9wE4vVDLUXWpf1/slBVqzXuM96jfk3nDkszswspRsi1QSdESJ/l44lobeZgiXxa5
-         7o5g==
-X-Forwarded-Encrypted: i=1; AHgh+RpNEJSEhNI9pQrlPCaSoIshGMl4FJcKqYeRSk6eKN5RtsgbKZYkZtrkWztLtfIMnXv/an5tMs2jul4=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yxhkm++UHULWXK6VVrXXRpc/0Jr8kn1DcyxPtR2LhdluDWD1kfg
-	3ab232JH9irAKiIYGB1nbU1ZMfEX1qP+g11fG8aVeHZeq43EactoNtNf
-X-Gm-Gg: AR+sD11rbu8pu4zcW58a/TlNY+GQq6Z5yypXBFgYuUb/fD6S51RB8mqNq9dx7xFETgI
-	a+flUMBUkbcDfTPnLCht3xQoGzxZEhcRjdlbY6q5AQjPLrcGligzRRk6zIhnPceYM+oSwgp55GD
-	/n4ZGxAg28bQAiwytE/+XbL7ojCQmXFV9tYSKVK40tmdRJ4/UrvT+SE/UDzl7+X7En5cnbiJJUD
-	jqyKnPbV2Uak6bQwbvpDGpQCFKXKdZtkldEk4p573rHgT18ThknvUkHr5AVFl0l3bq79FlxkIWk
-	1N6FoUqNYUjDce038GcB9l7RF2Eu29gRaWIs1QgoU1tyWs+M8Z3lDCKkoAmHMda+rMAEoq4uq7h
-	fVCEN+ociaiprZ30AbbRDLF2QSbN7V6ibZQkJ7iKxWMYFM4ySajDNLY4umEKmmQj4sAncriUfvi
-	v4PXtC+OiqClxg1HtFmw==
-X-Received: by 2002:a05:690c:4b0d:b0:81c:c77b:3546 with SMTP id 00721157ae682-81f4c20e739mr14265437b3.21.1784845871777;
-        Thu, 23 Jul 2026 15:31:11 -0700 (PDT)
+        bh=3daCLJ1kp7Y+iaqF144Ru8UeiZ4TA3+qTjsGJpJy0rA=;
+        b=D8TMRUJOn+mh6rjZ1wn4DAgm0NR3wYeMEP604FfVlUvxShwJuxbNvTchx8NJK1Y2EZ
+         +pcPqDgTALjWouz6apLLwE+YIGbWHlyHAVZ0TUeWJpdCCnmjIQLevq+CE5mX3QamWalT
+         K7ZTji4gLVeT01P+MYexr6LZ9nN63BDAdDseoUuUtf/7YQeKYAJ0Rhacd7ZxG5d1XWY2
+         Df3d3Gf29hR0cNCDFethKt49qTg5VWrwLb0vHe97SoO+2WSY1Uld9/OT0d6E1w8/JGR1
+         pHqN9/sQY5Qe17rD/wi7xg0Cq45q+MDMUCayJc4whFl0j0nNN9Vht5osTaIdzYzzyE6q
+         CzBg==
+X-Forwarded-Encrypted: i=1; AHgh+RpEgn3DNlrgCHDB72Dzk2hP3AYPXXHDJfxonEIFXah+K/HpGr74nJFEiQVEvmtLTdYIdm1YTEOCMak=@lists.linux.dev
+X-Gm-Message-State: AOJu0YxFGCTC5o44HYnpUgwswNTdL8j0naMBeMt8Zo/e2lW/cHFaGBaT
+	mXErOT3p63Ft9ptg0wlEo/IBg6er6dAPbDY+AQlkh51JYrXgrpkOPlaB
+X-Gm-Gg: AR+sD13tfok6I5p+pcerDJTa7vSi+wpD41szlssgbrofU2FsvzV2we+0h9HKQWeTMkB
+	n2td+r9EkeygrCe7Id3MRalfzG/NW5OpIoupTo3Co1yekII8v5BGZdLnJRVTpUwY/jJ3UnCmXGA
+	k+Go82MhdRSNzngUPG5xjqrnl/WVV6NYvYKmPeolC4+uuPtKjWbbPa/JNS4WhJalHYfj3k20Cd+
+	WIP6Ryqf77X3oiLhPQhTi43xjeYyye5qynNh2oDuyUDd83VfAWFtsEHpF13WTHl0yUu7fl5TF+m
+	MUQqdb31Ysel+zMsc+h7A3wldAA8aGx0vDeX0uk96sNqp0mLAy5DDNp67/kFmvWXz6kgj8n12R6
+	leRPTIPSdSQOMlHlxd0OxtiURjphHBobeqKayQ8vsXB75+6FvCWCclXkUMyh8ShwL/doFyAwLGy
+	1C7TbC707EtnFemY8jVQ==
+X-Received: by 2002:a05:690c:c4e4:b0:81e:edfb:3194 with SMTP id 00721157ae682-81f4c351402mr14830007b3.59.1784845875169;
+        Thu, 23 Jul 2026 15:31:15 -0700 (PDT)
 Received: from [127.0.1.1] ([2600:1700:e140:14d0:446f:49ff:37bd:d45a])
-        by smtp.gmail.com with ESMTPSA id 00721157ae682-81f33c3c1c5sm35766777b3.17.2026.07.23.15.31.08
+        by smtp.gmail.com with ESMTPSA id 00721157ae682-81f33c3c1c5sm35766777b3.17.2026.07.23.15.31.12
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Thu, 23 Jul 2026 15:31:11 -0700 (PDT)
+        Thu, 23 Jul 2026 15:31:14 -0700 (PDT)
 From: Connor Kite <connorkite@gmail.com>
-Date: Thu, 23 Jul 2026 15:30:07 -0700
-Subject: [PATCH RFC 08/15] hw/virtio/vhost-shadow-virtqueue: used handler
+Date: Thu, 23 Jul 2026 15:30:08 -0700
+Subject: [PATCH RFC 09/15] hw/virtio/vhost-shadow-virtqueue: specified
+ vring placement
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -70,7 +71,7 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
-Message-Id: <20260723-vhost-user-isolated-memory-v1-8-6b97c439eb28@gmail.com>
+Message-Id: <20260723-vhost-user-isolated-memory-v1-9-6b97c439eb28@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
 In-Reply-To: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
 To: qemu-devel@nongnu.org
@@ -96,65 +97,82 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>, 
  Connor Kite <connorkite@gmail.com>
 X-Mailer: b4 0.13.0
-X-Developer-Signature: v=1; a=ed25519-sha256; t=1784845839; l=2085;
+X-Developer-Signature: v=1; a=ed25519-sha256; t=1784845839; l=3241;
  i=connorkite@gmail.com; s=20260723; h=from:subject:message-id;
- bh=BA6x/hUTVMBTeCNDEULOcGlNa3xXcwfyjSTX82F/bvE=;
- b=7VfH4IA82HBRppUZ24zMa8oz1EFKQW87j2JcXhb+DAvu5J9rymFlCfor8xdKNfIFK5cl2i6Ds
- uyK7/eO1cXHDFKikVsmgO5gLq1g741DLSV+rBgLH3+eJYxsNttpni4o
+ bh=jUAZQS3R6KxjXedQOFVXhZurjmT2dN3NOYDdWrU4F2s=;
+ b=IWJbWb4oHeq4FxWn0jL2j3GKcWqBbUU4hHnG/ZyZI07odrLByCvEjJtwoFfYsgny3mm4atw8s
+ /1LXUxIIArRCuPgCozwIugnJKZV1NTK95p5EDr/SbrWDmNMoWG6Tvc6
 X-Developer-Key: i=connorkite@gmail.com; a=ed25519;
  pk=xg/3N8AntFCYogaIgN5NC/KkT7UlZB6ktPIRliJ3hv4=
 
-Adds a handler callback to shadow virtqueues in order to enable
-non-default processing of used vring elements from the device.
+By default svq vrings are placed in an anonymous memory map. As svqs
+will be leveraged to enable memory isolation in vhost-user, it is useful
+to be able to place the vrings in a shared isolation memory region.
+
+Adds the option to specify vring placement by providing a vring base
+address before starting the svq.
 
 Signed-off-by: Connor Kite <connorkite@gmail.com>
 ---
- hw/virtio/vhost-shadow-virtqueue.c |  4 ++++
- hw/virtio/vhost-shadow-virtqueue.h | 14 ++++++++++++++
- 2 files changed, 18 insertions(+)
+ hw/virtio/vhost-shadow-virtqueue.c | 22 +++++++++++++++-------
+ hw/virtio/vhost-shadow-virtqueue.h |  3 +++
+ 2 files changed, 18 insertions(+), 7 deletions(-)
 
 diff --git a/hw/virtio/vhost-shadow-virtqueue.c b/hw/virtio/vhost-shadow-virtqueue.c
-index bcb7f2ffc7..eb86c1ee37 100644
+index eb86c1ee37..9e3c359f50 100644
 --- a/hw/virtio/vhost-shadow-virtqueue.c
 +++ b/hw/virtio/vhost-shadow-virtqueue.c
-@@ -669,6 +669,10 @@ static void vhost_svq_flush(VhostShadowVirtqueue *svq,
-                 break;
-             }
+@@ -857,14 +857,21 @@ void vhost_svq_start(VhostShadowVirtqueue *svq, VirtIODevice *vdev,
  
-+            if (svq->ops && svq->ops->used_handler) {
-+                svq->ops->used_handler(svq, elem, svq->ops_opaque);
-+            }
-+
-             if (unlikely(i >= svq->vring.num)) {
-                 qemu_log_mask(LOG_GUEST_ERROR,
-                          "More than %u used buffers obtained in a %u size SVQ",
+     svq->vring.num = virtio_queue_get_num(vdev, virtio_get_queue_index(vq));
+     svq->num_free = svq->vring.num;
+-    svq->vring.desc = mmap(NULL, vhost_svq_driver_area_size(svq),
+-                           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,
+-                           -1, 0);
+     desc_size = sizeof(vring_desc_t) * svq->vring.num;
+-    svq->vring.avail = (void *)((char *)svq->vring.desc + desc_size);
+-    svq->vring.used = mmap(NULL, vhost_svq_device_area_size(svq),
+-                           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,
+-                           -1, 0);
++    if (svq->base_addr == NULL) {
++        svq->vring.desc = mmap(NULL, vhost_svq_driver_area_size(svq),
++                            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,
++                            -1, 0);
++        svq->vring.avail = (void *)((char *)svq->vring.desc + desc_size);
++        svq->vring.used = mmap(NULL, vhost_svq_device_area_size(svq),
++                            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,
++                            -1, 0);
++    } else {
++        svq->vring.desc = (void *) svq->base_addr;
++        svq->vring.avail = (void *)((char *)svq->vring.desc + desc_size);
++        svq->vring.used = (void *)((char *)svq->base_addr +
++                          vhost_svq_driver_area_size(svq));
++    }
+     svq->desc_state = g_new0(SVQDescState, svq->vring.num);
+     if (virtio_vdev_has_feature(svq->vdev, VIRTIO_F_IN_ORDER)) {
+         svq->batch_last.id = VIRTIO_RING_NOT_IN_BATCH;
+@@ -929,6 +936,7 @@ VhostShadowVirtqueue *vhost_svq_new(const VhostShadowVirtqueueOps *ops,
+     event_notifier_init_fd(&svq->svq_kick, VHOST_FILE_UNBIND);
+     svq->ops = ops;
+     svq->ops_opaque = ops_opaque;
++    svq->base_addr = NULL;
+     return svq;
+ }
+ 
 diff --git a/hw/virtio/vhost-shadow-virtqueue.h b/hw/virtio/vhost-shadow-virtqueue.h
-index ec16a1e838..ccfeee36d7 100644
+index ccfeee36d7..39f69e6455 100644
 --- a/hw/virtio/vhost-shadow-virtqueue.h
 +++ b/hw/virtio/vhost-shadow-virtqueue.h
-@@ -56,8 +56,22 @@ typedef int (*VirtQueueAvailCallback)(VhostShadowVirtqueue *svq,
-                                       VirtQueueElement *elem,
-                                       void *vq_callback_opaque);
+@@ -148,6 +148,9 @@ typedef struct VhostShadowVirtqueue {
  
-+/**
-+ * Callback to handle a used buffer
-+ *
-+ * @svq: Shadow virtqueue
-+ * @elem: Element placed in the queue by the device
-+ * @vq_callback_opaque: Used to pass arguments to callback
-+ *
-+ * Returns 0 if the vq is running as expected
-+ */
-+typedef int (*VirtQueueUsedCallback)(VhostShadowVirtqueue *svq,
-+                                      VirtQueueElement *elem,
-+                                      void *vq_callback_opaque);
+     /* Size of SVQ vring free descriptors */
+     uint16_t num_free;
 +
- typedef struct VhostShadowVirtqueueOps {
-     VirtQueueAvailCallback avail_handler;
-+    VirtQueueUsedCallback used_handler;
- } VhostShadowVirtqueueOps;
++    /* Location assigned to vrings if not in default anon memory map*/
++    hwaddr *base_addr;
+ } VhostShadowVirtqueue;
  
- /* Shadow virtqueue to relay notifications */
+ bool vhost_svq_valid_features(uint64_t features, Error **errp);
 
 -- 
 2.43.0

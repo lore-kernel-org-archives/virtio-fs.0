@@ -1,68 +1,68 @@
-Received: from mail-yx1-f49.google.com (mail-yx1-f49.google.com [74.125.224.49])
+Received: from mail-yx1-f54.google.com (mail-yx1-f54.google.com [74.125.224.54])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id E9D49403AEB
-	for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 22:30:47 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=74.125.224.49
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id B2DAA3EEAF9
+	for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 22:30:51 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=74.125.224.54
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1784845850; cv=none; b=sJCa3eJGjNsR6BtPDmq+cjuJSiCdQtoCTMsSmIhQyOQHc5yYMDbxgoTXb1N6q3fZp15zNB6hFoebh4TJEOb1Nq/FCQcPgb6Tq5CkpSTHqTUf0gaLhvrvL9YVY360enPHskcthS3H0v01Xt7azK2vWQkNM7UlxG8q9NMSwiESuGo=
+	t=1784845857; cv=none; b=c+oG+YCgavq12AiX/Tw4fV4x7Kg9i1z9JK9LOqNnnSqQDhOsyhQesSnpiKb3gfWA2QYpwgPxeXPopBeRA+/ONCzb5Qfs+vkWukKG0A6y9do2bSyhpTMhPJgc3YUucQoL9TFxEEXOiv0C0Hs5a4rMMEYplsmBhf6YU9KpDTx07f8=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1784845850; c=relaxed/simple;
-	bh=y46aEYYWs6g66G1yduLOZWbS9jprmJN0wGotjR+n/g4=;
+	s=arc-20240116; t=1784845857; c=relaxed/simple;
+	bh=XqOLo5frjAV4wg3rR/2wYEwsGon0SXS6Qu2Lm8kDZ9g=;
 	h=From:Date:Subject:MIME-Version:Content-Type:Message-Id:References:
-	 In-Reply-To:To:Cc; b=c3q0wsbP47VGVe0YYPZP4i/0MEhQ26v7HXwEmDRLxbaATh3xBIzHcw32QxfPg3busFuSLg+N4f8f5cpRaB1MNNgNeGf29iU/Vzwyj8qT0sLozfVMFPWpR4gozbORf75X8JRjzdNywSMfVtaAd5Qnmd/VLk06J+aISCglOh4gWvY=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=OM7P4TDu; arc=none smtp.client-ip=74.125.224.49
+	 In-Reply-To:To:Cc; b=tgDIm8GYGJlSsvHPs+fRomdFGyHVnMgj009DFDBt/o/qyxwYxO/6XsvYoIoSPPZIvo4hT5ZnZRBIxBBiA4PRmXJ7hzk2umJWeQVBojS3fWHEVaR+IB9BS9AigPQIlRUz8pHEvsM0e4DYgVUjfjQhAfq+7zg1+VmTFh1tmsJrKS4=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=sF545Emq; arc=none smtp.client-ip=74.125.224.54
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="OM7P4TDu"
-Received: by mail-yx1-f49.google.com with SMTP id 956f58d0204a3-667bae10ba3so1143324d50.2
-        for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 15:30:47 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="sF545Emq"
+Received: by mail-yx1-f54.google.com with SMTP id 956f58d0204a3-667bae10ba3so1143362d50.2
+        for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 15:30:51 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1784845847; x=1785450647; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1784845851; x=1785450651; darn=lists.linux.dev;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:from:to:cc:subject:date
          :message-id:reply-to:content-type;
-        bh=AkZeRoc3E17YBp5XADn9w+7xUKDSvBeBFuBZM8xExpk=;
-        b=OM7P4TDuJ7jx76eojnPKz56jo3SfY8AIsQOr3cznZ7YKhBPk2WvD/kDAGR0KLKkoXp
-         2GgM3TFGYo90fKnLgs/O5Xm1SxfspjWGs0uUymK+AJ6ihKZ7vq/Nk8IydMaw8VXp/FBU
-         3kvx4FtKtclz7nNVhs67ofme4ge86Zv8aIpX3zafpgOdFt0HZ9+gvlsXHn9MKG9iflf4
-         8nomJvPc6Lo5cHyRZrz41Bm7BzoDiv+jdfQdsFmMLwWa8y68u49B1wy+FQ+mK45dUMtr
-         g3yXhi00srMgOK56WcHXw0jVW19K+SFHWcFummh5XE/tqmbNyGGt2fJlWdhnTRQlZDV/
-         AYPQ==
+        bh=AVzyy6xZ5ydOSxUHCiFZ8bWfqWfIoo+z7BTzm4kXyz0=;
+        b=sF545Emq46sxsIm7S6y3s0IS7acv3q+xgkUMmyBTMC7kg+zEWLmoUV/5TvBRHqds2e
+         THy9v4GrycT7Wh+HaikzOvjYe5hRB3aJOpTByAh/8JxNhAV+ITyhlvqZdAWE4D/IYqE0
+         mCXzO/L9PEhzLKegni9+bvEPgJNGNplF5dmbX2wVmZjlctJAcH3S4ciZ7Pn/6LEUJlnk
+         /rIpO0htZbsG0wHvs2QWP3NKWajMr8aOWv1YdXPg88Ez5V+8jBnm/jQ6uqCRXQd4V28Z
+         O7p7OgsjTo3ewSzJ4ax3pZpbXtUMzmSaqXGyfPowb5GIvW4KhnOi/yU1AsiT5ONfAFmG
+         MT0Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1784845847; x=1785450647;
+        d=1e100.net; s=20251104; t=1784845851; x=1785450651;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=AkZeRoc3E17YBp5XADn9w+7xUKDSvBeBFuBZM8xExpk=;
-        b=QBaMcrs54vcJZKW2iE14ht4RI1TBE1oAGyN03xUay773jXXBCDTW+YwSom0UTSB+8o
-         2B5y1Sl/HNoJwPvkNymjhLzBUnR/slgAclHwfq89engylNzmBe8aAJCWEzcJhGv0WyIV
-         VCSRtCJqNmNHVDhr23DFU0rlX80qXrTUoUOD/CSLH7BBhpY3JN99NBCqXANggMP8MxLb
-         xDDe6XJeCnE7YW/tWSerHyUE09eGbplK6abvbmWkH7nd7yzUicplb00N3m7HnufUoWfV
-         1LWsIrlpVILHPxbPV+xgq0lyDECTXqwY/mVQDXkTnGDeHdVt7pGTZKwoew3dcxmNqti6
-         rffg==
-X-Forwarded-Encrypted: i=1; AHgh+RoNbm+GuYL1b+vnADJXnoHDU6HD+Pemyx7XT5F5EEbVHS5eDofez4iA6Nkw8JKDLSo0kKJAiAaX4pM=@lists.linux.dev
-X-Gm-Message-State: AOJu0YzN0DDTzypobO2Eq6dV6e8Aq2USTa9EX+dZymA8BDOEU5hC1IdS
-	ucethTxbInV9ZFDoIByCZQ9rnjdG5RU8NquQh6dkNtkzK9bCe2YhMTmV
-X-Gm-Gg: AR+sD131/8ojxfAAKOAhMM/K1iDvNmsJzuWKGlyZYY9pL0IyKBPVUUNlcCEzm12dRPb
-	i4wXDmDEhl7jduLv7ir9trFrSD8H+P0AJuJ/yzfDkCYOVAUs7cPOgky/Gd0md+Y1Jfe/gWaxMf8
-	e72yzILWMrFUv/6OyFSIarFDlhkUpbRPUqbOnVwMXjox7b1Yoz5ZXrMBkZnbgGt4wg9uM/yKE7C
-	gSU55h2rfS2+j4uGyVEVR7d8j55wm8YuJTIuKGYVwbshemR3zJV3eah1i8ANyVA1Da/GFzHD6OD
-	27JRUAMdtTQSmWaQk3gcU2UXHRgSWMJHytnI3oL1cOOmFlIDWRpZuZ4/DMqGNrZeG7M8q8su+KF
-	8gkbbf1yBJ2J28HvdZvd0SFqudMYx4JnWBdY6SP8PgUSB+IFaUTZEbMdPiBl1eqAU7c7d6X69iH
-	bcaVa12gk=
-X-Received: by 2002:a05:690e:2497:b0:668:2353:1585 with SMTP id 956f58d0204a3-668a4bc2664mr970417d50.13.1784845846663;
-        Thu, 23 Jul 2026 15:30:46 -0700 (PDT)
+        bh=AVzyy6xZ5ydOSxUHCiFZ8bWfqWfIoo+z7BTzm4kXyz0=;
+        b=dcdlpW4Eso6cZRgh5Ln5idktje2i+AqNNgjCIFIVA2pbDYZIhrOeI+VCxu6C6f2lKJ
+         WWA37oDunNiaSGZ9D/O9jHzYmNcHRZEdi5XOuuhF5Hq+18QIOAOftu27F6u+VFkPutwM
+         zykTCnd20lCgBPJhh69nA2bUC+PwfVKSNeXhGG2Z/4fEetWyLFOkMNdjGjHNp2BNOWvu
+         ndD2gYkjgr5a+H+Zoxb/kFl5xW3xhTc3BcEN+WdIp2WZIvMtC0je7zc2zrTUW1+0tu21
+         MmTEbzKoc5IUo/qvw0Djv/3HsbSpBNFmTqYK43KV68GRV8+F7hqbvyL70qEjAFeZf3yQ
+         zZXA==
+X-Forwarded-Encrypted: i=1; AHgh+RrdiJ7R/HU2/cgwIKg4PnKmv3Ry0PcSfZ88bSuUEYNzAbex33jqMk98J9DJQQisqaa6Bs/FPSpqenc=@lists.linux.dev
+X-Gm-Message-State: AOJu0YwVHNNYo48vTyQ+tgR/RbytAmSGuWq2ZtSaijULJpdIWMnqFsZY
+	KGrlAoSwdk9sazcqqLZgFFC0xrweZq83p+PO269tsvPBywyPDm9XAe9K
+X-Gm-Gg: AR+sD13S+BRITa0BBPFtQ3XdJFpQsmfaIfNLZ7RMm4/Tr4oVg2+p4DKUltRv5Yv80Lo
+	uGVyc3A3pTiBAMbvumuOD7vli5L2Y07F7IbFwqrx7UA1G+JqVJUnrj8meDLoO9P91KlutGnnGJP
+	PXUIirFkLWUgL/UlddP8fUxzaA/vFdIzI5E0hZhfdou5zwj1PXDvl4B1VvarHlZwUKhpzFHbbhB
+	YwNcuiUvn7RPu89BR3LM3Xg+j7tb0LWdzXkEemefjbfM3deFNLlahh97fZa7W0TZOUyP0AW6Ewn
+	v5nRTlyKIJSX7YOFkHABHMWm/EInp4NRC1lGaj15ADCwr3+OXWJblJOQ3oXBshP5+RNT5F2m5up
+	CS74cdvybqERJ60/5Ith7K3wLrVMPcfazLrMNvuP4xCXJXzFvVKfVMOpwkKGyS68tkshif7T1P4
+	e2sQ2qbUs=
+X-Received: by 2002:a53:a6c5:0:b0:667:b84f:e402 with SMTP id 956f58d0204a3-668a4d72958mr799067d50.50.1784845850482;
+        Thu, 23 Jul 2026 15:30:50 -0700 (PDT)
 Received: from [127.0.1.1] ([2600:1700:e140:14d0:446f:49ff:37bd:d45a])
-        by smtp.gmail.com with ESMTPSA id 00721157ae682-81f33c3c1c5sm35766777b3.17.2026.07.23.15.30.43
+        by smtp.gmail.com with ESMTPSA id 00721157ae682-81f33c3c1c5sm35766777b3.17.2026.07.23.15.30.47
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Thu, 23 Jul 2026 15:30:46 -0700 (PDT)
+        Thu, 23 Jul 2026 15:30:49 -0700 (PDT)
 From: ConKite <connorkite@gmail.com>
-Date: Thu, 23 Jul 2026 15:30:00 -0700
-Subject: [PATCH RFC 01/15] vhost-user: Consolidate chardev property
- definitions
+Date: Thu, 23 Jul 2026 15:30:01 -0700
+Subject: [PATCH RFC 02/15] vhost-user: Add memory-isolation qdev property
+ to vhost-user devices
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -71,7 +71,7 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
-Message-Id: <20260723-vhost-user-isolated-memory-v1-1-6b97c439eb28@gmail.com>
+Message-Id: <20260723-vhost-user-isolated-memory-v1-2-6b97c439eb28@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
 In-Reply-To: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
 To: qemu-devel@nongnu.org
@@ -97,222 +97,207 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>, 
  Connor Kite <connorkite@gmail.com>
 X-Mailer: b4 0.13.0
-X-Developer-Signature: v=1; a=ed25519-sha256; t=1784845839; l=8233;
+X-Developer-Signature: v=1; a=ed25519-sha256; t=1784845839; l=8255;
  i=connorkite@gmail.com; s=20260723; h=from:subject:message-id;
- bh=y46aEYYWs6g66G1yduLOZWbS9jprmJN0wGotjR+n/g4=;
- b=//WY7dSmSnB3vYw09xpugMmsjQh3QQRotc/Sm/xroedRqBJKHANludIn3yXkteT9VmhDUo2F9
- RgBJ+b+nnEZAzVg7m+KzvXlHZiONuJjhqqtLr7tWJGPc6Oif6hkx8wF
+ bh=XqOLo5frjAV4wg3rR/2wYEwsGon0SXS6Qu2Lm8kDZ9g=;
+ b=igaD/fidgbsGc0CjOz/z1UUNIZCHaMg5VqOMnvLkV9N9Lk5yh9x2BcjZIrVD4lEK0h6wqWSEx
+ vAjAQ9rpNBDCWY1aPyvxOovuk8WLb+r2oJgANcGyZX60CVMnopTsfXQ
 X-Developer-Key: i=connorkite@gmail.com; a=ed25519;
  pk=xg/3N8AntFCYogaIgN5NC/KkT7UlZB6ktPIRliJ3hv4=
 
-Move chardev qdev property definitions from children into
-VHostUserBase. This reduces code duplication and allows children
-to simply inherit the property during initialization.
+In support of future work to add a memory isolation mode to vhost-user devices, a
+qdev property, "memory-isolation", is added to all vhost-user devices. This is
+simply a bool representing whether the mode is active or not.
 
 Signed-off-by: Connor Kite <connorkite@gmail.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- hw/virtio/vhost-user-base.c        | 9 +++++++++
- hw/virtio/vhost-user-gpio.c        | 4 ----
- hw/virtio/vhost-user-i2c.c         | 5 -----
- hw/virtio/vhost-user-input.c       | 5 -----
- hw/virtio/vhost-user-rng.c         | 5 -----
- hw/virtio/vhost-user-rtc.c         | 4 ----
- hw/virtio/vhost-user-snd.c         | 1 -
- hw/virtio/vhost-user-spi.c         | 5 -----
- hw/virtio/vhost-user-test-device.c | 1 -
- 9 files changed, 9 insertions(+), 30 deletions(-)
+ hw/block/vhost-user-blk.c            | 1 +
+ hw/display/vhost-user-gpu.c          | 1 +
+ hw/scsi/vhost-user-scsi.c            | 1 +
+ hw/virtio/vhost-user-base.c          | 3 ++-
+ hw/virtio/vhost-user-fs.c            | 1 +
+ hw/virtio/vhost-user-scmi.c          | 1 +
+ hw/virtio/vhost-user-vsock.c         | 1 +
+ include/hw/virtio/vhost-user-base.h  | 1 +
+ include/hw/virtio/vhost-user-blk.h   | 1 +
+ include/hw/virtio/vhost-user-fs.h    | 1 +
+ include/hw/virtio/vhost-user-scmi.h  | 1 +
+ include/hw/virtio/vhost-user-vsock.h | 1 +
+ include/hw/virtio/virtio-gpu.h       | 1 +
+ include/hw/virtio/virtio-scsi.h      | 1 +
+ 14 files changed, 15 insertions(+), 1 deletion(-)
 
+diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
+index 2e5b3ae1b1..9830dc6c35 100644
+--- a/hw/block/vhost-user-blk.c
++++ b/hw/block/vhost-user-blk.c
+@@ -631,6 +631,7 @@ static const VMStateDescription vmstate_vhost_user_blk = {
+ 
+ static const Property vhost_user_blk_properties[] = {
+     DEFINE_PROP_CHR("chardev", VHostUserBlk, chardev),
++    DEFINE_PROP_BOOL("memory-isolation", VHostUserBlk, memory_isolation, false),
+     DEFINE_PROP_UINT16("num-queues", VHostUserBlk, num_queues,
+                        VHOST_USER_BLK_AUTO_NUM_QUEUES),
+     DEFINE_PROP_UINT32("queue-size", VHostUserBlk, queue_size, 128),
+diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
+index 57360898ca..6d0ede672a 100644
+--- a/hw/display/vhost-user-gpu.c
++++ b/hw/display/vhost-user-gpu.c
+@@ -659,6 +659,7 @@ static struct vhost_dev *vhost_user_gpu_get_vhost(VirtIODevice *vdev)
+ 
+ static const Property vhost_user_gpu_properties[] = {
+     VIRTIO_GPU_BASE_PROPERTIES(VhostUserGPU, parent_obj.conf),
++    DEFINE_PROP_BOOL("memory-isolation", VhostUserGPU, memory_isolation, false),
+ };
+ 
+ static void
+diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
+index 5070178dc2..c1a0393220 100644
+--- a/hw/scsi/vhost-user-scsi.c
++++ b/hw/scsi/vhost-user-scsi.c
+@@ -346,6 +346,7 @@ static void vhost_user_scsi_unrealize(DeviceState *dev)
+ 
+ static const Property vhost_user_scsi_properties[] = {
+     DEFINE_PROP_CHR("chardev", VirtIOSCSICommon, conf.chardev),
++    DEFINE_PROP_BOOL("memory-isolation", VirtIOSCSICommon, conf.memory_isolation, false),
+     DEFINE_PROP_UINT32("boot_tpgt", VirtIOSCSICommon, conf.boot_tpgt, 0),
+     DEFINE_PROP_UINT32("num_queues", VirtIOSCSICommon, conf.num_queues,
+                        VIRTIO_SCSI_AUTO_NUM_QUEUES),
 diff --git a/hw/virtio/vhost-user-base.c b/hw/virtio/vhost-user-base.c
-index 478ec68f09..90bd2903db 100644
+index 90bd2903db..d2a74a2860 100644
 --- a/hw/virtio/vhost-user-base.c
 +++ b/hw/virtio/vhost-user-base.c
-@@ -407,9 +407,16 @@ static void vub_device_unrealize(DeviceState *dev)
-     do_vhost_user_cleanup(vdev, vub);
- }
+@@ -409,7 +409,8 @@ static void vub_device_unrealize(DeviceState *dev)
  
-+/*Define common qdev properties.  Inherited by all children*/
-+static const Property vub_properties[] = {
-+    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev)
-+};
-+
-+
- static void vub_class_init(ObjectClass *klass, const void *data)
- {
-     VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
-+    DeviceClass *dc = DEVICE_CLASS(klass);
- 
-     vdc->realize = vub_device_realize;
-     vdc->unrealize = vub_device_unrealize;
-@@ -417,6 +424,8 @@ static void vub_class_init(ObjectClass *klass, const void *data)
-     vdc->get_config = vub_get_config;
-     vdc->set_config = vub_set_config;
-     vdc->set_status = vub_set_status;
-+
-+    device_class_set_props(dc, vub_properties);
- }
- 
- static const TypeInfo vub_types[] = {
-diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
-index d473f87077..33b8752282 100644
---- a/hw/virtio/vhost-user-gpio.c
-+++ b/hw/virtio/vhost-user-gpio.c
-@@ -14,9 +14,6 @@
- #include "standard-headers/linux/virtio_ids.h"
- #include "standard-headers/linux/virtio_gpio.h"
- 
--static const Property vgpio_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
--};
- 
- static void vgpio_realize(DeviceState *dev, Error **errp)
- {
-@@ -42,7 +39,6 @@ static void vu_gpio_class_init(ObjectClass *klass, const void *data)
-     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
- 
-     dc->vmsd = &vu_gpio_vmstate;
--    device_class_set_props(dc, vgpio_properties);
-     device_class_set_parent_realize(dc, vgpio_realize,
-                                     &vubc->parent_realize);
-     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
-diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
-index 152b1f6740..3f5427b5b2 100644
---- a/hw/virtio/vhost-user-i2c.c
-+++ b/hw/virtio/vhost-user-i2c.c
-@@ -14,10 +14,6 @@
- #include "qemu/error-report.h"
- #include "standard-headers/linux/virtio_ids.h"
- 
--static const Property vi2c_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
--};
--
- static void vi2c_realize(DeviceState *dev, Error **errp)
- {
-     VHostUserBase *vub = VHOST_USER_BASE(dev);
-@@ -42,7 +38,6 @@ static void vu_i2c_class_init(ObjectClass *klass, const void *data)
-     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
- 
-     dc->vmsd = &vu_i2c_vmstate;
--    device_class_set_props(dc, vi2c_properties);
-     device_class_set_parent_realize(dc, vi2c_realize,
-                                     &vubc->parent_realize);
-     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
-diff --git a/hw/virtio/vhost-user-input.c b/hw/virtio/vhost-user-input.c
-index 5cfc5bbb56..8fe6349ffc 100644
---- a/hw/virtio/vhost-user-input.c
-+++ b/hw/virtio/vhost-user-input.c
-@@ -7,10 +7,6 @@
- #include "qemu/osdep.h"
- #include "hw/virtio/virtio-input.h"
- 
--static const Property vinput_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
--};
--
- static void vinput_realize(DeviceState *dev, Error **errp)
- {
-     VHostUserBase *vub = VHOST_USER_BASE(dev);
-@@ -36,7 +32,6 @@ static void vhost_input_class_init(ObjectClass *klass, const void *data)
-     DeviceClass *dc = DEVICE_CLASS(klass);
- 
-     dc->vmsd = &vmstate_vhost_input;
--    device_class_set_props(dc, vinput_properties);
-     device_class_set_parent_realize(dc, vinput_realize,
-                                     &vubc->parent_realize);
-     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
-diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
-index 106c8f211a..664aee403d 100644
---- a/hw/virtio/vhost-user-rng.c
-+++ b/hw/virtio/vhost-user-rng.c
-@@ -20,10 +20,6 @@ static const VMStateDescription vu_rng_vmstate = {
-     .unmigratable = 1,
+ /*Define common qdev properties.  Inherited by all children*/
+ static const Property vub_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev)
++    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
++    DEFINE_PROP_BOOL("memory-isolation", VHostUserBase, memory_isolation, false)
  };
  
--static const Property vrng_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
--};
--
- static void vu_rng_base_realize(DeviceState *dev, Error **errp)
- {
-     VHostUserBase *vub = VHOST_USER_BASE(dev);
-@@ -43,7 +39,6 @@ static void vu_rng_class_init(ObjectClass *klass, const void *data)
-     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
  
-     dc->vmsd = &vu_rng_vmstate;
--    device_class_set_props(dc, vrng_properties);
-     device_class_set_parent_realize(dc, vu_rng_base_realize,
-                                     &vubc->parent_realize);
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index 209993918a..3d980d814b 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -410,6 +410,7 @@ static const VMStateDescription vuf_backend_vmstate = {
  
-diff --git a/hw/virtio/vhost-user-rtc.c b/hw/virtio/vhost-user-rtc.c
-index 88b0c70b90..6d80cb6263 100644
---- a/hw/virtio/vhost-user-rtc.c
-+++ b/hw/virtio/vhost-user-rtc.c
-@@ -19,9 +19,6 @@ static const VMStateDescription vu_rtc_vmstate = {
-     .unmigratable = 1,
+ static const Property vuf_properties[] = {
+     DEFINE_PROP_CHR("chardev", VHostUserFS, conf.chardev),
++    DEFINE_PROP_BOOL("memory-isolation", VHostUserFS, conf.memory_isolation, false),
+     DEFINE_PROP_STRING("tag", VHostUserFS, conf.tag),
+     DEFINE_PROP_UINT16("num-request-queues", VHostUserFS,
+                        conf.num_request_queues, 1),
+diff --git a/hw/virtio/vhost-user-scmi.c b/hw/virtio/vhost-user-scmi.c
+index 02dc088ea9..d514d89392 100644
+--- a/hw/virtio/vhost-user-scmi.c
++++ b/hw/virtio/vhost-user-scmi.c
+@@ -287,6 +287,7 @@ static const VMStateDescription vu_scmi_vmstate = {
+ 
+ static const Property vu_scmi_properties[] = {
+     DEFINE_PROP_CHR("chardev", VHostUserSCMI, chardev),
++    DEFINE_PROP_BOOL("memory-isolation", VHostUserSCMI, memory_isolation, false),
  };
  
--static const Property vrtc_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
--};
+ static void vu_scmi_class_init(ObjectClass *klass, const void *data)
+diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
+index c2cd376e73..89aa789e22 100644
+--- a/hw/virtio/vhost-user-vsock.c
++++ b/hw/virtio/vhost-user-vsock.c
+@@ -154,6 +154,7 @@ static void vuv_device_unrealize(DeviceState *dev)
  
- static void vu_rtc_base_realize(DeviceState *dev, Error **errp)
- {
-@@ -42,7 +39,6 @@ static void vu_rtc_class_init(ObjectClass *klass, const void *data)
-     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
- 
-     dc->vmsd = &vu_rtc_vmstate;
--    device_class_set_props(dc, vrtc_properties);
-     device_class_set_parent_realize(dc, vu_rtc_base_realize,
-                                     &vubc->parent_realize);
- 
-diff --git a/hw/virtio/vhost-user-snd.c b/hw/virtio/vhost-user-snd.c
-index 7129b77d9c..3663450aed 100644
---- a/hw/virtio/vhost-user-snd.c
-+++ b/hw/virtio/vhost-user-snd.c
-@@ -34,7 +34,6 @@ static const VMStateDescription vu_snd_vmstate = {
+ static const Property vuv_properties[] = {
+     DEFINE_PROP_CHR("chardev", VHostUserVSock, conf.chardev),
++    DEFINE_PROP_BOOL("memory-isolation", VHostUserVSock, conf.memory_isolation, false),
  };
  
- static const Property vsnd_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
-     DEFINE_PROP_BIT64("controls", VHostUserBase,
-                       parent_obj.host_features, VIRTIO_SND_F_CTLS, false),
+ static void vuv_class_init(ObjectClass *klass, const void *data)
+diff --git a/include/hw/virtio/vhost-user-base.h b/include/hw/virtio/vhost-user-base.h
+index d5d2f081ae..29bc40736c 100644
+--- a/include/hw/virtio/vhost-user-base.h
++++ b/include/hw/virtio/vhost-user-base.h
+@@ -25,6 +25,7 @@ struct VHostUserBase {
+     uint32_t num_vqs;
+     uint32_t vq_size; /* can't exceed VIRTIO_QUEUE_MAX */
+     uint32_t config_size;
++    bool memory_isolation;
+     /* State tracking */
+     VhostUserState vhost_user;
+     struct vhost_virtqueue *vhost_vq;
+diff --git a/include/hw/virtio/vhost-user-blk.h b/include/hw/virtio/vhost-user-blk.h
+index dee848cfd8..8126447a86 100644
+--- a/include/hw/virtio/vhost-user-blk.h
++++ b/include/hw/virtio/vhost-user-blk.h
+@@ -30,6 +30,7 @@ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserBlk, VHOST_USER_BLK)
+ struct VHostUserBlk {
+     VirtIODevice parent_obj;
+     CharFrontend chardev;
++    bool memory_isolation;
+     int32_t bootindex;
+     struct virtio_blk_config blkcfg;
+     uint16_t num_queues;
+diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
+index 5699ea03a1..bf71990b9c 100644
+--- a/include/hw/virtio/vhost-user-fs.h
++++ b/include/hw/virtio/vhost-user-fs.h
+@@ -28,6 +28,7 @@ typedef struct {
+     char *tag;
+     uint16_t num_request_queues;
+     uint16_t queue_size;
++    bool memory_isolation;
+ } VHostUserFSConf;
+ 
+ struct VHostUserFS {
+diff --git a/include/hw/virtio/vhost-user-scmi.h b/include/hw/virtio/vhost-user-scmi.h
+index 30ab0d7ab7..d346b42ed8 100644
+--- a/include/hw/virtio/vhost-user-scmi.h
++++ b/include/hw/virtio/vhost-user-scmi.h
+@@ -19,6 +19,7 @@ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserSCMI, VHOST_USER_SCMI);
+ struct VHostUserSCMI {
+     VirtIODevice parent;
+     CharFrontend chardev;
++    bool memory_isolation;
+     struct vhost_virtqueue *vhost_vqs;
+     struct vhost_dev vhost_dev;
+     VhostUserState vhost_user;
+diff --git a/include/hw/virtio/vhost-user-vsock.h b/include/hw/virtio/vhost-user-vsock.h
+index 5db6938b8b..6288b26fa4 100644
+--- a/include/hw/virtio/vhost-user-vsock.h
++++ b/include/hw/virtio/vhost-user-vsock.h
+@@ -21,6 +21,7 @@ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserVSock, VHOST_USER_VSOCK)
+ 
+ typedef struct {
+     CharFrontend chardev;
++    bool memory_isolation;
+ } VHostUserVSockConf;
+ 
+ struct VHostUserVSock {
+diff --git a/include/hw/virtio/virtio-gpu.h b/include/hw/virtio/virtio-gpu.h
+index b9bad27c97..707612c3a4 100644
+--- a/include/hw/virtio/virtio-gpu.h
++++ b/include/hw/virtio/virtio-gpu.h
+@@ -277,6 +277,7 @@ struct VhostUserGPU {
+     CharFrontend vhost_chr;
+     QemuDmaBuf *dmabuf[VIRTIO_GPU_MAX_SCANOUTS];
+     bool backend_blocked;
++    bool memory_isolation;
  };
-diff --git a/hw/virtio/vhost-user-spi.c b/hw/virtio/vhost-user-spi.c
-index 707f96c250..fb6168d391 100644
---- a/hw/virtio/vhost-user-spi.c
-+++ b/hw/virtio/vhost-user-spi.c
-@@ -15,10 +15,6 @@
- #include "standard-headers/linux/virtio_ids.h"
- #include "standard-headers/linux/virtio_spi.h"
  
--static const Property vspi_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
--};
--
- static void vspi_realize(DeviceState *dev, Error **errp)
- {
-     VHostUserBase *vub = VHOST_USER_BASE(dev);
-@@ -44,7 +40,6 @@ static void vu_spi_class_init(ObjectClass *klass, const void *data)
-     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
- 
-     dc->vmsd = &vu_spi_vmstate;
--    device_class_set_props(dc, vspi_properties);
-     device_class_set_parent_realize(dc, vspi_realize,
-                                     &vubc->parent_realize);
-     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
-diff --git a/hw/virtio/vhost-user-test-device.c b/hw/virtio/vhost-user-test-device.c
-index a2f963fdf6..91e23bf07a 100644
---- a/hw/virtio/vhost-user-test-device.c
-+++ b/hw/virtio/vhost-user-test-device.c
-@@ -30,7 +30,6 @@ static const VMStateDescription vud_vmstate = {
- };
- 
- static const Property vud_properties[] = {
--    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
-     DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
-     DEFINE_PROP_UINT32("vq_size", VHostUserBase, vq_size, 64),
-     DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
+ #define MAX_SLOTS 4096
+diff --git a/include/hw/virtio/virtio-scsi.h b/include/hw/virtio/virtio-scsi.h
+index b6028bb5cd..47fdc3785c 100644
+--- a/include/hw/virtio/virtio-scsi.h
++++ b/include/hw/virtio/virtio-scsi.h
+@@ -59,6 +59,7 @@ struct VirtIOSCSIConf {
+     char *vhostfd;
+     char *wwpn;
+     CharFrontend chardev;
++    bool memory_isolation;
+     uint32_t boot_tpgt;
+     IOThread *iothread;
+     IOThreadVirtQueueMappingList *iothread_vq_mapping_list;
 
 -- 
 2.43.0

@@ -1,68 +1,67 @@
-Received: from mail-yw1-f177.google.com (mail-yw1-f177.google.com [209.85.128.177])
+Received: from mail-yw1-f172.google.com (mail-yw1-f172.google.com [209.85.128.172])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id E7D1A32B12A
-	for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 22:31:01 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.128.177
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 2AF9131717F
+	for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 22:31:04 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.128.172
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1784845863; cv=none; b=Dwp95AK1ZJe/aXL348f+AXx9M1iL1mXehpw7Br73MoADMfbSuO7DmIcmHh5dCONFZYzlwlH7/JJvWm5H2BQ6m/D0Y79htr2Fl5OuPsoyl4IWcZtyyvPS+NYrGS3tIZmSAp+mG/fb/GEmUtnauC3tuadNuEitSYJGhknbQI9Xl8M=
+	t=1784845866; cv=none; b=ZF3fUiM5bzbMBdqO7irwL8CALpr/YonKbbIVTsvXsyVh60gjPAyK+p5sU0o0baGhGvr0g1UQigS6XGv+mNpZvsBG0jEGbJ/TjfCDpObvYXW8HQXVueNMW+Rs3TToFQCca/Rnyzp97J2oJk06/W1s1EpzKE6tuDLjz5IvAvxE6R8=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1784845863; c=relaxed/simple;
-	bh=e0y3nCskpzkZj4kyMOzgDnBn6vCXRdmOknYla343ncU=;
+	s=arc-20240116; t=1784845866; c=relaxed/simple;
+	bh=4NYTmMM/tKQClf8Rfwd0s8ArOE7KiiEH3lfBWfSv8GE=;
 	h=From:Date:Subject:MIME-Version:Content-Type:Message-Id:References:
-	 In-Reply-To:To:Cc; b=ICWxMnVDbgs2V73/o0pPJr4vQAwHoYflSEZeefAsq0a5msZMrfWto+ZzF3dt1tmFnGsPO71pVnfLOZHBq237CTzmdIEcGAcvV1E5JlMQQNArTlGnqQHlhVi7Zfv5paX9rkxPFUNewvqVqtTC7D87K2DlQSVBgMpRM8B6ssBsEak=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=nw4pJ0tW; arc=none smtp.client-ip=209.85.128.177
+	 In-Reply-To:To:Cc; b=DoztIn7kC2fPNHx9/4bwoqRWZK/wooWESq6buUp7gC88qS+E7Jbub1NJfYf3In+/B2EZL/sn342pTkt8hp67C2nG1n/dEvUpu31XrKzRA+xUZGiKZzdVy0mDimFD39Vkszz3aDPtW+w3uK4fLYoUevuDbog99v/2ij+wPEVpakU=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=N7EjLJ3h; arc=none smtp.client-ip=209.85.128.172
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="nw4pJ0tW"
-Received: by mail-yw1-f177.google.com with SMTP id 00721157ae682-81e69a2db34so11705797b3.0
-        for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 15:31:01 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="N7EjLJ3h"
+Received: by mail-yw1-f172.google.com with SMTP id 00721157ae682-81eb41c1f1aso10182207b3.2
+        for <virtio-fs@lists.linux.dev>; Thu, 23 Jul 2026 15:31:04 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1784845861; x=1785450661; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1784845864; x=1785450664; darn=lists.linux.dev;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:from:to:cc:subject:date
          :message-id:reply-to:content-type;
-        bh=/jjfgEle2QNh6JABBQuFrx8Xpr2yY+fX3Wnyut93Uas=;
-        b=nw4pJ0tWMXmqcWb4CnKwLR4akkZy244Tx4VadzygqxnH7v5/QBEiiqNP/5vrLFff08
-         paeo4qXQAtzZ7IfFmpxbXedXYeoZXf/C16phXhsDtzAyjKZI5/lZFtp4iYJpVI42aU07
-         L0tXIN2Ugv5zfCYsPm9gQ8EfNBZwXwFopocL0I+jK8WYNanBY3wf3wCzC8HSI2F1GzGe
-         ldsHXLVGm+0DIHfC6g9c4D1axYDgFZ/n0Es97c2iuftkfHNQ7d+WYIAjc1hFyWnGIrth
-         hx2c2cxHB8qL2eC+j3ofRnlofoUlFL53YQamcLUr+h1D2ImJqe2HRT9xGztzRfmKHmhI
-         5gaw==
+        bh=NcYm30w4l7Vli4IAxyKgucSKPfeiorfv7ej3+wDF8Ng=;
+        b=N7EjLJ3hT94v/qOiMqCquIU0ihDhQwy1kFQcSNO0ln9F5IBUZw1g5kp6cv1DfkrwWV
+         6KXOftVFeQP/e7EE6yTb1lCcvEyNmzniY7iXP3PDBGqJstu26/bXaH0IOlbyThG6HMrb
+         vmLPCGTghOR1/a7bvdz+OApJqiVY1OVmG/K8E3TSNjh0CWGdAMLHPXGoGGDOP7DbHMdl
+         IOizoctmPeUHGCYERWqWZyMLoVDYS/dbra27YRZEnj4frIuom3LsgCRvYZjH5Q3IehQ8
+         X3nY4Ym4mRRP8RBh7o1K8+/A4GlzoGFEIyOhYc6CTdlE0+OoomdoCFtpSDGauGgqjf0g
+         hecg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1784845861; x=1785450661;
+        d=1e100.net; s=20251104; t=1784845864; x=1785450664;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=/jjfgEle2QNh6JABBQuFrx8Xpr2yY+fX3Wnyut93Uas=;
-        b=ionqfD7QfmldivarjFZgGOalDHAuE2a3/4y1CH9XLTPJwcYvHSKqVPSUZ07/hHR2W8
-         mUhcWFrjkWwc49rHQ+OFEggLJqDV07+rUESwwPBt6y2ZnHVTwoxHshqdRUiIDArQTKvr
-         hFfwgZlSZjuK172L973eYx1CkX6uCC+lBgAioR0exiAo5RzpqV14ZWZyAKgBQ6vbJKNd
-         yZsN+E/3Yj5HscGGnI8o/KHQhUa0BHu0oVn2+ZXYiCHg1R7zQNVqiYQA6DJjPykoSg1B
-         X4zYqqT27eEks/hmPSSVSqlAOHNC27sXHj0qjZtyWqW4ga8LlZhZ5O40jsUY7ggg1861
-         aGEA==
-X-Forwarded-Encrypted: i=1; AHgh+RpeNRwSHsajl8/Ph0JRgSc1L6DgcyJZ5tMHRbt8F+k90B6NAGRWtiTswhHE+Hx8JZJEVsgKL6F7RDY=@lists.linux.dev
-X-Gm-Message-State: AOJu0YwsA+kBV//N2nFeHDQTQO5sJp5LBPDFytp7kphahRXiw+CED8Dn
-	YJ6iN66JFoBpPJRt9hToWLHlxKBAvCbMSVDX4ziv8SesPvVYERSIs9LJ
-X-Gm-Gg: AR+sD11M8WjL/4Smd8nAVFXwHrCsHCGb+WDexjRyDX0Zde4Js2QRDgpdkCblgs491DD
-	gb2nS6Bq5PfdiRwZVYLVE/m4t9Nm06g1F6DYLz7TQ+oO0IZ16B6JhvHiulpYV5EWST5Vairu6G6
-	zvkAufyvmGCeNGYa0kslB9lEmjn++iFHvFny3GNf6TVWyhh/aa/ey94nWgb5K+5x5erhJ+vqRVh
-	oZHHFujl4/LZK34BJx/ZAoYgB+4hpuwapphDDO6lx2iNkhlpMkO8EonsiubRbgQXQRhyfOZdt6O
-	Ih7cXhtTD8SX8aEUCy+6GbqB6E8x3eTTDbx+ikVPx4meNYaTfh4UN4nBvnR1te6UnO+GwXggeie
-	9n1ncs6HO4mpBi4108lTzDqY4RUV3Ip5gKlg9qIuNIf2hZXATZqSOFxb7qCaG4nB+jzqKncY/Al
-	+3eJfgagLT4C+YK6cVDg==
-X-Received: by 2002:a05:690c:6606:b0:80d:a249:4854 with SMTP id 00721157ae682-81f4c1ff813mr16496237b3.17.1784845860602;
-        Thu, 23 Jul 2026 15:31:00 -0700 (PDT)
+        bh=NcYm30w4l7Vli4IAxyKgucSKPfeiorfv7ej3+wDF8Ng=;
+        b=ZYNKCIbWuC4WA/av+sOuvpxgXjHFPQcv6T8jDWfUjAw6/lXi+r02KB9+kB8a2U3QFp
+         SXs17CM6Y7USs3+n5UWMWj3+HxIKYsB1wozv/7oBujf1sMy60v00rxM+S7GN5YCAeewg
+         pRkK1QN9RkWwzzhlSpadYq46S+qxXRAWZqEyftZwNs7aWucVVXtpU6eIln3dHOP/n8RF
+         l7fmM5flvkWmpZXyEOJWYBqavkaG/z2nGN494aNeTstVhfS7WkDeLbK3Pj66IkDbeuoN
+         s8hzLYvWbfUOzZHThkZ91XevRtafgeGelGdjBnkwOpNUh0n7WVBaIzCnE+WStFyREqo5
+         vTRw==
+X-Forwarded-Encrypted: i=1; AHgh+Rr2lcLbt/N9LnpvHQfiNza1tHYaOgHDNZu2pheiCTX5E/hV1pSI2juZ8Lk2kmd3cL6V7dw/N1ziApM=@lists.linux.dev
+X-Gm-Message-State: AOJu0YyecmoOlOX6wxIPxdnav8ngjL4C55tpfGMER1CfqcoDdbWIsRHm
+	54eAH6X1bnQvQ4RHW0tYYfR6tQ5xER3MiMcy689YK6x/OUwbq8bvjEC8
+X-Gm-Gg: AR+sD12WL7mD3MHoOQrInyaU/BOJqKiHCDCLmjZ3NsxS6LHz05c0rXT4MLf+Xv2VhCj
+	vmvWJ0VQvfOxKm95F5+dAigxmNmbzz4AsaHY1W8grqLGjwgbnHFGDGBHKRz+Q/IjRLNHkUAlSwV
+	gpuxNiaWf7LjZrshbtLOlqqT0szsQjpeXnggaweAdZEPL1X8QdoBloPfXlT1kJiCk6PgfKyI5x7
+	EDAHcignUWgS50IQQDgJZYIyzd0EafkDNa08yNequIFu+LJD6cQOpJP5a45SreIde/feJWPEQ95
+	29RcJLCeQtDebbP+zj86E1JyK04W2LWPeRhPMA9fzl8O3JGDACwinjEl+38wFEh9M2FGdmYsq7Y
+	bD8zYnVK9mx1q4AKliaxUjKOCwBgg02BNehKDqRwehlS/KZa2NLUf0m7m3B+raX90Vk7L4uO8Or
+	VZnxCuEvM=
+X-Received: by 2002:a05:690c:23c1:b0:81e:9bcf:3331 with SMTP id 00721157ae682-81f4c308803mr15470147b3.50.1784845864063;
+        Thu, 23 Jul 2026 15:31:04 -0700 (PDT)
 Received: from [127.0.1.1] ([2600:1700:e140:14d0:446f:49ff:37bd:d45a])
-        by smtp.gmail.com with ESMTPSA id 00721157ae682-81f33c3c1c5sm35766777b3.17.2026.07.23.15.30.57
+        by smtp.gmail.com with ESMTPSA id 00721157ae682-81f33c3c1c5sm35766777b3.17.2026.07.23.15.31.01
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Thu, 23 Jul 2026 15:31:00 -0700 (PDT)
+        Thu, 23 Jul 2026 15:31:03 -0700 (PDT)
 From: Connor Kite <connorkite@gmail.com>
-Date: Thu, 23 Jul 2026 15:30:04 -0700
-Subject: [PATCH RFC 05/15] vhost-user: add memory_isolation to
- VhostUserState
+Date: Thu, 23 Jul 2026 15:30:05 -0700
+Subject: [PATCH RFC 06/15] util/iova-tree: g_tree_foreach wrapper
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -71,7 +70,7 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
-Message-Id: <20260723-vhost-user-isolated-memory-v1-5-6b97c439eb28@gmail.com>
+Message-Id: <20260723-vhost-user-isolated-memory-v1-6-6b97c439eb28@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
 In-Reply-To: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
 To: qemu-devel@nongnu.org
@@ -97,340 +96,58 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>, 
  Connor Kite <connorkite@gmail.com>
 X-Mailer: b4 0.13.0
-X-Developer-Signature: v=1; a=ed25519-sha256; t=1784845839; l=12759;
+X-Developer-Signature: v=1; a=ed25519-sha256; t=1784845839; l=1380;
  i=connorkite@gmail.com; s=20260723; h=from:subject:message-id;
- bh=e0y3nCskpzkZj4kyMOzgDnBn6vCXRdmOknYla343ncU=;
- b=9XNaHkONueEdA25B/5J+uN0TnlB4RppQdOFG/3neXY5pVon5glSxUn9WVvpNe4x60XkvBStE0
- 6N0ri5d0aWHCjA0+jMHDIrLqNnDEV0Hq8XS3sfqWk4Wh5zRn4z+BkYQ
+ bh=4NYTmMM/tKQClf8Rfwd0s8ArOE7KiiEH3lfBWfSv8GE=;
+ b=phRfMm78NGRBj6uBF6zMDcCEhyCfeowKCx4+ej3y94dVfM5n66RXMSPbK+UaifHytU6Sc8h5I
+ VlIfEHiwhCVBrikoJ+SbUFScNgv+jfy0OCahLgR2lVACw5+ssxMOwlp
 X-Developer-Key: i=connorkite@gmail.com; a=ed25519;
  pk=xg/3N8AntFCYogaIgN5NC/KkT7UlZB6ktPIRliJ3hv4=
 
-Add a memory_isolation bool to the VhostUserState struct. This
-bool is set within vhost_user_init(), which takes a
-memory_isolation bool as an argument.
-
-Refactor all call locations of vhost_user_init to include the new
-argument.
+Add a wrapper to iova-tree to call g_tree_foreach.  Provies a means to
+execute some function on each node of the iova-tree.
 
 Signed-off-by: Connor Kite <connorkite@gmail.com>
 ---
- backends/cryptodev-vhost-user.c     |  2 +-
- backends/vhost-user.c               |  4 ++--
- hw/block/vhost-user-blk.c           |  3 ++-
- hw/display/vhost-user-gpu.c         |  3 ++-
- hw/scsi/vhost-user-scsi.c           |  3 ++-
- hw/virtio/vhost-stub.c              |  3 ++-
- hw/virtio/vhost-user-base.c         |  3 ++-
- hw/virtio/vhost-user-fs.c           |  3 ++-
- hw/virtio/vhost-user-scmi.c         |  3 ++-
- hw/virtio/vhost-user-vsock.c        |  3 ++-
- hw/virtio/vhost-user.c              |  5 ++++-
- include/hw/virtio/vhost-user.h      |  6 +++++-
- include/system/vhost-user-backend.h |  3 ++-
- net/passt.c                         | 13 ++++++++-----
- net/vhost-user.c                    |  9 +++++----
- 15 files changed, 43 insertions(+), 23 deletions(-)
+ include/qemu/iova-tree.h | 13 +++++++++++++
+ util/iova-tree.c         |  5 +++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/backends/cryptodev-vhost-user.c b/backends/cryptodev-vhost-user.c
-index e0547c5d40..328d7fbdfe 100644
---- a/backends/cryptodev-vhost-user.c
-+++ b/backends/cryptodev-vhost-user.c
-@@ -214,7 +214,7 @@ static void cryptodev_vhost_user_init(
-         }
-     }
- 
--    if (!vhost_user_init(&s->vhost_user, &s->chr, errp)) {
-+    if (!vhost_user_init(&s->vhost_user, &s->chr, s->memory_isolation, errp)) {
-         return;
-     }
- 
-diff --git a/backends/vhost-user.c b/backends/vhost-user.c
-index 380d825023..470eba1775 100644
---- a/backends/vhost-user.c
-+++ b/backends/vhost-user.c
-@@ -22,13 +22,13 @@
- 
- int
- vhost_user_backend_dev_init(VhostUserBackend *b, VirtIODevice *vdev,
--                            unsigned nvqs, Error **errp)
-+                            unsigned nvqs, bool memory_isolation, Error **errp)
- {
-     int ret;
- 
-     assert(!b->vdev && vdev);
- 
--    if (!vhost_user_init(&b->vhost_user, &b->chr, errp)) {
-+    if (!vhost_user_init(&b->vhost_user, &b->chr, memory_isolation, errp)) {
-         return -1;
-     }
- 
-diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
-index 9830dc6c35..5c1a19eb50 100644
---- a/hw/block/vhost-user-blk.c
-+++ b/hw/block/vhost-user-blk.c
-@@ -505,7 +505,8 @@ static void vhost_user_blk_device_realize(DeviceState *dev, Error **errp)
-         return;
-     }
- 
--    if (!vhost_user_init(&s->vhost_user, &s->chardev, errp)) {
-+    if (!vhost_user_init(&s->vhost_user, &s->chardev,
-+                         s->memory_isolation, errp)) {
-         return;
-     }
- 
-diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
-index 6d0ede672a..b44c989f58 100644
---- a/hw/display/vhost-user-gpu.c
-+++ b/hw/display/vhost-user-gpu.c
-@@ -625,7 +625,8 @@ vhost_user_gpu_device_realize(DeviceState *qdev, Error **errp)
-     VirtIODevice *vdev = VIRTIO_DEVICE(g);
- 
-     vhost_dev_set_config_notifier(&g->vhost->dev, &config_ops);
--    if (vhost_user_backend_dev_init(g->vhost, vdev, 2, errp) < 0) {
-+    if (vhost_user_backend_dev_init(g->vhost, vdev, 2, g->memory_isolation,
-+                                    errp) < 0) {
-         return;
-     }
- 
-diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
-index c1a0393220..5a19182f2b 100644
---- a/hw/scsi/vhost-user-scsi.c
-+++ b/hw/scsi/vhost-user-scsi.c
-@@ -276,7 +276,8 @@ static void vhost_user_scsi_realize(DeviceState *dev, Error **errp)
-         return;
-     }
- 
--    if (!vhost_user_init(&s->vhost_user, &vs->conf.chardev, errp)) {
-+    if (!vhost_user_init(&s->vhost_user, &vs->conf.chardev,
-+                         vs->conf.memory_isolation, errp)) {
-         goto free_virtio;
-     }
- 
-diff --git a/hw/virtio/vhost-stub.c b/hw/virtio/vhost-stub.c
-index 7321dc9210..d1e1075a31 100644
---- a/hw/virtio/vhost-stub.c
-+++ b/hw/virtio/vhost-stub.c
-@@ -12,7 +12,8 @@ unsigned int vhost_get_free_memslots(void)
-     return UINT_MAX;
- }
- 
--bool vhost_user_init(VhostUserState *user, CharFrontend *chr, Error **errp)
-+bool vhost_user_init(VhostUserState *user, CharFrontend *chr,
-+                     bool memory_isolation, Error **errp)
- {
-     return false;
- }
-diff --git a/hw/virtio/vhost-user-base.c b/hw/virtio/vhost-user-base.c
-index d2a74a2860..11864a3f08 100644
---- a/hw/virtio/vhost-user-base.c
-+++ b/hw/virtio/vhost-user-base.c
-@@ -317,7 +317,8 @@ static void vub_device_realize(DeviceState *dev, Error **errp)
-         vub->vhost_user.supports_config = true;
-     }
- 
--    if (!vhost_user_init(&vub->vhost_user, &vub->chardev, errp)) {
-+    if (!vhost_user_init(&vub->vhost_user, &vub->chardev,
-+                         vub->memory_isolation, errp)) {
-         return;
-     }
- 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 3d980d814b..07ff2a35e0 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -238,7 +238,8 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-         return;
-     }
- 
--    if (!vhost_user_init(&fs->vhost_user, &fs->conf.chardev, errp)) {
-+    if (!vhost_user_init(&fs->vhost_user, &fs->conf.chardev,
-+                         fs->conf.memory_isolation, errp)) {
-         return;
-     }
- 
-diff --git a/hw/virtio/vhost-user-scmi.c b/hw/virtio/vhost-user-scmi.c
-index d514d89392..2c1dbb723e 100644
---- a/hw/virtio/vhost-user-scmi.c
-+++ b/hw/virtio/vhost-user-scmi.c
-@@ -244,7 +244,8 @@ static void vu_scmi_device_realize(DeviceState *dev, Error **errp)
- 
-     vdev->host_features |= (1ULL << VIRTIO_SCMI_F_P2A_CHANNELS);
- 
--    if (!vhost_user_init(&scmi->vhost_user, &scmi->chardev, errp)) {
-+    if (!vhost_user_init(&scmi->vhost_user, &scmi->chardev,
-+                         scmi->memory_isolation, errp)) {
-         return;
-     }
- 
-diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
-index 89aa789e22..33ab3b69e6 100644
---- a/hw/virtio/vhost-user-vsock.c
-+++ b/hw/virtio/vhost-user-vsock.c
-@@ -106,7 +106,8 @@ static void vuv_device_realize(DeviceState *dev, Error **errp)
-         return;
-     }
- 
--    if (!vhost_user_init(&vsock->vhost_user, &vsock->conf.chardev, errp)) {
-+    if (!vhost_user_init(&vsock->vhost_user, &vsock->conf.chardev,
-+                         vsock->conf.memory_isolation, errp)) {
-         return;
-     }
- 
-diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-index 517cc4ca71..f296b63fb9 100644
---- a/hw/virtio/vhost-user.c
-+++ b/hw/virtio/vhost-user.c
-@@ -3118,13 +3118,16 @@ static void vhost_user_state_destroy(gpointer data)
-     vhost_user_host_notifier_remove(n, NULL, true);
- }
- 
--bool vhost_user_init(VhostUserState *user, CharFrontend *chr, Error **errp)
-+bool vhost_user_init(VhostUserState *user, CharFrontend *chr,
-+                     bool memory_isolation,
-+                     Error **errp)
- {
-     if (user->chr) {
-         error_setg(errp, "Cannot initialize vhost-user state");
-         return false;
-     }
-     user->chr = chr;
-+    user->memory_isolation = memory_isolation;
-     user->memory_slots = 0;
-     user->notifiers = g_ptr_array_new_full(VIRTIO_QUEUE_MAX / 4,
-                                            &vhost_user_state_destroy);
-diff --git a/include/hw/virtio/vhost-user.h b/include/hw/virtio/vhost-user.h
-index 06c360af18..72b5787efe 100644
---- a/include/hw/virtio/vhost-user.h
-+++ b/include/hw/virtio/vhost-user.h
-@@ -66,6 +66,7 @@ typedef struct VhostUserHostNotifier {
-  * @chr: the character backend for the socket
-  * @notifiers: GPtrArray of @VhostUserHostnotifier
-  * @memory_slots:
-+ * @memory_isolation: determines whether data is shared or copied
+diff --git a/include/qemu/iova-tree.h b/include/qemu/iova-tree.h
+index 14e82a22d5..4d77f4dc57 100644
+--- a/include/qemu/iova-tree.h
++++ b/include/qemu/iova-tree.h
+@@ -161,4 +161,17 @@ int iova_tree_alloc_map(IOVATree *tree, DMAMap *map, hwaddr iova_begin,
   */
- typedef struct VhostUserState {
-     CharFrontend *chr;
-@@ -73,12 +74,14 @@ typedef struct VhostUserState {
-     int memory_slots;
-     bool supports_config;
-     bool supports_inflight_migration;
-+    bool memory_isolation;
- } VhostUserState;
+ void iova_tree_destroy(IOVATree *tree);
  
- /**
-  * vhost_user_init() - initialise shared vhost_user state
-  * @user: allocated area for storing shared state
-  * @chr: the chardev for the vhost socket
-+ * @memory_isolation: disables device access to guest memory
-  * @errp: error handle
-  *
-  * User can either directly g_new() space for the state or embed
-@@ -87,7 +90,8 @@ typedef struct VhostUserState {
-  *
-  * Return: true on success, false on error while setting errp.
-  */
--bool vhost_user_init(VhostUserState *user, CharFrontend *chr, Error **errp);
-+bool vhost_user_init(VhostUserState *user, CharFrontend *chr,
-+                     bool memory_isolation, Error **errp);
++/**
++ * iova_tree_foreach:
++ *
++ * @tree: the iova tree to traverse
++ * @func: the function called at every node. A true return value ends traversal
++ * @data: an argument passed to func
++ *
++ * Wrapper to call g_tree_foreach on underlying g_tree
++ *
++ * Return: None
++ */
++void iova_tree_foreach(IOVATree *tree, GTraverseFunc func, gpointer data);
++
+ #endif
+diff --git a/util/iova-tree.c b/util/iova-tree.c
+index 5b0c95ff15..2239bb6ae1 100644
+--- a/util/iova-tree.c
++++ b/util/iova-tree.c
+@@ -303,3 +303,8 @@ int gpa_tree_insert(IOVATree *tree, const DMAMap *map)
  
- /**
-  * vhost_user_cleanup() - cleanup state
-diff --git a/include/system/vhost-user-backend.h b/include/system/vhost-user-backend.h
-index 3184c8e799..c23f689182 100644
---- a/include/system/vhost-user-backend.h
-+++ b/include/system/vhost-user-backend.h
-@@ -41,7 +41,8 @@ struct VhostUserBackend {
- };
- 
- int vhost_user_backend_dev_init(VhostUserBackend *b, VirtIODevice *vdev,
--                                unsigned nvqs, Error **errp);
-+                                unsigned nvqs, bool memory_isolation,
-+                                Error **errp);
- void vhost_user_backend_start(VhostUserBackend *b);
- int vhost_user_backend_stop(VhostUserBackend *b);
- 
-diff --git a/net/passt.c b/net/passt.c
-index ce80186883..a3021f37ef 100644
---- a/net/passt.c
-+++ b/net/passt.c
-@@ -433,7 +433,9 @@ static void passt_vhost_user_event(void *opaque, QEMUChrEvent event)
-     }
+     return IOVA_OK;
  }
- 
--static int net_passt_vhost_user_init(NetPasstState *s, Error **errp)
-+static int net_passt_vhost_user_init(NetPasstState *s,
-+                                     bool memory_isolation,
-+                                     Error **errp)
- {
-     Chardev *chr;
-     int sv[2];
-@@ -457,7 +459,8 @@ static int net_passt_vhost_user_init(NetPasstState *s, Error **errp)
- 
-     s->vhost_user = g_new0(struct VhostUserState, 1);
-     if (!qemu_chr_fe_init(&s->vhost_chr, chr, errp) ||
--        !vhost_user_init(s->vhost_user, &s->vhost_chr, errp)) {
-+        !vhost_user_init(s->vhost_user, &s->vhost_chr, memory_isolation,
-+                         errp)) {
-         goto err;
-     }
- 
-@@ -735,14 +738,14 @@ int net_init_passt(const Netdev *netdev, const char *name,
-     s->pidfile = pidfile;
- 
-     if (netdev->u.passt.has_vhost_user && netdev->u.passt.vhost_user) {
--        bool memory_isolation G_GNUC_UNUSED = false;
-+        bool memory_isolation = false;
- 
-         if (netdev->u.passt.has_memory_isolation &&
--           netdev->u.passt.memory_isolation) {
-+            netdev->u.passt.memory_isolation) {
-             memory_isolation = true;
-         }
- 
--        if (net_passt_vhost_user_init(s, errp) == -1) {
-+        if (net_passt_vhost_user_init(s, memory_isolation, errp) == -1) {
-             qemu_del_net_client(nc);
-             return -1;
-         }
-diff --git a/net/vhost-user.c b/net/vhost-user.c
-index 8fa303f901..722ab20228 100644
---- a/net/vhost-user.c
-+++ b/net/vhost-user.c
-@@ -370,7 +370,7 @@ static void net_vhost_user_event(void *opaque, QEMUChrEvent event)
- 
- static int net_vhost_user_init(NetClientState *peer, const char *device,
-                                const char *name, Chardev *chr,
--                               int queues)
-+                               int queues, bool memory_isolation)
- {
-     Error *err = NULL;
-     NetClientState *nc, *nc0 = NULL;
-@@ -390,7 +390,7 @@ static int net_vhost_user_init(NetClientState *peer, const char *device,
-             nc0 = nc;
-             s = DO_UPCAST(NetVhostUserState, nc, nc);
-             if (!qemu_chr_fe_init(&s->chr, chr, &err) ||
--                !vhost_user_init(user, &s->chr, &err)) {
-+                !vhost_user_init(user, &s->chr, memory_isolation, &err)) {
-                 error_report_err(err);
-                 goto err;
-             }
-@@ -459,7 +459,7 @@ int net_init_vhost_user(const Netdev *netdev, const char *name,
-     int queues;
-     const NetdevVhostUserOptions *vhost_user_opts;
-     Chardev *chr;
--    bool memory_isolation G_GNUC_UNUSED;
-+    bool memory_isolation;
- 
-     assert(netdev->type == NET_CLIENT_DRIVER_VHOST_USER);
-     vhost_user_opts = &netdev->u.vhost_user;
-@@ -480,5 +480,6 @@ int net_init_vhost_user(const Netdev *netdev, const char *name,
-     memory_isolation = vhost_user_opts->has_memory_isolation ?
-                        vhost_user_opts->memory_isolation : false;
- 
--    return net_vhost_user_init(peer, "vhost_user", name, chr, queues);
-+    return net_vhost_user_init(peer, "vhost_user", name, chr, queues,
-+                               memory_isolation);
- }
++
++void iova_tree_foreach(IOVATree *tree, GTraverseFunc func, gpointer data)
++{
++    g_tree_foreach(tree->tree, func, data);
++}
 
 -- 
 2.43.0

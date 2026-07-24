@@ -1,39 +1,39 @@
 Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 1F2D227FB1F
-	for <virtio-fs@lists.linux.dev>; Fri, 24 Jul 2026 12:31:53 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id D93D63A380C
+	for <virtio-fs@lists.linux.dev>; Fri, 24 Jul 2026 12:54:07 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1784896315; cv=none; b=r1AI2QdyCFGNO8rnDEKEYkjBG/cdLK9U/rniISmSIjjtOZ9SoZpiOupP0ItQNtOJ6PryCKbYvzn4OmcO/zFrSU786z0mB0c/uEqHRg2j0mHq1Nh5DifDSz44CCkec288jh/UXAfhMHcozvN6ODhf/biXa7G5QjkeVPVvf88YKlk=
+	t=1784897650; cv=none; b=uLf4QMtUNRqQ0OABN2Grf+ZdTl0KutfOVj/+WJedkhZAxWctYanKVxiMzojd/nEYT9wdsrYO1GgbNnT1UK+/TsiTN0C8jvsSxIu0qwdJ54MNkqClM10zb1PTcJEnD9HwWxWY8b1n5qkH1olW1C9Xs8O9HBGlSPqW9tsb/Qvu7H8=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1784896315; c=relaxed/simple;
-	bh=A5RGVVsvZ3sJtOY0+F9BD8+4sOrLzWA/+FSNVirnk2k=;
+	s=arc-20240116; t=1784897650; c=relaxed/simple;
+	bh=ptyC6CSW5ZJwEfT1nzw5VO4PGfGwI64C+xYR6cAPtxw=;
 	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=sKgW+1LF84Djy0QF0To9rqSmq/j03ZCCSBKnD5NFBZkjJUinFBmTtrAKYk9k5wSLy5V9HENGK00T1Zt5/jU7NWpA3+t2rkmbRR7P1l/IwCIdp74qmJPaEFVYlH6ULANKgXfhrCXwWSTJeXVt//MArQOxpWvGSpeJnpKU60Xxib0=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=J+pSdIuZ; arc=none smtp.client-ip=49.212.243.89
+	 In-Reply-To:Content-Type; b=ceT2xXWS5jURus7cTnKnvxTli2YlR5VvsigFkn2mTcaTN9k4fQvqmP6y/q+yb3cKkYxhDXLA1MNDlLYCTByMLrptF8K5T+YSRcgXrUhmRih+wwnP8xesFMPD3QfJsWf6PCkTd0ZxGket7zUtN54oUWP3VVFMHFWCJOdjYv56phM=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=FHruRpKP; arc=none smtp.client-ip=49.212.243.89
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="J+pSdIuZ"
+	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="FHruRpKP"
 Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
 	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 66OCVJE2072314
+	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 66OCrTpH079605
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Fri, 24 Jul 2026 21:31:20 +0900 (JST)
+	Fri, 24 Jul 2026 21:53:29 +0900 (JST)
 	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=eH7TayLpe7he7hVkx6BzQNlGA6oPajPQamzf56Qx8eE=;
+DKIM-Signature: a=rsa-sha256; bh=swlNFhClk9/N7RnNUcRjVYZolczmGr+JWUwncsjWQJc=;
         c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
         h=From:Message-ID:To:Subject:Date;
-        s=rs20250326; t=1784896280; v=1;
-        b=J+pSdIuZj6p2hWpzEih21O3uxsaQXryDZtLE8vLs1jjHt6RzT9Wm7jo6O0Bj8EiU
-         hMGzSDV+/mXOC2ra1Kds42u1GdJVkWfEZIo55BwaMWMKsoqs6+r2G48rMqO/lH9z
-         8hvUDLDDHC+x8hr1HeusVk6o2bp5l1jojFyfXfNQe3yWmQ7HW7iG9F3rFAcNW74G
-         erw9+q+G3VT8nzNwRqHiOMf8MLdoeDQLvminSW0KJ/v7ASBq62Xno6gKWUlbj0gs
-         oanzBjjXzkkycX6o0n3t+VQdcoQEEcI/p58uvH8alxU4PDlNRvp+IkCikxDVIyMR
-         iZzAimaHis2VPzAT9J514Q==
-Message-ID: <2af0a465-2f27-4e0f-b1dd-16bb8d3c5538@rsg.ci.i.u-tokyo.ac.jp>
-Date: Fri, 24 Jul 2026 21:31:19 +0900
+        s=rs20250326; t=1784897609; v=1;
+        b=FHruRpKPar6FJHKFO3+DoRdg3S8WXCgHCD9nEL79IcUv1GXo9jadsZ0Rv0KWayeA
+         3o95OxRNT/2W7G5W9TK1Kk+O77Tyl3YiHDzaw1UEIOsk3v/3h5uBpdcxPXrtORWk
+         TFEwzOIlu45QsL2FGsiGSIhzrYxZRzYizY9JyaTkOZGJLwyc4SqUPUGk8/YtkUZI
+         dq6S0WIRDJKYaJX6DHMlIEFgixbQDQQTC0JAJZXOnNeWMvTjW6eAuYVnb228oTnO
+         Ye/z3XhHS4y8hxQB0/LrHEr5yTUt0OorGz5Nq0gHbacHudiMcEFWDV7l2rDy9Q8a
+         j4vBk99ikiYnpINSAete2g==
+Message-ID: <9f5869df-0484-456e-8060-b3a9f74a388b@rsg.ci.i.u-tokyo.ac.jp>
+Date: Fri, 24 Jul 2026 21:53:29 +0900
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -41,8 +41,7 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC 10/15] hw/virtio/vhost-shadow-virtqueue: range
- boundary in translation
+Subject: Re: [PATCH RFC 11/15] hw/virtio/vhost-user: create isolation region
 To: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Stefano Garzarella <sgarzare@redhat.com>,
@@ -69,58 +68,222 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  <eperezma@redhat.com>,
         Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-10-6b97c439eb28@gmail.com>
+ <20260723-vhost-user-isolated-memory-v1-11-6b97c439eb28@gmail.com>
 Content-Language: en-US
 From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20260723-vhost-user-isolated-memory-v1-10-6b97c439eb28@gmail.com>
+In-Reply-To: <20260723-vhost-user-isolated-memory-v1-11-6b97c439eb28@gmail.com>
 Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 7bit
 
 On 2026/07/24 7:30, Connor Kite wrote:
-> iova-tree expects inclusive range sizing when maps are allocated or searched.
-> Currently, svqs use exclusive sizing when searching their
-> vhost-iova-tree for a match to the region to be translated.  This could
-> lead to errors if the region to be translated is at the edge of an iova
-> region.
+> If memory isolation mode is active for the vhost-user device adds
+> features to:
+> - Gather the size required for bounce buffers and vrings in shared
+>    isolation region
+> - Allocate the required space in an anonymous file
+> - Create a vhost-iova-tree with space to map entire isolation region
+> - Map guest memory regions and shared vrings into the tree
+> - Release these resources upon backend cleanup
 > 
-> Fix this by reducing `needle.size` by 1 in
-> vhost_svq_translate_addr to bring then it line with DMAMap and iova-tree
-> convention.
+> Signed-off-by: Connor Kite <connorkite@gmail.com>
+> ---
+>   hw/virtio/vhost-user.c | 129 +++++++++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 129 insertions(+)
+> 
+> diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+> index f296b63fb9..710cf966f8 100644
+> --- a/hw/virtio/vhost-user.c
+> +++ b/hw/virtio/vhost-user.c
+> @@ -18,6 +18,7 @@
+>   #include "hw/virtio/vhost-backend.h"
+>   #include "hw/virtio/virtio.h"
+>   #include "hw/virtio/virtio-net.h"
+> +#include "hw/virtio/vhost-iova-tree.h"
+>   #include "chardev/char-fe.h"
+>   #include "io/channel-socket.h"
+>   #include "system/kvm.h"
+> @@ -25,6 +26,7 @@
+>   #include "qemu/main-loop.h"
+>   #include "qemu/uuid.h"
+>   #include "qemu/sockets.h"
+> +#include "qemu/memfd.h"
+>   #include "system/runstate.h"
+>   #include "system/cryptodev.h"
+>   #include "migration/postcopy-ram.h"
+> @@ -320,6 +322,13 @@ static VhostUserMsg m __attribute__ ((unused));
+>   /* The version of the protocol we support */
+>   #define VHOST_USER_VERSION    (0x1)
+>   
+> +typedef struct IsolationRegion {
+> +    uint64_t base_addr;
+> +    uint64_t vring_base_addr;
+> +    uint64_t size;
+> +    int iso_fd;
+> +} IsolationRegion;
+> +
+>   struct vhost_user {
+>       struct vhost_dev *dev;
+>       /* Shared between vhost devs of the same virtio device */
+> @@ -353,6 +362,10 @@ struct vhost_user {
+>        * by the backend (see @features).
+>        */
+>       uint64_t protocol_features;
+> +
+> +    /* Isolated memory data*/
+> +    struct IsolationRegion iso_memory;
+> +    VhostIOVATree *iso_iova_tree;
+>   };
+>   
+>   struct scrub_regions {
+> @@ -1109,6 +1122,121 @@ static int vhost_user_set_mem_table_postcopy(struct vhost_dev *dev,
+>       return 0;
+>   }
+>   
+> +/* TODO: Is there any notifier cleanup required here?*/
+> +static void cleanup_isolation_regions(struct vhost_dev *dev)
+> +{
+> +    struct vhost_user *u = dev->opaque;
+> +    if (u->iso_memory.base_addr) {
+> +        vhost_iova_tree_delete(u->iso_iova_tree);
+> +        u->iso_iova_tree = NULL;
+> +        memset(&u->iso_memory, 0, sizeof(IsolationRegion));
+> +        qemu_memfd_free((gpointer) u->iso_memory.base_addr, u->iso_memory.size,
+> +                         u->iso_memory.iso_fd);
 
-I think this patch is better to be extracted from this series since this 
-series is complex and this patch is worth being landed earlier. You can 
-chain this series to the patch with the Based-on: described in:
-docs/devel/submitting-a-patch.rst
+u->iso_memory is zeroed before they are read here.
+
+> +        u->iso_memory.base_addr = 0;
+> +    }
+> +}
+> +
+> +__attribute__((unused))
+> +static int init_isolation_regions(struct vhost_dev *dev,
+> +                                  VhostUserMsg *msg,
+> +                                  int *fds, size_t *fd_num)
+> +{
+> +    Error *err = NULL;
+> +    struct vhost_user *u = dev->opaque;
+> +    uint32_t nregions = dev->mem->nregions;
+> +    uint64_t buffer_reg_size = 0;
+> +    DMAMap newEntry = {
+
+This should be new_entry as per: docs/devel/style.rst
+
+> +        .perm = IOMMU_RW
+> +    };
+> +    g_autoptr(GArray) buffer_regions =
+> +        g_array_new(FALSE, TRUE, sizeof(DMAMap));
+> +
+> +    msg->hdr.request = VHOST_USER_SET_MEM_TABLE;
+> +
+> +    /* In case of reset, clear old regions*/
+> +    if (u->iso_memory.base_addr != 0) {
+> +        cleanup_isolation_regions(dev);
+> +        vhost_iova_tree_delete(u->iso_iova_tree);
+> +    }
+
+The check of u->iso_memory.base_addr is redundant; 
+cleanup_isolation_regions() performs that check.
+
+cleanup_isolation_regions() also calls vhost_iova_tree_delete(), so the 
+duplicate call of the function leads to use-after-free and double-free.
+
+> +
+> +    /* Gather information for bounce buffers to be mapped */
+> +    for (int i = 0; i < nregions; i++) {
+> +        struct vhost_memory_region *dev_region = &dev->mem->regions[i];
+> +        hwaddr size = ROUND_UP(dev_region->memory_size,
+> +                      qemu_real_host_page_size());
+> +        newEntry.translated_addr = dev_region->guest_phys_addr;
+> +        newEntry.size = size - 1;
+> +        buffer_reg_size += size;
+> +        g_array_append_val(buffer_regions, newEntry);
+> +    }
+> +
+> +    int num;
+> +    size_t desc_size;
+> +    size_t avail_size;
+> +    size_t driver_area_size;
+> +    size_t device_area_size;
+> +    size_t total_vring_size = 0;
+> +    size_t total_mmap_size;
+> +
+> +    /* Get space required for all vrings */
+> +    for (int j = 0; j < dev->nvqs; j++) {
+> +        num = virtio_queue_get_num(dev->vdev, dev->vq_index + j);
+> +        desc_size = sizeof(vring_desc_t) * num;
+> +        avail_size = offsetof(vring_avail_t, ring[num]) +
+> +                        sizeof(uint16_t);
+> +        driver_area_size = ROUND_UP(desc_size + avail_size,
+> +                            qemu_real_host_page_size());
+> +        device_area_size = ROUND_UP(offsetof(vring_used_t, ring[num]) +
+> +                                    sizeof(uint16_t),
+> +                                    qemu_real_host_page_size());
+> +        total_vring_size += driver_area_size + device_area_size;
+> +    }
+> +
+> +    total_mmap_size = buffer_reg_size + total_vring_size;
+> +
+> +    /* Allocate and map an anonymous file to hold the isolation region */
+> +    u->iso_memory.base_addr = (uint64_t) qemu_memfd_alloc("iso_r",
+> +                              total_mmap_size,
+> +                              F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL,
+> +                              &u->iso_memory.iso_fd, &err);
+> +    u->iso_memory.size = total_mmap_size;
+> +
+> +    if (err) {
+> +        error_report_err(err);
+> +        cleanup_isolation_regions(dev);
+> +        return -1;
+> +    }
+> +
+> +    uint64_t last_addr = int128_get64(int128_add(u->iso_memory.base_addr,
+> +                                                 total_mmap_size - 1));
+> +
+> +    /*
+> +     * Instantiates iova tree sized to map bounce buffers and vrings to the
+> +     * isolation region in host va.
+> +     */
+> +    u->iso_iova_tree = vhost_iova_tree_new(u->iso_memory.base_addr, last_addr);
+> +
+> +    assert(&u->iso_memory.iso_fd >= 0);
+> +    DMAMap *map;
+> +    DMAMap vring_map = {
+> +        .perm = IOMMU_RW,
+> +        .size = total_vring_size - 1,
+> +        /*vrings are allocated on tree first, so will be assigned base addr*/
+> +        .translated_addr = u->iso_memory.base_addr
+> +    };
+> +
+> +    vhost_iova_tree_map_alloc(u->iso_iova_tree, &vring_map,
+> +                              vring_map.translated_addr);
+> +    u->iso_memory.vring_base_addr = vring_map.iova;
+> +    for (int i = 0; i < buffer_regions->len; i++) {
+> +        map = &g_array_index(buffer_regions, DMAMap, i);
+> +        vhost_iova_tree_map_alloc_gpa(u->iso_iova_tree, map,
+> +                                      map->translated_addr);
+
+I wonder if it is fine to dismiss return values of 
+vhost_iova_tree_map_alloc() and vhost_iova_tree_map_alloc_gpa().
 
 Regards,
 Akihiko Odaki
 
-> 
-> Signed-off-by: Connor Kite <connorkite@gmail.com>
-> ---
->   hw/virtio/vhost-shadow-virtqueue.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/hw/virtio/vhost-shadow-virtqueue.c b/hw/virtio/vhost-shadow-virtqueue.c
-> index 9e3c359f50..20e5c7d2f1 100644
-> --- a/hw/virtio/vhost-shadow-virtqueue.c
-> +++ b/hw/virtio/vhost-shadow-virtqueue.c
-> @@ -104,14 +104,14 @@ static bool vhost_svq_translate_addr(const VhostShadowVirtqueue *svq,
->               /* Search the GPA->IOVA tree */
->               needle = (DMAMap) {
->                   .translated_addr = gpas[i],
-> -                .size = iovec[i].iov_len,
-> +                .size = iovec[i].iov_len - 1,  /* Inclusive */
->               };
->               map = vhost_iova_tree_find_gpa(svq->iova_tree, &needle);
->           } else {
->               /* Search the IOVA->HVA tree */
->               needle = (DMAMap) {
->                   .translated_addr = (hwaddr)(uintptr_t)iovec[i].iov_base,
-> -                .size = iovec[i].iov_len,
-> +                .size = iovec[i].iov_len - 1, /* Inclusive */
->               };
->               map = vhost_iova_tree_find_iova(svq->iova_tree, &needle);
->           }
+> +    }
+> +
+> +    return 0;
+> +}
+> +
+>   static int vhost_user_set_mem_table(struct vhost_dev *dev,
+>                                       struct vhost_memory *mem)
+>   {
+> @@ -2681,6 +2809,7 @@ static int vhost_user_backend_cleanup(struct vhost_dev *dev)
+>       g_free(u->region_rb_offset);
+>       u->region_rb_offset = NULL;
+>       u->region_rb_len = 0;
+> +    cleanup_isolation_regions(dev);
+>       g_free(u);
+>       dev->opaque = 0;
+>   
 > 
 

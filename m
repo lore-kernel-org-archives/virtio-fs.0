@@ -1,39 +1,39 @@
 Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id D93D63A380C
-	for <virtio-fs@lists.linux.dev>; Fri, 24 Jul 2026 12:54:07 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 35BBC191F94
+	for <virtio-fs@lists.linux.dev>; Fri, 24 Jul 2026 13:38:35 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1784897650; cv=none; b=uLf4QMtUNRqQ0OABN2Grf+ZdTl0KutfOVj/+WJedkhZAxWctYanKVxiMzojd/nEYT9wdsrYO1GgbNnT1UK+/TsiTN0C8jvsSxIu0qwdJ54MNkqClM10zb1PTcJEnD9HwWxWY8b1n5qkH1olW1C9Xs8O9HBGlSPqW9tsb/Qvu7H8=
+	t=1784900318; cv=none; b=C56UKZOxrVNDyuVZvX4qEJ03Ow1vOi0HLJ42ohWTj4O69tPAV5j082jQWhFMwwKqr0/5yLQ9NvpuVLC2EynlB9PyUYezFcq5Pe2GA+e+dqc0p7swZkaU1Fg2eEK6IsO6uiejDKRYn2Vmy0PXk33puFKiaTrWHG3QSE7YXBLid9s=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1784897650; c=relaxed/simple;
-	bh=ptyC6CSW5ZJwEfT1nzw5VO4PGfGwI64C+xYR6cAPtxw=;
+	s=arc-20240116; t=1784900318; c=relaxed/simple;
+	bh=foJeYLwLRCAIgeFyJm8TXVcn3j/Ga4JdbSKkIyogCxc=;
 	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=ceT2xXWS5jURus7cTnKnvxTli2YlR5VvsigFkn2mTcaTN9k4fQvqmP6y/q+yb3cKkYxhDXLA1MNDlLYCTByMLrptF8K5T+YSRcgXrUhmRih+wwnP8xesFMPD3QfJsWf6PCkTd0ZxGket7zUtN54oUWP3VVFMHFWCJOdjYv56phM=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=FHruRpKP; arc=none smtp.client-ip=49.212.243.89
+	 In-Reply-To:Content-Type; b=JNvMBNQHYOOYbk70zeWYSqYAymkv7WeAfkjylDozedGgMv9zXWMQQLdxkVuNJwp/DpuOt2IEn5YoRsL0Me3LlXJQN7lMVfkYX0DOxXAfXPweV9Gni4KKFz51bwWriE+C3JPMsEkIpLJsiUWOtjtwOphRVwE/wHf2p/ra/JaYEDI=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=KqfJDV4o; arc=none smtp.client-ip=49.212.243.89
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="FHruRpKP"
+	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="KqfJDV4o"
 Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
 	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 66OCrTpH079605
+	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 66ODX4EU091774
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Fri, 24 Jul 2026 21:53:29 +0900 (JST)
+	Fri, 24 Jul 2026 22:33:05 +0900 (JST)
 	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=swlNFhClk9/N7RnNUcRjVYZolczmGr+JWUwncsjWQJc=;
+DKIM-Signature: a=rsa-sha256; bh=1zW6Tv1h4d8+uZR56utH7MO8nsBorHhTP/SbCJgwdOk=;
         c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
         h=From:Message-ID:To:Subject:Date;
-        s=rs20250326; t=1784897609; v=1;
-        b=FHruRpKPar6FJHKFO3+DoRdg3S8WXCgHCD9nEL79IcUv1GXo9jadsZ0Rv0KWayeA
-         3o95OxRNT/2W7G5W9TK1Kk+O77Tyl3YiHDzaw1UEIOsk3v/3h5uBpdcxPXrtORWk
-         TFEwzOIlu45QsL2FGsiGSIhzrYxZRzYizY9JyaTkOZGJLwyc4SqUPUGk8/YtkUZI
-         dq6S0WIRDJKYaJX6DHMlIEFgixbQDQQTC0JAJZXOnNeWMvTjW6eAuYVnb228oTnO
-         Ye/z3XhHS4y8hxQB0/LrHEr5yTUt0OorGz5Nq0gHbacHudiMcEFWDV7l2rDy9Q8a
-         j4vBk99ikiYnpINSAete2g==
-Message-ID: <9f5869df-0484-456e-8060-b3a9f74a388b@rsg.ci.i.u-tokyo.ac.jp>
-Date: Fri, 24 Jul 2026 21:53:29 +0900
+        s=rs20250326; t=1784899985; v=1;
+        b=KqfJDV4oVAaXNpq1gyJ0Bp9ArlbU3lKuAhKbpKznY56uKJbu5C8jbqu1iGG3eAgp
+         RaI1zCIa1m7WNM39CzsjeTWGRUkg1wTOR4VaSdRcVkzGJSf0M0fnrDklV+X0BPQd
+         Kc+TQSxhlz1LOaZrl8cDHZbST1Zc2t1azo5eCR1F1GrSyTw7CzFgw+N7QKu0fOSn
+         feVnaIArQucANAJuKax1VhDu49fwcJQemwnpXit7FHQDfO3dtXWK283frbVXVpmZ
+         XzFcXM2ZB1s+8e8e1fQj/inlctrWO6Wd8RXzWlS4VNs2L28L7muTt+zMtgca7Wws
+         A0YunDNv2LX6msrJuHUGgQ==
+Message-ID: <a0580312-28d3-4cac-82d3-20b211b7038a@rsg.ci.i.u-tokyo.ac.jp>
+Date: Fri, 24 Jul 2026 22:33:04 +0900
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -41,7 +41,8 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC 11/15] hw/virtio/vhost-user: create isolation region
+Subject: Re: [PATCH RFC 12/15] hw/virtio/vhost-user: send isolation regions to
+ device
 To: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Stefano Garzarella <sgarzare@redhat.com>,
@@ -68,222 +69,162 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  <eperezma@redhat.com>,
         Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-11-6b97c439eb28@gmail.com>
+ <20260723-vhost-user-isolated-memory-v1-12-6b97c439eb28@gmail.com>
 Content-Language: en-US
 From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20260723-vhost-user-isolated-memory-v1-11-6b97c439eb28@gmail.com>
+In-Reply-To: <20260723-vhost-user-isolated-memory-v1-12-6b97c439eb28@gmail.com>
 Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 7bit
 
 On 2026/07/24 7:30, Connor Kite wrote:
-> If memory isolation mode is active for the vhost-user device adds
-> features to:
-> - Gather the size required for bounce buffers and vrings in shared
->    isolation region
-> - Allocate the required space in an anonymous file
-> - Create a vhost-iova-tree with space to map entire isolation region
-> - Map guest memory regions and shared vrings into the tree
-> - Release these resources upon backend cleanup
+> Adds features to fill a vhost_user_set_mem_table message with the
+> addresses of isolation memory regions corresponding to bounce buffers
+> and vrings.
 > 
 > Signed-off-by: Connor Kite <connorkite@gmail.com>
 > ---
->   hw/virtio/vhost-user.c | 129 +++++++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 129 insertions(+)
+>   hw/virtio/vhost-user.c | 80 +++++++++++++++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 79 insertions(+), 1 deletion(-)
 > 
 > diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-> index f296b63fb9..710cf966f8 100644
+> index 710cf966f8..acabfb7f1c 100644
 > --- a/hw/virtio/vhost-user.c
 > +++ b/hw/virtio/vhost-user.c
-> @@ -18,6 +18,7 @@
->   #include "hw/virtio/vhost-backend.h"
->   #include "hw/virtio/virtio.h"
->   #include "hw/virtio/virtio-net.h"
-> +#include "hw/virtio/vhost-iova-tree.h"
->   #include "chardev/char-fe.h"
->   #include "io/channel-socket.h"
->   #include "system/kvm.h"
-> @@ -25,6 +26,7 @@
->   #include "qemu/main-loop.h"
->   #include "qemu/uuid.h"
->   #include "qemu/sockets.h"
-> +#include "qemu/memfd.h"
->   #include "system/runstate.h"
->   #include "system/cryptodev.h"
->   #include "migration/postcopy-ram.h"
-> @@ -320,6 +322,13 @@ static VhostUserMsg m __attribute__ ((unused));
->   /* The version of the protocol we support */
->   #define VHOST_USER_VERSION    (0x1)
+> @@ -625,6 +625,21 @@ static void vhost_user_fill_msg_region(struct vhost_dev *dev,
+>       dst->mmap_offset = mmap_offset;
+>   }
 >   
-> +typedef struct IsolationRegion {
-> +    uint64_t base_addr;
-> +    uint64_t vring_base_addr;
-> +    uint64_t size;
-> +    int iso_fd;
-> +} IsolationRegion;
+> +static void vhost_user_fill_msg_region_iso(VhostUserMemoryRegion *dst,
+> +                                           const struct vhost_user *u,
+> +                                           const struct vhost_memory_region
+> +                                           *iova_reg)
+> +{
+> +    assert(u != NULL && dst != NULL && iova_reg != NULL);
+> +    uint64_t offset;
 > +
->   struct vhost_user {
->       struct vhost_dev *dev;
->       /* Shared between vhost devs of the same virtio device */
-> @@ -353,6 +362,10 @@ struct vhost_user {
->        * by the backend (see @features).
->        */
->       uint64_t protocol_features;
+> +    offset = iova_reg->userspace_addr - u->iso_memory.base_addr;
+> +    dst->userspace_addr = iova_reg->userspace_addr;
+> +    dst->memory_size = iova_reg->memory_size;
+> +    dst->guest_phys_addr = iova_reg->userspace_addr;
+> +    dst->mmap_offset = offset;
+> +}
 > +
-> +    /* Isolated memory data*/
-> +    struct IsolationRegion iso_memory;
-> +    VhostIOVATree *iso_iova_tree;
->   };
+>   static int vhost_user_fill_set_mem_table_msg(struct vhost_user *u,
+>                                                struct vhost_dev *dev,
+>                                                VhostUserMsg *msg,
+> @@ -1136,7 +1151,33 @@ static void cleanup_isolation_regions(struct vhost_dev *dev)
+>       }
+>   }
 >   
->   struct scrub_regions {
-> @@ -1109,6 +1122,121 @@ static int vhost_user_set_mem_table_postcopy(struct vhost_dev *dev,
+> -__attribute__((unused))
+> +struct iova_tree_traversal_args {
+> +    VhostUserMsg *msg;
+> +    struct vhost_user *u;
+> +    int *fds;
+> +    size_t *fd_num;
+> +};
+> +
+> +static gboolean vhost_user_iova_tree_traverse_funct(gpointer key,
+> +                                                    gpointer value,
+> +                                                    gpointer data)
+
+It is a bit odd naming. Functions usually do not have "funct" or similar 
+suffixes.
+
+> +{
+> +    struct iova_tree_traversal_args *args = data;
+> +    struct vhost_memory_region msg_region;
+> +    VhostUserMemoryRegion region_buffer;
+> +    DMAMap *map = key;
+> +    args->fds[*args->fd_num] = args->u->iso_memory.iso_fd;
+
+This may overrun the buffer because *args->fd_num is not checked as done 
+in vhost_user_fill_set_mem_table_msg() for the non-isolation case.
+
+> +
+> +    msg_region.guest_phys_addr = map->iova;
+> +    msg_region.memory_size = map->size + 1;
+> +    msg_region.userspace_addr = map->iova;
+> +    vhost_user_fill_msg_region_iso(&region_buffer, args->u, &msg_region);
+> +    args->msg->payload.memory.regions[*args->fd_num] = region_buffer;
+> +    (*args->fd_num)++;
+> +
+> +    return false;
+> +}
+> +
+>   static int init_isolation_regions(struct vhost_dev *dev,
+>                                     VhostUserMsg *msg,
+>                                     int *fds, size_t *fd_num)
+> @@ -1234,6 +1275,24 @@ static int init_isolation_regions(struct vhost_dev *dev,
+>                                         map->translated_addr);
+>       }
+>   
+> +    struct iova_tree_traversal_args args = {
+> +        .fd_num = fd_num,
+> +        .fds = fds,
+> +        .msg = msg,
+> +        .u = u
+> +    };
+> +
+> +    vhost_iova_tree_foreach(u->iso_iova_tree,
+> +                            vhost_user_iova_tree_traverse_funct, &args);
+> +
+> +    msg->payload.memory.nregions = *fd_num;
+> +
+> +    assert(*fd_num != 0);
+> +
+> +    msg->hdr.size = sizeof(msg->payload.memory.nregions);
+> +    msg->hdr.size += sizeof(msg->payload.memory.padding);
+> +    msg->hdr.size += *fd_num * sizeof(VhostUserMemoryRegion);
+> +
 >       return 0;
 >   }
 >   
-> +/* TODO: Is there any notifier cleanup required here?*/
-> +static void cleanup_isolation_regions(struct vhost_dev *dev)
-> +{
-> +    struct vhost_user *u = dev->opaque;
-> +    if (u->iso_memory.base_addr) {
-> +        vhost_iova_tree_delete(u->iso_iova_tree);
-> +        u->iso_iova_tree = NULL;
-> +        memset(&u->iso_memory, 0, sizeof(IsolationRegion));
-> +        qemu_memfd_free((gpointer) u->iso_memory.base_addr, u->iso_memory.size,
-> +                         u->iso_memory.iso_fd);
+> @@ -1241,6 +1300,7 @@ static int vhost_user_set_mem_table(struct vhost_dev *dev,
+>                                       struct vhost_memory *mem)
+>   {
+>       struct vhost_user *u = dev->opaque;
+> +    bool memory_isolation = u->user->memory_isolation;
+>       int fds[VHOST_MEMORY_BASELINE_NREGIONS];
 
-u->iso_memory is zeroed before they are read here.
+This needs one more element for vring.
 
-> +        u->iso_memory.base_addr = 0;
-> +    }
-> +}
+>       size_t fd_num = 0;
+>       bool do_postcopy = u->postcopy_listen && u->postcopy_fd.handler;
+> @@ -1268,6 +1328,24 @@ static int vhost_user_set_mem_table(struct vhost_dev *dev,
+>           msg.hdr.flags |= VHOST_USER_NEED_REPLY_MASK;
+>       }
+>   
+> +    if (memory_isolation) {
+> +        ret = init_isolation_regions(dev, &msg, fds, &fd_num);
+> +        if (ret < 0) {
+> +            return ret;
+> +        }
 > +
-> +__attribute__((unused))
-> +static int init_isolation_regions(struct vhost_dev *dev,
-> +                                  VhostUserMsg *msg,
-> +                                  int *fds, size_t *fd_num)
-> +{
-> +    Error *err = NULL;
-> +    struct vhost_user *u = dev->opaque;
-> +    uint32_t nregions = dev->mem->nregions;
-> +    uint64_t buffer_reg_size = 0;
-> +    DMAMap newEntry = {
-
-This should be new_entry as per: docs/devel/style.rst
-
-> +        .perm = IOMMU_RW
-> +    };
-> +    g_autoptr(GArray) buffer_regions =
-> +        g_array_new(FALSE, TRUE, sizeof(DMAMap));
+> +        ret = vhost_user_write(dev, &msg, fds, fd_num);
+> +        if (ret < 0) {
+> +            return ret;
+> +        }
 > +
-> +    msg->hdr.request = VHOST_USER_SET_MEM_TABLE;
+> +        if (reply_supported) {
+> +            return process_message_reply(dev, &msg);
+> +        }
 > +
-> +    /* In case of reset, clear old regions*/
-> +    if (u->iso_memory.base_addr != 0) {
-> +        cleanup_isolation_regions(dev);
-> +        vhost_iova_tree_delete(u->iso_iova_tree);
-> +    }
-
-The check of u->iso_memory.base_addr is redundant; 
-cleanup_isolation_regions() performs that check.
-
-cleanup_isolation_regions() also calls vhost_iova_tree_delete(), so the 
-duplicate call of the function leads to use-after-free and double-free.
-
-> +
-> +    /* Gather information for bounce buffers to be mapped */
-> +    for (int i = 0; i < nregions; i++) {
-> +        struct vhost_memory_region *dev_region = &dev->mem->regions[i];
-> +        hwaddr size = ROUND_UP(dev_region->memory_size,
-> +                      qemu_real_host_page_size());
-> +        newEntry.translated_addr = dev_region->guest_phys_addr;
-> +        newEntry.size = size - 1;
-> +        buffer_reg_size += size;
-> +        g_array_append_val(buffer_regions, newEntry);
+> +        return 0;
 > +    }
 > +
-> +    int num;
-> +    size_t desc_size;
-> +    size_t avail_size;
-> +    size_t driver_area_size;
-> +    size_t device_area_size;
-> +    size_t total_vring_size = 0;
-> +    size_t total_mmap_size;
-> +
-> +    /* Get space required for all vrings */
-> +    for (int j = 0; j < dev->nvqs; j++) {
-> +        num = virtio_queue_get_num(dev->vdev, dev->vq_index + j);
-> +        desc_size = sizeof(vring_desc_t) * num;
-> +        avail_size = offsetof(vring_avail_t, ring[num]) +
-> +                        sizeof(uint16_t);
-> +        driver_area_size = ROUND_UP(desc_size + avail_size,
-> +                            qemu_real_host_page_size());
-> +        device_area_size = ROUND_UP(offsetof(vring_used_t, ring[num]) +
-> +                                    sizeof(uint16_t),
-> +                                    qemu_real_host_page_size());
-> +        total_vring_size += driver_area_size + device_area_size;
-> +    }
-> +
-> +    total_mmap_size = buffer_reg_size + total_vring_size;
-> +
-> +    /* Allocate and map an anonymous file to hold the isolation region */
-> +    u->iso_memory.base_addr = (uint64_t) qemu_memfd_alloc("iso_r",
-> +                              total_mmap_size,
-> +                              F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL,
-> +                              &u->iso_memory.iso_fd, &err);
-> +    u->iso_memory.size = total_mmap_size;
-> +
-> +    if (err) {
-> +        error_report_err(err);
-> +        cleanup_isolation_regions(dev);
-> +        return -1;
-> +    }
-> +
-> +    uint64_t last_addr = int128_get64(int128_add(u->iso_memory.base_addr,
-> +                                                 total_mmap_size - 1));
-> +
-> +    /*
-> +     * Instantiates iova tree sized to map bounce buffers and vrings to the
-> +     * isolation region in host va.
-> +     */
-> +    u->iso_iova_tree = vhost_iova_tree_new(u->iso_memory.base_addr, last_addr);
-> +
-> +    assert(&u->iso_memory.iso_fd >= 0);
-> +    DMAMap *map;
-> +    DMAMap vring_map = {
-> +        .perm = IOMMU_RW,
-> +        .size = total_vring_size - 1,
-> +        /*vrings are allocated on tree first, so will be assigned base addr*/
-> +        .translated_addr = u->iso_memory.base_addr
-> +    };
-> +
-> +    vhost_iova_tree_map_alloc(u->iso_iova_tree, &vring_map,
-> +                              vring_map.translated_addr);
-> +    u->iso_memory.vring_base_addr = vring_map.iova;
-> +    for (int i = 0; i < buffer_regions->len; i++) {
-> +        map = &g_array_index(buffer_regions, DMAMap, i);
-> +        vhost_iova_tree_map_alloc_gpa(u->iso_iova_tree, map,
-> +                                      map->translated_addr);
 
-I wonder if it is fine to dismiss return values of 
-vhost_iova_tree_map_alloc() and vhost_iova_tree_map_alloc_gpa().
+This does not cover the postcopy path.
+
+It also allocates memory that is never sent for vq_index != 0. The 
+isolation regions need to be shared by all vqs. Please see 
+vhost_user_write() for the context.
 
 Regards,
 Akihiko Odaki
 
-> +    }
-> +
-> +    return 0;
-> +}
-> +
->   static int vhost_user_set_mem_table(struct vhost_dev *dev,
->                                       struct vhost_memory *mem)
->   {
-> @@ -2681,6 +2809,7 @@ static int vhost_user_backend_cleanup(struct vhost_dev *dev)
->       g_free(u->region_rb_offset);
->       u->region_rb_offset = NULL;
->       u->region_rb_len = 0;
-> +    cleanup_isolation_regions(dev);
->       g_free(u);
->       dev->opaque = 0;
->   
+>       if (config_mem_slots) {
+>           ret = vhost_user_add_remove_regions(dev, &msg, reply_supported, false);
+>           if (ret < 0) {
 > 
 

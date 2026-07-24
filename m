@@ -1,50 +1,50 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 72BCC3515D2
-	for <virtio-fs@lists.linux.dev>; Fri, 24 Jul 2026 06:06:49 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 383632749DF
+	for <virtio-fs@lists.linux.dev>; Fri, 24 Jul 2026 06:09:49 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1784873212; cv=none; b=LRvNf7gckZ7+sUz50fZwB+COOIpwioHqYYRX8XGhe2PRPIWbdc5XUYZzY6KQw3HQ6isvETeA3fP3K6SeaFJppHVNMFn1lUeV++CnLiEIWbgNFN3hRhEeDKPx9Dj9d3IQhefCkoIGXM0X3QcbboGoRv1Dx2x0hZyWIg9ESSKpNnA=
+	t=1784873391; cv=none; b=uEKFzRNJjGGUvcXpxuUDRVmkE0EGJFUh4ZIORwCAawhv+YW5aYlceC5svqOAFpL48AE1b8KNFf7KRcPz8flMtMSN7lrMyLaBMzLYkAsaMl0O0rbayOXq8pQKGJc760LpsFP+c+vRVrV7R7hYmxWDPaIXMay+xsGPRoS39sQZe0c=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1784873212; c=relaxed/simple;
-	bh=4dno0SUrBXa2HW/xJwuldiFVJN7M4XawhPbXfFXV6O4=;
+	s=arc-20240116; t=1784873391; c=relaxed/simple;
+	bh=lWtRmGTaK4+oY26dRaa0T6C8CkV1LQ9cnm24CHzVOzM=;
 	h=From:To:Cc:Subject:In-Reply-To:References:Date:Message-ID:
-	 MIME-Version:Content-Type; b=PSDuAKRZuEM1dX9V4fvEyH+qz7/gZpIJqVgGwCOpMarSoe9cwV9/7GDGaBjxx6knNJR9J2JHzGgBh0/EPBlkY+R+0PEwzRFPsLTso+gX+FyMYSjnZELIH8fxRku4h3UNagKUC8yHCdkJjucDtB+c7gDgDe1U06Ui5X2DVxu1TvQ=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=IFKJXeKP; arc=none smtp.client-ip=170.10.129.124
+	 MIME-Version:Content-Type; b=YuV1ZxrEkl9ulzsgdhU3/zATQ5cB6EN+NJ2GlLtqA0rPyu/8Ar8BiZJyCtaYjn7ybsE2hLHaMj58VbRblIY96wyKRgfWb9rypIw4V2aOH9bwYMOvQZoc4MZfA0g4dEL24q5v0/UaJe1rhXl93jJ3nHHA3YAuL0ugTI9E3kt0ni4=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=TaRbav6F; arc=none smtp.client-ip=170.10.133.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="IFKJXeKP"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="TaRbav6F"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1784873209;
+	s=mimecast20190719; t=1784873389;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 in-reply-to:in-reply-to:references:references;
-	bh=w9O6KyIWmVVPSWAdn3TWrQGghYaE/eWA8y4KU2yeK80=;
-	b=IFKJXeKPFnHj7i0USZNmj7AULMp1tRO2OKvgrp4DP8Ci51el5O9p1XzrhOqhfNvap5TW03
-	JtyN4in6Vf8+JGgqn2Emmk9zc0VejfBu17Aymbn7N51wJwixE6v3HCil8mT2gngepUngTX
-	oscdeIqAK5kF3Eymm6/eUxEWiUABkS4=
+	bh=lWtRmGTaK4+oY26dRaa0T6C8CkV1LQ9cnm24CHzVOzM=;
+	b=TaRbav6FzDsC456b6oXdzBPPEEJB8Q0VTtH9LQ2w1rttIGRssdcE2pWZkeXdl0GhxjRC14
+	BOHKEppbVDgP+52/YPo0RyiRSAMxwoHfZHV/WZXeVRGi1HsrSnlX3DnPoQUhh8aN/Qeulw
+	SA8p1xoCOw/oFi0KGNBlRAFXU0JQ9RI=
 Received: from mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com
  (ec2-54-186-198-63.us-west-2.compute.amazonaws.com [54.186.198.63]) by
  relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
- cipher=TLS_AES_256_GCM_SHA384) id us-mta-447-5sbwfBJYPbyh3dkZPeYbrg-1; Fri,
- 24 Jul 2026 02:06:45 -0400
-X-MC-Unique: 5sbwfBJYPbyh3dkZPeYbrg-1
-X-Mimecast-MFC-AGG-ID: 5sbwfBJYPbyh3dkZPeYbrg_1784873202
-Received: from mx-prod-int-05.mail-002.prod.us-west-2.aws.redhat.com (mx-prod-int-05.mail-002.prod.us-west-2.aws.redhat.com [10.30.177.17])
+ cipher=TLS_AES_256_GCM_SHA384) id us-mta-562-M_nHmmGyOmu7IJnIUqjh8w-1; Fri,
+ 24 Jul 2026 02:09:45 -0400
+X-MC-Unique: M_nHmmGyOmu7IJnIUqjh8w-1
+X-Mimecast-MFC-AGG-ID: M_nHmmGyOmu7IJnIUqjh8w_1784873383
+Received: from mx-prod-int-08.mail-002.prod.us-west-2.aws.redhat.com (mx-prod-int-08.mail-002.prod.us-west-2.aws.redhat.com [10.30.177.111])
 	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
 	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
 	(No client certificate requested)
-	by mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 3861319540E9;
-	Fri, 24 Jul 2026 06:06:41 +0000 (UTC)
+	by mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 894811954239;
+	Fri, 24 Jul 2026 06:09:41 +0000 (UTC)
 Received: from blackfin.pond.sub.org (unknown [10.44.22.4])
-	by mx-prod-int-05.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 18FA21954221;
-	Fri, 24 Jul 2026 06:06:38 +0000 (UTC)
+	by mx-prod-int-08.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 10C6B1800240;
+	Fri, 24 Jul 2026 06:09:39 +0000 (UTC)
 Received: by blackfin.pond.sub.org (Postfix, from userid 1000)
-	id 5554521E6920; Fri, 24 Jul 2026 08:06:36 +0200 (CEST)
+	id 3703121E6920; Fri, 24 Jul 2026 08:09:37 +0200 (CEST)
 From: Markus Armbruster <armbru@redhat.com>
-To: Connor Kite <connorkite@gmail.com>
+To: ConKite <connorkite@gmail.com>
 Cc: qemu-devel@nongnu.org,  "Michael S. Tsirkin" <mst@redhat.com>,  Stefano
  Garzarella <sgarzare@redhat.com>,  Alex =?utf-8?Q?Benn=C3=A9e?=
  <alex.bennee@linaro.org>,
@@ -66,14 +66,14 @@ Cc: qemu-devel@nongnu.org,  "Michael S. Tsirkin" <mst@redhat.com>,  Stefano
  =?utf-8?Q?P=C3=A9rez?=
  <eperezma@redhat.com>,  Alyssa Ross <hi@alyssa.is>,  Demi Marie Obenour
  <demiobenour@gmail.com>
-Subject: Re: [PATCH RFC 03/15] backends/cryptodev-vhost-user: add memory
- isolation bool
-In-Reply-To: <20260723-vhost-user-isolated-memory-v1-3-6b97c439eb28@gmail.com>
-	(Connor Kite's message of "Thu, 23 Jul 2026 15:30:02 -0700")
+Subject: Re: [PATCH RFC 01/15] vhost-user: Consolidate chardev property
+ definitions
+In-Reply-To: <20260723-vhost-user-isolated-memory-v1-1-6b97c439eb28@gmail.com>
+	(ConKite's message of "Thu, 23 Jul 2026 15:30:00 -0700")
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
-	<20260723-vhost-user-isolated-memory-v1-3-6b97c439eb28@gmail.com>
-Date: Fri, 24 Jul 2026 08:06:36 +0200
-Message-ID: <87fr18diqb.fsf@pond.sub.org>
+	<20260723-vhost-user-isolated-memory-v1-1-6b97c439eb28@gmail.com>
+Date: Fri, 24 Jul 2026 08:09:37 +0200
+Message-ID: <87bjbwdila.fsf@pond.sub.org>
 User-Agent: Gnus/5.13 (Gnus v5.13)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
@@ -81,60 +81,11 @@ List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-X-Scanned-By: MIMEDefang 3.0 on 10.30.177.17
-X-Mimecast-MFC-PROC-ID: k5SEYD6tiSD8xIxpfretG6Vk1Nlfo5ACdGU7kDIRktw_1784873202
+X-Scanned-By: MIMEDefang 3.4.1 on 10.30.177.111
+X-Mimecast-MFC-PROC-ID: xX7SWI_Q3yBCC_YpIYVPGP6eAFU3rwAWjeItG98Z6qk_1784873383
 X-Mimecast-Originator: redhat.com
 Content-Type: text/plain
 
-Connor Kite <connorkite@gmail.com> writes:
-
-> Add a memory_isolation property to CryptoDevBackendVhostUser and
-> add add it as an optional member of CryptodevVhostUserProperties
-> in qapi.
->
-> This is needed to be able to specify memory isolation for
-> cryptodev-vhost-user objects, and the bool will eventually be
-> passed to vhost_user_init() in a future patch.
->
-> Signed-off-by: Connor Kite <connorkite@gmail.com>
-
-[...]
-
-> diff --git a/qapi/qom.json b/qapi/qom.json
-> index c55776af7d..d7ca1b4203 100644
-> --- a/qapi/qom.json
-> +++ b/qapi/qom.json
-> @@ -350,11 +350,15 @@
->  # @chardev: the name of a Unix domain socket character device that
->  #     connects to the vhost-user server
->  #
-> +# @memory-isolation: disables access from cryptodev to guest memory.
-> +#     (default: false)
-
-Want imperative mood and need "since", like this:
-
-   # @memory-isolation: disable access from cryptodev to guest memory.
-   #     (default: false) (since 11.2)
-
-Pardon my ignorance...  What exactly is "cryptodev" here?  Is it code
-running in another process?
-
-Should the description answer my question?  Perhaps like this:
-
-  # @memory-isolation: isolate guest memory.  Isolated guest memory
-  #     cannot be accessed from uh, what exactly?
-
-Fill in the blank.
-
-> +#
->  # Since: 2.12
->  ##
->  { 'struct': 'CryptodevVhostUserProperties',
->    'base': 'CryptodevBackendProperties',
-> -  'data': { 'chardev': 'str' },
-> +  'data': { 'chardev': 'str',
-> +            '*memory-isolation': 'bool' },
->    'if': 'CONFIG_VHOST_CRYPTO' }
->  
->  ##
+This patch and the next one are From: ConKite, whereas the remainder are
+From: Connor Kite, which is nicer.
 

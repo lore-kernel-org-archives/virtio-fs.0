@@ -1,200 +1,129 @@
-Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 0F80978F39
-	for <virtio-fs@lists.linux.dev>; Sat, 25 Jul 2026 03:50:46 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 358F3318EE1
+	for <virtio-fs@lists.linux.dev>; Sat, 25 Jul 2026 05:33:00 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1784951449; cv=none; b=tgNTZYxFNhukHehPXyrfZTrcEV/OkJorDZ4tH9+Ws1s3mHf8JyeAxEyLTcMFqYXglP0HfJOGAoo2cjK3AsKU3AS4Hm4U02SyQPjaWzqmIYa9vm8Ym3w8kF0xpK2vBmB9L4YEuE7dc3t8P0Oee0XU6CV4x8IrcnH4U2j14KVvnTE=
+	t=1784957583; cv=none; b=R1MA6kzAg//9/bNdC+W7XA4rUr6cVQLeHr4vcaN3ZErJppRhlFcCh2RmUd0ifs/MWMC9XlZmR9kTXEKpSVsBPf2bbrDrWPotAwn7TaFtqQutyP/EM5R5QTy/Ch1JnpEJh5Py/intU7tnIRqAotZ7QSDATTw914N3zNOpryWERkY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1784951449; c=relaxed/simple;
-	bh=mROuDwUvy193QLIsKDngQ6rOzkbNoM3B/oSvgu89O5M=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=PqlVckp8xxsqjZcJ+asyJOULU6SqG8dwlWWbXiWD0d7h61vYUX1z4fWs7p0AwN3gKlqpoFJp3dX3o6fYxupQQXgHN5l14ikP2KXxng4Ab95FSI8t646PsrbZdrJVgZZtaEdRRFJbRMbX+zVql9MoYtx10wxlAa901iDaCqaVRMg=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=Gy8oWwqq; arc=none smtp.client-ip=49.212.243.89
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
+	s=arc-20240116; t=1784957583; c=relaxed/simple;
+	bh=2sa+2WFNvMavsE0VFdye5c90rqnztXR+oJyPl2xZLXY=;
+	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
+	 In-Reply-To:Content-Type:Content-Disposition; b=lPr+Yug4wgVd2Hf1C1zOnfsDV8Z8YHr/hNCW7PmnfbdW74S0V2Iy3AgeEQ1X2G1lv5LeT3jqfKFYtJ44TvMm7D3T0HnnKl/bj3bFqZ2Pv4+BL2vPooqqOe+26ckKbCc+zk8pmR7rIFz/Loqw7Tgt+58jPoSmGBp7I28Ys4jxpgg=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=XDzDbZeP; arc=none smtp.client-ip=170.10.129.124
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="Gy8oWwqq"
-Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
-	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 66P3j9JZ074791
-	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Sat, 25 Jul 2026 12:45:09 +0900 (JST)
-	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=TTDrMrUz5kVQCujTWwvnoY6dMbXMfEvnn4K/R9id/Dc=;
-        c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
-        h=From:Message-ID:To:Subject:Date;
-        s=rs20250326; t=1784951109; v=1;
-        b=Gy8oWwqqaF3dBoNA44REwP6MPeF3ZynpecZf9Ndq+gzUwRhjACGDXylVS+wvrfnB
-         Lh1Rkc1F89pe1i07r8fet13n94icwoftgPVHXq7prODEx7n1swA9uEiMXdarYOfB
-         Rtf8ALPf4z6XgwwvL8afv8Zev6ydU8ngcw2Wj0g5lvUfqBbr+Mm8PHdKvHBUhNj/
-         3VOlexqDAdhNrYRL/WlpDcGzugZxtiTB2493XD+yy6Veoe676G1/mBC6RuTynJ7T
-         LtRlYmubTsSuBY/mTxidKeAB5OWqARgczj7OLK75VBUsxofy5b59gjzuukplU+pU
-         O3WSHHC0MGsv8YqPbGinRw==
-Message-ID: <a45f108c-f897-40b7-a996-9e55150c09c8@rsg.ci.i.u-tokyo.ac.jp>
-Date: Sat, 25 Jul 2026 12:45:08 +0900
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="XDzDbZeP"
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
+	s=mimecast20190719; t=1784957579;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	 in-reply-to:in-reply-to:references:references;
+	bh=t650BNQ4TcDAv5114g+Y9Qf6j6gJ5cCULhZu4PXheWY=;
+	b=XDzDbZePMqo2huUsJPfS9WctZpaaaFwj1MwUebaykr8kHZ6gDdXa6afw4xmBLkICMIo1CZ
+	PYlpaN2Jv3Xs8kdjQF1JbrZBd06bQ3JT/zEwNoFspmir6pw62v4iHfu1grySqVLfCijxyu
+	scdD2ewcIKEqvuWNz6kMq2IH0xfRT4g=
+Received: from mail-wm1-f70.google.com (mail-wm1-f70.google.com
+ [209.85.128.70]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-223-qkgqBcS5NXuvvz-S5zA25g-1; Sat, 25 Jul 2026 01:32:56 -0400
+X-MC-Unique: qkgqBcS5NXuvvz-S5zA25g-1
+X-Mimecast-MFC-AGG-ID: qkgqBcS5NXuvvz-S5zA25g_1784957575
+Received: by mail-wm1-f70.google.com with SMTP id 5b1f17b1804b1-4954fe32d6eso5586615e9.1
+        for <virtio-fs@lists.linux.dev>; Fri, 24 Jul 2026 22:32:55 -0700 (PDT)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20251104; t=1784957575; x=1785562375;
+        h=in-reply-to:content-disposition:content-type:mime-version
+         :references:message-id:subject:cc:to:from:date:x-gm-gg
+         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=t650BNQ4TcDAv5114g+Y9Qf6j6gJ5cCULhZu4PXheWY=;
+        b=tWAJStHKbhqX0pzE8Tjhn+0uQECxcXCnU4gun+M4oVd14cMsnE8q7ihqPBSQ/lWKO1
+         y1nnh5TF+Lwv30PZPBL1f1Q8gIJynUjih5p0MbeKhg2RhFHUrhi+6dwlt8zdY9PoGMTF
+         2hVcyaDMFtrlCXTgNIZ0gB/joDymC43k3NcvFjQH0gfx5GoLRULCVeQ291dc4anytii5
+         0LWF0+j3HPoyqdGstofhOLSSq9zBmaR/fjwEsP8kzklv/Voh8s2xpY7avgJiWsKmlM/Q
+         cZgE7GuFu+lxsWzfhWpQ39iVMh7WRFOQXDCpsBfz8uEacJHC7MxPqXZFQOTor+V6ZfrI
+         1pNQ==
+X-Forwarded-Encrypted: i=1; AHgh+Ro5dS3eU2VSNtKykUWEHEeBGwp61bpQTpOKWXZC0aVUiYlT58d/dheoeiS2V99FAlcIGtoDb0pFVjo=@lists.linux.dev
+X-Gm-Message-State: AOJu0Yy4bBYT0J+rXxro/BA5qQo+kX07+wxj6tAmILGehefhXZQcnZNq
+	RTJSl8gEQKDMdDTs1kBz5cF31gKrmQW1JH2KtuU+wdqRufbFndYC/sYifRkiKZbrBBiuXncadCI
+	HlvzY/ZqxGeYs2qei8VrgE/13OX4Bn874NczLoyjZF1+6Cowgmn96evHs/M6PHw==
+X-Gm-Gg: AR+sD11DQNp+hAuR6Yz/LOWwq9BCBsdVsx4Sc/P2FQekrfm/lCuXGhB3+uWHxkp7Q+Y
+	/242Z9Ql06xtTaY+mq6fZz1mwhTe0isqsDoELCqnZYg6T6ga+s0Qi7y1J3bqfm1ACB3D+iXBZVp
+	/tz/1auHof05pGaFMVirZ+vOtPJbMCr9Giv4N/mULgZdkaFXgLPceLL4SqbDI8Zrowbp6ncty4T
+	VQbhXSYQVxNJ+STnwoCFKFe7fn8UZEuPuGlsDunIOt4zO0RJSThp/lWqufgu2HmQSCPXU0/CIuT
+	iwBRpBnjv5MjbxyR4Ssl70+tsB1Dzotvq4MxuGSAPxeaZs4QKJqCbaaxlO6dBLCcX7moGtmss2R
+	8ymbz8fzRbPpgqWzYgznYH4Td8FE0yTE=
+X-Received: by 2002:a05:600c:1991:b0:495:4bf3:2150 with SMTP id 5b1f17b1804b1-496b6a232d1mr6244075e9.8.1784957574705;
+        Fri, 24 Jul 2026 22:32:54 -0700 (PDT)
+X-Received: by 2002:a05:600c:1991:b0:495:4bf3:2150 with SMTP id 5b1f17b1804b1-496b6a232d1mr6243835e9.8.1784957574247;
+        Fri, 24 Jul 2026 22:32:54 -0700 (PDT)
+Received: from redhat.com (bzq-79-177-145-168.red.bezeqint.net. [79.177.145.168])
+        by smtp.gmail.com with ESMTPSA id 5b1f17b1804b1-496b4f33b73sm38681325e9.14.2026.07.24.22.32.51
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 24 Jul 2026 22:32:53 -0700 (PDT)
+Date: Sat, 25 Jul 2026 01:32:49 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+To: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
+Cc: qemu-devel@nongnu.org, Jason Wang <jasowangio@gmail.com>,
+	Milan Zamazal <mzamazal@redhat.com>,
+	Hanna Reitz <hreitz@redhat.com>,
+	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
+	zhenwei pi <zhenwei.pi@linux.dev>,
+	Stefan Hajnoczi <stefanha@redhat.com>,
+	"Gonglei (Arei)" <arei.gonglei@huawei.com>,
+	Stefano Garzarella <sgarzare@redhat.com>,
+	Kevin Wolf <kwolf@redhat.com>, virtio-fs@lists.linux.dev,
+	Jason Wang <jasowang@redhat.com>,
+	"yc-core@yandex-team.ru" <yc-core@yandex-team.ru>,
+	qemu-block@nongnu.org, Raphael Norwitz <rnorwitz@nvidia.com>,
+	Pierrick Bouvier <pierrick.bouvier@oss.qualcomm.com>,
+	Pierrick Bouvier <pierrick.bouvier@linaro.org>,
+	Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>,
+	Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>
+Subject: Re: [PATCH v4 0/6] vhost-user-blk: fix compatibility with older qemu
+ versions
+Message-ID: <20260725011415-mutt-send-email-mst@kernel.org>
+References: <20260702091023.3306378-1-dtalexundeer@yandex-team.ru>
+ <d95a174d-83ec-4bc0-ac5f-46628262bd0a@yandex-team.ru>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC 00/15] vhost-user: isolated memory
-To: ConKite <connorkite@gmail.com>, qemu-devel@nongnu.org
-Cc: "Michael S. Tsirkin" <mst@redhat.com>,
-        Stefano Garzarella <sgarzare@redhat.com>,
-        =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
-        Viresh Kumar <viresh.kumar@linaro.org>,
-        Gerd Hoffmann <kraxel@redhat.com>,
-        Mathieu Poirier <mathieu.poirier@linaro.org>,
-        Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
-        Haixu Cui <quic_haixcui@quicinc.com>,
-        Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>,
-        Hanna Reitz <hreitz@redhat.com>,
-        =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>,
-        Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
-        Stefan Hajnoczi <stefanha@redhat.com>,
-        Milan Zamazal <mzamazal@redhat.com>,
-        Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org,
-        virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
-        zhenwei pi <zhenwei.pi@linux.dev>,
-        =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?=
- <berrange@redhat.com>,
-        Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>,
-        Jason Wang <jasowangio@gmail.com>, Peter Xu <peterx@redhat.com>,
-        =?UTF-8?Q?Eugenio_P=C3=A9rez?=
- <eperezma@redhat.com>,
-        Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
-References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
-Content-Language: en-US
-From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
+In-Reply-To: <d95a174d-83ec-4bc0-ac5f-46628262bd0a@yandex-team.ru>
+X-Mimecast-Spam-Score: 0
+X-Mimecast-MFC-PROC-ID: 1ysafRkj5MkSBRqPpoIoiyjLCd7rXeLZgSayuDM9SZc_1784957575
+X-Mimecast-Originator: redhat.com
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-On 2026/07/24 7:29, ConKite wrote:
-> This patch series implements a memory isolation mode in vhost-user. The
-> purpose of this mode is to provide the option of additional security by
-> eliminating direct access of guest memory by vhost-user devices.
-> At a high level this works by:
-> 
-> 1. Adding qdev and qapi properties required to enable isolation mode for
->     various devices.
-> 2. Allocating an isolation memory region in an anonymous file and mapping it
->     to host memory.  This isolation region will hold the bounce buffers and
->     vrings necessary to move data.
-> 3. Using a vhost-iova-tree to allocate and track the mapping between
->     guest regions and their corresponding bounce buffers in the isolation
->     memory.
-> 4. Creating shadow virtqueues to intercept request notifications.  As
->     kick and call events are received by an svq, it copies buffer
->     contents and descriptors between isolation and guest memory before
->     notifying the backend or guest.
-> 
-> Note: This project is currently in a partially functional state. For
-> example, in testing vhost-user-input and a keyboard, keystrokes may
-> register correctly or be double counted depending on the combination
-> of backend daemon and guest OS used. However, the desire is to make
-> this work public at this stage for comment on the overall
-> approach.
+On Thu, Jul 16, 2026 at 12:30:33PM +0500, Alexandr Moshkov wrote:
+> Ping :)
 
-I guess this intends to achieve something similar to IOMMU and also 
-Linux's swiotlb for the VMM (please correct me if I'm wrong):
 
- > Other edge case scenarios arise for bounce buffers. For example, when
- > IOMMU mappings are set up for a DMA operation to/from a device that is
- > considered “untrusted”, the device should be given access only to the
- > memory containing the data being transferred. But if that memory
- > occupies only part of an IOMMU granule, other parts of the granule may
- > contain unrelated kernel data. Since IOMMU access control is
- > per-granule, the untrusted device can gain access to the unrelated
- > kernel data. This problem is solved by bounce buffering the DMA
- > operation and ensuring that unused portions of the bounce buffers do
- > not contain any unrelated kernel data.
+I don't know what to do with this one. IIUC in flight migration is in 11.0
+so I doubt we can just introduce new messages without a protocol flag.
 
-https://docs.kernel.org/next/core-api/swiotlb.html#usage-scenarios
+It says fix compatibility but really it's a feature, right?
 
-It would be nice if the security property this feature provides is 
-explicitly stated, ideally as documentation.
+And this is somehow related to GET_BASE?
 
-I also hope this could fix vhost-user for TCG:
-https://gitlab.com/qemu-project/qemu/-/work_items/2092
+Half the commits here have no or a single line of comment, those that
+do, repeat what the commit does instead of explaining why.
 
-Perhaps the memory isolation should be enabled by default for TCG.
+That's not how it should be.
 
-Implementation-wise, there are rough edges as you stated. Some of them 
-can be fixed by more closely following what vhost-user does for the 
-non-isolated case and what vhost-vdpa does with shadow virtqueues.
+Here's a good template to use:
 
-Regards,
-Akihiko Odaki
+Currently .... This is a problem because ... We can not do .... because
+... To address .... And then ....
 
-> 
-> Signed-off-by: Connor Kite <connorkite@gmail.com>
-> ---
-> ConKite (2):
->        vhost-user: Consolidate chardev property definitions
->        vhost-user: Add memory-isolation qdev property to vhost-user devices
-> 
-> Connor Kite (13):
->        backends/cryptodev-vhost-user: add memory isolation bool
->        net/vhost-user: add memory isolation
->        vhost-user: add memory_isolation to VhostUserState
->        util/iova-tree: g_tree_foreach wrapper
->        hw/virtio: iova_tree_foreach wrapper
->        hw/virtio/vhost-shadow-virtqueue: used handler
->        hw/virtio/vhost-shadow-virtqueue: specified vring placement
->        hw/virtio/vhost-shadow-virtqueue: range boundary in translation
->        hw/virtio/vhost-user: create isolation region
->        hw/virtio/vhost-user: send isolation regions to device
->        hw/virtio/vhost-user: add shadow virtqueues and eventfd intercepts
->        hw/virtio/vhost-user: handle data movement with shadow vqs
->        hw/virtio/vhost-user: shadow vq cleanup
-> 
->   backends/cryptodev-vhost-user.c      |  24 +-
->   backends/vhost-user.c                |   4 +-
->   hw/block/vhost-user-blk.c            |   4 +-
->   hw/display/vhost-user-gpu.c          |   4 +-
->   hw/scsi/vhost-user-scsi.c            |   4 +-
->   hw/virtio/vhost-iova-tree.c          |  15 ++
->   hw/virtio/vhost-iova-tree.h          |   3 +
->   hw/virtio/vhost-shadow-virtqueue.c   |  30 ++-
->   hw/virtio/vhost-shadow-virtqueue.h   |  17 ++
->   hw/virtio/vhost-stub.c               |   3 +-
->   hw/virtio/vhost-user-base.c          |  13 +-
->   hw/virtio/vhost-user-fs.c            |   4 +-
->   hw/virtio/vhost-user-gpio.c          |   4 -
->   hw/virtio/vhost-user-i2c.c           |   5 -
->   hw/virtio/vhost-user-input.c         |   5 -
->   hw/virtio/vhost-user-rng.c           |   5 -
->   hw/virtio/vhost-user-rtc.c           |   4 -
->   hw/virtio/vhost-user-scmi.c          |   4 +-
->   hw/virtio/vhost-user-snd.c           |   1 -
->   hw/virtio/vhost-user-spi.c           |   5 -
->   hw/virtio/vhost-user-test-device.c   |   1 -
->   hw/virtio/vhost-user-vsock.c         |   4 +-
->   hw/virtio/vhost-user.c               | 441 ++++++++++++++++++++++++++++++++++-
->   include/hw/virtio/vhost-user-base.h  |   1 +
->   include/hw/virtio/vhost-user-blk.h   |   1 +
->   include/hw/virtio/vhost-user-fs.h    |   1 +
->   include/hw/virtio/vhost-user-scmi.h  |   1 +
->   include/hw/virtio/vhost-user-vsock.h |   1 +
->   include/hw/virtio/vhost-user.h       |   6 +-
->   include/hw/virtio/virtio-gpu.h       |   1 +
->   include/hw/virtio/virtio-scsi.h      |   1 +
->   include/qemu/iova-tree.h             |  13 ++
->   include/system/vhost-user-backend.h  |   3 +-
->   net/passt.c                          |  16 +-
->   net/vhost-user.c                     |  11 +-
->   qapi/net.json                        |  15 +-
->   qapi/qom.json                        |   6 +-
->   util/iova-tree.c                     |   5 +
->   38 files changed, 622 insertions(+), 64 deletions(-)
-> ---
-> base-commit: 006a22cb26998998385b104db1ff9466ef2f3153
-> change-id: 20260604-vhost-user-isolated-memory-070ed4833ee7
-> 
-> Best regards,
+HTH
+
+-- 
+MST
 

@@ -1,47 +1,47 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id D32613C061F
-	for <virtio-fs@lists.linux.dev>; Mon, 27 Jul 2026 18:48:22 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 8A9CA3CB2E5
+	for <virtio-fs@lists.linux.dev>; Mon, 27 Jul 2026 19:06:17 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785178104; cv=none; b=nhBlAn1ev2DqBhheJx4FmBM0UFKXRrcK8T0HTNBu6m0ALBs4n8702qLUm2U77kE1RQAhbOic39fNhnjfpDObLz7nRt1h1l44uBIj0x0iZv6ijiEAtdUe4K4CfUxloAuLzk6FCCSVCNE1NcnSrNXma/Ri66YvWQgOvq6P6T27Z84=
+	t=1785179179; cv=none; b=n4hKInrcuqcCP0QNgcAS1YNNgoZSrx2yFHQ/2PV4oJKTs+cSYFTlfyM4SZ2Zurr+eiAdtWihCZ1+XzeFBSBZCLnxlDM3tkIwNJ531F7hCW8I//meXmGFmcoGK2PilrhuNBseqz0xrU9RcmQlyBMJunKbQ48pbpa1OspR1vRuuvY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785178104; c=relaxed/simple;
-	bh=DxvmTtchr4UzzMmASLsG9ODgqCC37XNBV1t92AT83uo=;
+	s=arc-20240116; t=1785179179; c=relaxed/simple;
+	bh=ur0naNpj19H+JnpldDRHdrjL1rdj2IvD/r1kcm7fnTg=;
 	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
-	 Content-Type:Content-Disposition:In-Reply-To; b=LhfT7FQvU7reZDNwYHNSFMTQ42esg+SD3l7dghhgs+/39EKebP+CaBMJLJLUBCHhW7vLS4+0X1ZzW7yHfK42Lq0hadKeHezjN4u8y4m5zJmJt+sG2zcehZuJXjvbN1o/+8VOivyZMkvFkrtvXrrZRJt/0JuohkmPaxo8lmI6WcI=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=K5zLNQZH; arc=none smtp.client-ip=170.10.133.124
+	 Content-Type:Content-Disposition:In-Reply-To; b=oCuSggVj7HrrtpT163ohiokp/80NnL81JfrdTKc427Lihp2DGOwIPjZotQ3HZ56plsA0ti76HRN5V5UUbAjHDQqlwa8cOGFrzfN7fpJdvW9CJEuwyuW+tIAW2XRs1aiT0Z3u8koncJc44si7c3spJFN9XG5G50qofRMLpsXl32o=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=fZjG7rJp; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="K5zLNQZH"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="fZjG7rJp"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1785178101;
+	s=mimecast20190719; t=1785179176;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 in-reply-to:in-reply-to:references:references;
-	bh=WpsSGUZlY0X4wFyUj6Sc+g+V8RjxHI71Pn+TpdujcMo=;
-	b=K5zLNQZHIEmPqrO+ZhLQzjiFtgoTvE66IMTadpLrKBvcH4vALHeREypyX7lAbH7LRsm4uE
-	KJiyOG9iOeKr1bYTpywzJEVx/6yZfOX2UKsSHOtooYFDVHAGMg7BKbubzTyvOyVYwEmkIH
-	R3Sy2DKxE28SXc7cl7TywpF9qkFlTOQ=
+	bh=mM5h3ubQZstLI8T1Ui9C4krWDKq5yQCBW2N0LqK792s=;
+	b=fZjG7rJp2SzWX2X2hlrmTEWVC4Jr82QYiISxwPKkDsuvrF35OU27MUJBINriNK72WtGDl+
+	IOuaga+Nh1WWJoPj+dhugjWemLeTzTNS7LJDaarjUMfgCS2lEOD35V+R6D/YJ2qP1c2nM4
+	O21V+BWNj/nboL5p1001beX66YiUYbs=
 Received: from mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com
  (ec2-54-186-198-63.us-west-2.compute.amazonaws.com [54.186.198.63]) by
  relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
- cipher=TLS_AES_256_GCM_SHA384) id us-mta-352-7h0j0K1_OA2ZPPvNoKDbeQ-1; Mon,
- 27 Jul 2026 14:48:15 -0400
-X-MC-Unique: 7h0j0K1_OA2ZPPvNoKDbeQ-1
-X-Mimecast-MFC-AGG-ID: 7h0j0K1_OA2ZPPvNoKDbeQ_1785178093
+ cipher=TLS_AES_256_GCM_SHA384) id us-mta-443-0hyJ2HrKMBiq2oioB9mdxg-1; Mon,
+ 27 Jul 2026 15:06:11 -0400
+X-MC-Unique: 0hyJ2HrKMBiq2oioB9mdxg-1
+X-Mimecast-MFC-AGG-ID: 0hyJ2HrKMBiq2oioB9mdxg_1785179169
 Received: from mx-prod-int-08.mail-002.prod.us-west-2.aws.redhat.com (mx-prod-int-08.mail-002.prod.us-west-2.aws.redhat.com [10.30.177.111])
 	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
 	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
 	(No client certificate requested)
-	by mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 7D4AD195607C;
-	Mon, 27 Jul 2026 18:48:12 +0000 (UTC)
+	by mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id ECD561956072;
+	Mon, 27 Jul 2026 19:06:07 +0000 (UTC)
 Received: from localhost (unknown [10.2.16.116])
-	by mx-prod-int-08.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTP id E79EE180058F;
-	Mon, 27 Jul 2026 18:48:09 +0000 (UTC)
-Date: Mon, 27 Jul 2026 14:48:08 -0400
+	by mx-prod-int-08.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTP id D5F3E180058F;
+	Mon, 27 Jul 2026 19:06:05 +0000 (UTC)
+Date: Mon, 27 Jul 2026 15:06:04 -0400
 From: Stefan Hajnoczi <stefanha@redhat.com>
 To: Connor Kite <connorkite@gmail.com>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
@@ -69,10 +69,11 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 	Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>,
 	Alyssa Ross <hi@alyssa.is>,
 	Demi Marie Obenour <demiobenour@gmail.com>
-Subject: Re: [PATCH RFC 04/15] net/vhost-user: add memory isolation
-Message-ID: <20260727184808.GC371693@fedora>
+Subject: Re: [PATCH RFC 05/15] vhost-user: add memory_isolation to
+ VhostUserState
+Message-ID: <20260727190604.GD371693@fedora>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-4-6b97c439eb28@gmail.com>
+ <20260723-vhost-user-isolated-memory-v1-5-6b97c439eb28@gmail.com>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -80,72 +81,56 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="1OUtWB2/rX/yB0aQ"
+	protocol="application/pgp-signature"; boundary="GRVu7jzoCipJ+wdN"
 Content-Disposition: inline
-In-Reply-To: <20260723-vhost-user-isolated-memory-v1-4-6b97c439eb28@gmail.com>
+In-Reply-To: <20260723-vhost-user-isolated-memory-v1-5-6b97c439eb28@gmail.com>
 X-Scanned-By: MIMEDefang 3.4.1 on 10.30.177.111
 
---1OUtWB2/rX/yB0aQ
+--GRVu7jzoCipJ+wdN
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Jul 23, 2026 at 03:30:03PM -0700, Connor Kite wrote:
-> Add a memory-isolation property to NetdevPassOptions and
-> NetDevVhostUserOptions in net.json.  This property will
-> be used for vhost-user devices to disable access to guest
-> memory from devices.
->=20
-> It will be passed into vhost_user_init() in a future patch.
->=20
-> Signed-off-by: Connor Kite <connorkite@gmail.com>
-> ---
->  net/passt.c      |  7 +++++++
->  net/vhost-user.c |  4 ++++
->  qapi/net.json    | 15 +++++++++++----
->  3 files changed, 22 insertions(+), 4 deletions(-)
->=20
-> diff --git a/net/passt.c b/net/passt.c
-> index 45440c399b..ce80186883 100644
-> --- a/net/passt.c
-> +++ b/net/passt.c
-> @@ -735,6 +735,13 @@ int net_init_passt(const Netdev *netdev, const char =
-*name,
->      s->pidfile =3D pidfile;
+On Thu, Jul 23, 2026 at 03:30:04PM -0700, Connor Kite wrote:
+> @@ -73,12 +74,14 @@ typedef struct VhostUserState {
+>      int memory_slots;
+>      bool supports_config;
+>      bool supports_inflight_migration;
+> +    bool memory_isolation;
+>  } VhostUserState;
 > =20
->      if (netdev->u.passt.has_vhost_user && netdev->u.passt.vhost_user) {
-> +        bool memory_isolation G_GNUC_UNUSED =3D false;
-> +
-> +        if (netdev->u.passt.has_memory_isolation &&
-> +           netdev->u.passt.memory_isolation) {
-> +            memory_isolation =3D true;
-> +        }
+>  /**
+>   * vhost_user_init() - initialise shared vhost_user state
+>   * @user: allocated area for storing shared state
+>   * @chr: the chardev for the vhost socket
+> + * @memory_isolation: disables device access to guest memory
 
-This is dead code (hence G_GNUC_UNUSED) and is harder to review because
-we don't know how it will be used until later in the patch series. I
-guess vhost_user_init() and net_passt_vhost_user_init() will gain a
-memory_isolation argument in a future patch.
+"Device" is confusing because it has several meanings. "vhost-user
+back-end" would be clearer.
 
-Linear reviews of the patch series are easiest for reviewers. Please
-reorder this so that vhost_user_init() and net_pass_vhost_user_init()
-are changed first. You can hardcode the argument to false in those
-patches. This patch can be moved afterwards so that memory_isolation is
-never dead code.
+"Disables" is also a little confusing because the vhost-user back-end
+still needs to access guest memory somehow. Memory access cannot be
+completely disabled. Something like "restricts vhost-user back-end
+access to guest memory via bounce buffers" could be clearer, but it's up
+to you. We probably don't want to repeat the full explanation in every
+comment about memory isolation, so it's fine to omit the details as long
+as there is user-facing documentation somewhere that explains what the
+feature does.
 
---1OUtWB2/rX/yB0aQ
+--GRVu7jzoCipJ+wdN
 Content-Type: application/pgp-signature; name=signature.asc
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCgAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmpnp+gACgkQnKSrs4Gr
-c8gPOQf/XYHmejG58UtHRz8dS3h1zerjw27qrlpz+sb/VxPkff6Q/N1EFsQBjOYI
-mzxUd8rmBkUdE6VtdcU9EBjyJdOFuimihT8mM+GD6fq8Iui6U1tVGVRxFNvefRo4
-2lTCTqvDMCQUIIMflryfP5oVGZY2Gq3V65xOslZ7MYvilPWCVG4iIS58/1vk1VI7
-qHaQoJPMpSsSyZ/PYLbb8R5JCtGprERCDaadSXXQDqpTF9iiFrAW0CQRhdmKTYXz
-K5GA2i1EAO74SJzBBBd1UglZ4mwZBsmv5RBj1eopve0TfTDfMGiUzOlZAiNUvpCl
-kw0n/Akh/aL6XnT5z8uReL63ALKMng==
-=8TkL
+iQEzBAEBCgAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmpnrBwACgkQnKSrs4Gr
+c8g/dggAh1YcQjd3Z68P3Ps7X5qBR06hLTnzCcvxJcgUdkL/zhk2JRB8QNKknhvW
+S3BgaUom6aHcIvbo510pR/Y/IH0TqPU/IqKKwCRMS801ifd0K+Ma34s99i3vislo
+vq5zrfcfMuyWUKb3KFaiiwGpoRSIEMon+jyZvB2UxU+bfRvRvVDN1wP/1Wn+TsDK
+QRVDqg8Gzy4fWGB9YvM+OV6efVcOtLCTdzOLb/TVAFaxG0nJ3529x49lQHG5Myv+
+i91ha0m/yl1XM/YMcTwIi8/ptgMgtPdqJPh8fSuU9d03ej4OM7bRsRkowrHE0+eq
+F+92L+IMyU7aR8Y1A1vdhcakQZ2IBw==
+=3u2s
 -----END PGP SIGNATURE-----
 
---1OUtWB2/rX/yB0aQ--
+--GRVu7jzoCipJ+wdN--
 

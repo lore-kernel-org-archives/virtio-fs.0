@@ -1,109 +1,133 @@
-Received: from forwardcorp1d.mail.yandex.net (forwardcorp1d.mail.yandex.net [178.154.239.200])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 49161374E5B
-	for <virtio-fs@lists.linux.dev>; Mon, 27 Jul 2026 05:54:30 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=178.154.239.200
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 88C003FE36E
+	for <virtio-fs@lists.linux.dev>; Mon, 27 Jul 2026 18:23:36 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785131676; cv=none; b=JYcpgnTeNEzP9hDdx/FRC4QWJeP7PazoHPKlpNY1aj5kDW1OzuM+BtseZK91b5y7SytDgvlC4jJlwiRt/tIr2mN9Y+gsYKbVFMk9Mmr8bWfU6YYuFzdyQUH/tW53bedVKUTwxteQ2biXF18QKXKKtd5pSVR2YPAhTU/ydFFc3wE=
+	t=1785176618; cv=none; b=uY24rGN8NBxHC6jCS6t9sh+zabEtyUREQXL+ssQDCfEBsISS5HGxTbprQ3ZmmE337BYIrMjOzs7ecOAAEhrEFnM7RaYKBlM4pdClnYQWP5SbM5R0287ZB/DyOW3RYarTFZP29uJBJJL8yQbPHMesLm4IoUKGVW1a6tc5UOnQn1A=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785131676; c=relaxed/simple;
-	bh=SwhFmL3YqiTsB1DO77Qiptk32EWX/NhZ6FavHtU3040=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=B9LVeeut7K8xVGksoCF6C3IGhrX/mDnbPbijsCmQqma9pwFvlMs1oSqxTvjlQH3vXFhPikb9JmFnMLhlyEE9HVS0wrMl/Cfy+3Zs7DoxpYBE/EHStQTPCpd07UPm2vc5x9Bl/LVoTRWKpCeVm15rLSe1f8xOA+EZmsv2w+V6OIk=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=UK4l7Bxb; arc=none smtp.client-ip=178.154.239.200
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=yandex-team.ru
+	s=arc-20240116; t=1785176618; c=relaxed/simple;
+	bh=ZXDlJ8n3xPDBjhT4EY3xq+fK/7i5VAnTGhoZVp2UdkA=;
+	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
+	 Content-Type:Content-Disposition:In-Reply-To; b=IX/1sQbbzoFSLa/iZPrwSxz9b1qFynPQMadMhOf+ztOnBKyZ+9+X9HZvnd7phbUulWGUgFDT9t9WP4dr2ezdRC9jWbN5Wh+pc4OCkcw8GtMjAMcAXhvUpHhsxqEn3VWNkqT353BAaBfjs8JH1cpQN/bYImycd07tixj/qoll1OQ=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=IjTQOBE9; arc=none smtp.client-ip=170.10.133.124
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="UK4l7Bxb"
-Received: from mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net (mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net [IPv6:2a02:6b8:c42:86a0:0:640:75de:0])
-	by forwardcorp1d.mail.yandex.net (postfix) with ESMTPS id 03CE380B11;
-	Mon, 27 Jul 2026 08:50:21 +0300 (MSK)
-Received: from [IPV6:2a02:6bf:803e:400:bea7:2940:6406:4130] (unknown [2a02:6bf:803e:400:bea7:2940:6406:4130])
-	by mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net (smtpcorp) with ESMTPSA id 7oUooL3h78c0-kCefQyDF;
-	Mon, 27 Jul 2026 08:50:20 +0300
-Precedence: bulk
-X-Yandex-Fwd: 1
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
-	s=default; t=1785131420;
-	bh=ApUu1XBttSABZmu3OrRXGLuO/GVExIO6x2kbPh+Plzo=;
-	h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
-	b=UK4l7BxbQ4xaDGQiMYl+CDKQARjR+iohGbjXaVhk7Aqdfp7CJt7AAwu7Y8a+zQL9w
-	 1Wvkjqj+E91MaKSrcwapXNKrpexCGvUX3bD7O/d3E1TTP2C5OcAZeHXDdnsu5oP9/J
-	 dkmDvktHhVEAMfpFD91sft7Uk3YqK7UGG93b6xL4=
-Authentication-Results: mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net; dkim=pass header.i=@yandex-team.ru
-Message-ID: <a8841f42-c8b4-4a11-a7e9-014ddc06f105@yandex-team.ru>
-Date: Mon, 27 Jul 2026 10:50:07 +0500
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="IjTQOBE9"
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
+	s=mimecast20190719; t=1785176615;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	 in-reply-to:in-reply-to:references:references;
+	bh=ZXDlJ8n3xPDBjhT4EY3xq+fK/7i5VAnTGhoZVp2UdkA=;
+	b=IjTQOBE9Wx5HnHfdk0Tc+vu2UILsL/Zu1VhlYV0mSsZaRaTEkn5DzF2OCuPx/1uNhDydef
+	AW+1SWTyWYC27/P/X5sVeDLSiP2GwN/8LnorqRSFSkiwkfJDO2R1rBuRSCqMqFOH7EAC22
+	pvusbyZAbzT0PRUAM6S1V928np6vM+k=
+Received: from mx-prod-mc-05.mail-002.prod.us-west-2.aws.redhat.com
+ (ec2-54-186-198-63.us-west-2.compute.amazonaws.com [54.186.198.63]) by
+ relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
+ cipher=TLS_AES_256_GCM_SHA384) id us-mta-290-LVGBbTrvN66hTohZ7yIYHQ-1; Mon,
+ 27 Jul 2026 14:23:32 -0400
+X-MC-Unique: LVGBbTrvN66hTohZ7yIYHQ-1
+X-Mimecast-MFC-AGG-ID: LVGBbTrvN66hTohZ7yIYHQ_1785176609
+Received: from mx-prod-int-01.mail-002.prod.us-west-2.aws.redhat.com (mx-prod-int-01.mail-002.prod.us-west-2.aws.redhat.com [10.30.177.4])
+	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
+	(No client certificate requested)
+	by mx-prod-mc-05.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 3AE5A195E909;
+	Mon, 27 Jul 2026 18:23:28 +0000 (UTC)
+Received: from localhost (unknown [10.2.16.116])
+	by mx-prod-int-01.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTP id A7A5530010D0;
+	Mon, 27 Jul 2026 18:23:25 +0000 (UTC)
+Date: Mon, 27 Jul 2026 14:23:24 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+To: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
+Cc: ConKite <connorkite@gmail.com>, qemu-devel@nongnu.org,
+	"Michael S. Tsirkin" <mst@redhat.com>,
+	Stefano Garzarella <sgarzare@redhat.com>,
+	Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>,
+	Viresh Kumar <viresh.kumar@linaro.org>,
+	Gerd Hoffmann <kraxel@redhat.com>,
+	Mathieu Poirier <mathieu.poirier@linaro.org>,
+	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
+	Haixu Cui <quic_haixcui@quicinc.com>,
+	Raphael Norwitz <rnorwitz@nvidia.com>,
+	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>,
+	=?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>,
+	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
+	Milan Zamazal <mzamazal@redhat.com>,
+	Dmitry Osipenko <dmitry.osipenko@collabora.com>,
+	qemu-block@nongnu.org, virtio-fs@lists.linux.dev,
+	"Gonglei (Arei)" <arei.gonglei@huawei.com>,
+	zhenwei pi <zhenwei.pi@linux.dev>,
+	Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>,
+	Eric Blake <eblake@redhat.com>,
+	Markus Armbruster <armbru@redhat.com>,
+	Jason Wang <jasowangio@gmail.com>, Peter Xu <peterx@redhat.com>,
+	Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>,
+	Alyssa Ross <hi@alyssa.is>,
+	Demi Marie Obenour <demiobenour@gmail.com>
+Subject: Re: [PATCH RFC 00/15] vhost-user: isolated memory
+Message-ID: <20260727182324.GA371693@fedora>
+References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
+ <a45f108c-f897-40b7-a996-9e55150c09c8@rsg.ci.i.u-tokyo.ac.jp>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH v4 0/6] vhost-user-blk: fix compatibility with older qemu
- versions
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: qemu-devel@nongnu.org, Jason Wang <jasowangio@gmail.com>,
- Milan Zamazal <mzamazal@redhat.com>, Hanna Reitz <hreitz@redhat.com>,
- Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
- zhenwei pi <zhenwei.pi@linux.dev>, Stefan Hajnoczi <stefanha@redhat.com>,
- "Gonglei (Arei)" <arei.gonglei@huawei.com>,
- Stefano Garzarella <sgarzare@redhat.com>, Kevin Wolf <kwolf@redhat.com>,
- virtio-fs@lists.linux.dev, Jason Wang <jasowang@redhat.com>,
- "yc-core@yandex-team.ru" <yc-core@yandex-team.ru>, qemu-block@nongnu.org,
- Raphael Norwitz <rnorwitz@nvidia.com>,
- Pierrick Bouvier <pierrick.bouvier@oss.qualcomm.com>,
- Pierrick Bouvier <pierrick.bouvier@linaro.org>,
- =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
- Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>
-References: <20260702091023.3306378-1-dtalexundeer@yandex-team.ru>
- <d95a174d-83ec-4bc0-ac5f-46628262bd0a@yandex-team.ru>
- <20260725011415-mutt-send-email-mst@kernel.org>
-Content-Language: en-US
-From: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
-In-Reply-To: <20260725011415-mutt-send-email-mst@kernel.org>
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="7gZyb6NXvQiWaoF9"
+Content-Disposition: inline
+In-Reply-To: <a45f108c-f897-40b7-a996-9e55150c09c8@rsg.ci.i.u-tokyo.ac.jp>
+X-Scanned-By: MIMEDefang 3.4.1 on 10.30.177.4
 
+--7gZyb6NXvQiWaoF9
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-On 7/25/26 10:32, Michael S. Tsirkin wrote:
-> On Thu, Jul 16, 2026 at 12:30:33PM +0500, Alexandr Moshkov wrote:
->> Ping :)
-Thanks for reply!
->
-> I don't know what to do with this one. IIUC in flight migration is in 11.0
-> so I doubt we can just introduce new messages without a protocol flag.
+On Sat, Jul 25, 2026 at 12:45:08PM +0900, Akihiko Odaki wrote:
+> I also hope this could fix vhost-user for TCG:
+> https://gitlab.com/qemu-project/qemu/-/work_items/2092
+>=20
+> Perhaps the memory isolation should be enabled by default for TCG.
 
-The original plan was to push this series before the 11.0 release, using 
-the existing VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT flag - since 
-the new message is a direct extension of that feature.
-Now I agree that we need a separate protocol feature flag (like 
-VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN) for new 
-GET_VRING_BASE_SKIP_DRAIN message.
+If I understand the bug correctly, TCG needs the dirty bitmap to be
+up-to-date and vhost-user's dirty logging mechanism does not suffice.
+Memory isolation would keep the dirty bitmap up-to-date but copying data
+between guest RAM and the isolated memory would add overhead.
 
->
-> It says fix compatibility but really it's a feature, right?
-I called it a "fix" because I saw missing migration compatibility as a 
-deficiency, but from protocol perspective its more like "feature" - 
-you're right. I'll update the subject.
->
-> And this is somehow related to GET_BASE?
-Yes, GET_VRING_BASE_SKIP_DRAIN is a variant of GET_VRING_BASE - it stops 
-the vring the same way, but tells the backend to immediately suspend 
-in-flight I/O, rather than wait for it to complete.
->
-> Half the commits here have no or a single line of comment, those that
-> do, repeat what the commit does instead of explaining why.
->
-> That's not how it should be.
->
-> Here's a good template to use:
->
-> Currently .... This is a problem because ... We can not do .... because
-> ... To address .... And then ....
-Agreed, the descriptions are poor. I'll rewrite them following your 
-template. Thanks!
->
-> HTH
->
+For the TCG use case it should be possible to use just
+vhost-shadow-virtqueue.c without isolated memory so that
+vhost_svq_flush() -> virtqueue_fill() -> virtqueue_unmap_sg() ->
+dma_memory_unmap() keeps the dirty bitmap updated. There is still an
+overhead because the virtqueue kick/call is intercepted by QEMU, but
+there is no memcpy.
+
+The TCG use case is something that could be tackled once memory
+isolation is finished. If no one has time to implement the pure svq
+solution for TCG, then memory isolation could be used in any case.
+
+Stefan
+
+--7gZyb6NXvQiWaoF9
+Content-Type: application/pgp-signature; name=signature.asc
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCgAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmpnohwACgkQnKSrs4Gr
+c8jIxQgAuhwfSxCzUAdPtmkhQFxI+8GOr3btP712SYvxsAHGWWd4zJ53QTx8uue5
+ElpE2sc3AGz1CX++E+AcyrOI2Ut1wnsiAF42M3Zx5eHfpi7X4MEjf2uDUcxcAiEb
+RMjgfDl7gOBll5xnICbtouc3N+5PL9KyFXhLV4/kVsS8EamcCfO+X+N82jDxVhFG
+gDUUuBWNk2kqla8RffqOO63ccVkWTDwUYnfWWBAC+urVi8E+QGh8RgnW6NS0hXPU
+ElgGeB0pRrbfow60Rbd8tQxeF3mLifE3dd9AJTonR7Ivf3CrSvhv7EgdOCiczEQr
+Sx+vK5c7gHAJizeupduM8aZCfV9S2g==
+=3WQy
+-----END PGP SIGNATURE-----
+
+--7gZyb6NXvQiWaoF9--
+

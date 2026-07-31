@@ -1,82 +1,82 @@
-Received: from mail-qt1-f182.google.com (mail-qt1-f182.google.com [209.85.160.182])
+Received: from mail-qk1-f178.google.com (mail-qk1-f178.google.com [209.85.222.178])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id D13A73CDBBD
-	for <virtio-fs@lists.linux.dev>; Thu, 30 Jul 2026 21:28:35 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.182
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 14B332E7384
+	for <virtio-fs@lists.linux.dev>; Fri, 31 Jul 2026 00:52:03 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.222.178
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785446918; cv=pass; b=EGl9hfP50EvJMkW/7sFIkIUTY/wecoYE58mZOyCVRkfJ6qKiSCjVNUj89gwfr6ovQmOWvpqUlvu82wAVJnzQTmn40N3ffGTacd1++7t+C0Gu2XQ3GT/J2lIRt6l9NRdgRTw8KXrva+lrX+sxHiMqNx20Li21MUZT3/WOcaDXUbs=
+	t=1785459125; cv=pass; b=TLGy4yZ+IH5vTjZ1srs7f4uhKlmf4VKnd+5/KPErzjy9hjOL9Ohbzlk0hF1yKB+8M7tkE9dMHQLaqf41EfCmw/eLHWp/ceo3fD2BqaBHz651wEPgigjqbStOH2NCx2aMhWL+skTjjp9wClvkP1BJjNocThJgmYTN7zKYSatASmw=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785446918; c=relaxed/simple;
-	bh=ICsiHyGi4ddk32IDh6/2Ix77mm5g4eDlHXegf8TDsho=;
+	s=arc-20240116; t=1785459125; c=relaxed/simple;
+	bh=OCufJAKP0o8ko4L+o+cbyDbnsK8ugHfbZWTCLS/3Jag=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=ZEP0FEh+2YlsPbD4NUc+MK/96Q8URVMmkrMVu7y8xoMffU/ZLb9mZL/Hv2TypPSpMyxZq/mIA18RMwnkYc0zeVSKmAf0u6jOGQeoDpryALKOJw1lzFnI0ZrpqEJwU821v0IznInOzOxfFzYGeEBmDaPpLhG+pTYVIwUoEYRtyBk=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=n8E6SEnA; arc=pass smtp.client-ip=209.85.160.182
+	 To:Cc:Content-Type; b=gtzITl9f4S7avWvrPmsaDgOdnnPC6kxa8in6Q7xmzfIg+CyO/OYl0Ie1v4BiW4jvL77GHQkQRvyM1ZWGvVOAgabf5gQ07HudXPdmll4ipeF4XvwFaoor19S9QOgg4dAW2skteA41kkQYfKGM+BYdrnQ+qEMDJ+b3beWTVs2zBMI=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=YDLrLFmL; arc=pass smtp.client-ip=209.85.222.178
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="n8E6SEnA"
-Received: by mail-qt1-f182.google.com with SMTP id d75a77b69052e-51bfad59921so1670961cf.0
-        for <virtio-fs@lists.linux.dev>; Thu, 30 Jul 2026 14:28:34 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1785446911; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="YDLrLFmL"
+Received: by mail-qk1-f178.google.com with SMTP id af79cd13be357-934956bee57so9471685a.2
+        for <virtio-fs@lists.linux.dev>; Thu, 30 Jul 2026 17:52:03 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1785459123; cv=none;
         d=google.com; s=arc-20260327;
-        b=hcLqTjwDq5Q4GK5YlAMSP66++MAhd3oja4KckR0cnfE/fdWuvSW15OBwYBE7idtkce
-         K6zGQmmei3kMu9D/VIbDjP7un2ZiqVWP+H+t0K49ODiAB7Cu3E6uyOK9G1zfuCK2Fj1f
-         gj1yJjhRT5YIrqd01xM+pwhV/NO/NeQAN/j13tixsarm4/yWfUF4VBFjWov4LXycpODx
-         wIdxJkHRFyTZnPvECUDOUhAqpKIH/WprunAXz9Gg6qZqKmF2T83gyUhFNsEXy5aWVS1X
-         nCj8lV/LvTx2tlECYIqXU+pStLni7eOlye6+r7SiPmIZbK0PYk+k+Ub/f1cC9pV5tNwU
-         SiYw==
+        b=SiptyT/ZomVgd9pUUzCxgWL6j9c6uOwwlvLtOqW1rjKeVZqI6mAtNVwt/cib59OjFa
+         Vs/P5g1rRd07/Jz1HV0KgJireSEHlCwj1pTdG5YEK7nEwu+sagQ8bPyfo2MF74HC1R/E
+         +S85wZ24IKbUBwBjqNy10ynUOkPqKH5xsIJgigC2mzVTraKoFjMkPa844RTq/mCFOk/x
+         Sb990zMjVlzimTQjOa/2QhS5i1sxhfd/mR7koGZ8DqbzOx3hP2jdngxlwENDK+u8lsbA
+         LMth64yxj3fRJwk/cFyp92uP9gvtNrffNATYgJtRn6gs2YGGrS3LtPmmnN3b0pauP+lF
+         r9pg==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=8U5244hAigndAEdl7eLC13olLEushepCON12adQSRDs=;
-        fh=8Ez9ukQs8h3eafJaYDCVG7ykJtXSyhMW1tCexNFNNyA=;
-        b=U+xXKg7hkW71CxVibxKBv1hJ+jc/cJ5ueT+I6APWHfoo57BU/34jWyKtPgOxF5/267
-         8s9s0GZafaGfyECBmBCzmnHcG7wkpyxZTPSiwxyM185yNr19LjqykQ9TYGnHbfgxPYV3
-         2bjVX0rY0Q55ErpeaqC7MRUJnZd43nhU/rZpD7w8cEpstrjMmHLlczd5L6hFA43zibkk
-         1CUmtueJ9NKO3RO2kWaNojJJrKfzxkP0vW7doOhE+4meV1BZLCvK3CoLmtk8ugTorRjl
-         cJsL/JYJDGGbr26+QNwPHp2Hv8rEosQrB54oxAmGJobjOB1EKK8fEv13tRpr+R0H7zmp
-         x2Dw==;
+        bh=vjMP6aJWfSUMo3nRh7FU/rwRMj+UFQIPHjMaWbFWddk=;
+        fh=bEQBthINHbLnSi5c2TViuKWgKyuYW0JEyS8Qhbzcs+Y=;
+        b=YjjoilNQT3Mm/2obBa0S5870W5YCYQ7lfwJnecGm/tP2IXOlxcpy94CfEUdFVnyuAV
+         28rfxFqr5eWK2JRJhNJyR2icmRNYD7+uR0AKfsfya+5t5J1PNjqExDxXTccoJBEMi5Sj
+         N+KE1hr5GWX5vW5MICDOycPBXR+r78f3bNyA0OeZ87GLlNxfIUZz6G2rXSD2Zj2xJc+i
+         N7LS7qXmLeLTU6zJ0OyntWQnPsE6+f2x9fIaPDD2Q8P+pqGfA7j1FBWSxoclP2v0l+Od
+         SbTnd//R1vUcqx39UZamlfuDiIBj3KdF3pTmCooeMC7ybzdCNrC+2bRE7U+XrtdRWpmd
+         z7hA==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1785446911; x=1786051711; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1785459123; x=1786063923; darn=lists.linux.dev;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:from:to:cc:subject
          :date:message-id:reply-to:content-type;
-        bh=8U5244hAigndAEdl7eLC13olLEushepCON12adQSRDs=;
-        b=n8E6SEnAdaKi5CLmAobTYH3+pG5N5lZeUernYOWzEaupCMoiUcGjnFaeq+gtk70Q13
-         YzistsvlYvbYJJKzc82xT/pW3dNArX0zocS+dbvb4Vgdw4R3dT8bjfgEu0+zgW7+Mi25
-         6RvXitdL57ABziuaCqp3JSisDwH8QynJBszTOS23V8kuf2ZpT2C5Kq9fBACDKeKlqDTS
-         VThXfQjkP7elvHrw2WfEUqZpkQUNFrFcTWcHkWC+3+1RBtuyuORglSrnlJ5vfMB/SZDX
-         AkYKs14pTSIx/KQeKzJTsIVIS4Yl5w9PO7utcwXB2PDhe7rnv1/q5LLJdcpl/GFGXT8H
-         ySRA==
+        bh=vjMP6aJWfSUMo3nRh7FU/rwRMj+UFQIPHjMaWbFWddk=;
+        b=YDLrLFmLeFkUigagLl92GJTG1Ai9FeMhB47OPF99Lvi3kLmfT1Y7q1JGm5B7Vb/2os
+         bcBV3eKijth0cTwmD3L3FCDwETDOAAR9LkgI6DZhzaQ7iWieGercuw3oFcYPnu+0v8UB
+         T5FugAK7o0SjHHnAVwlwopq/I4EhB1H6YaytcH73F7Ysw3Wq9NxhBiFAE493U70xZYDW
+         muQyb2V3vg6RxM7ZtoJakmsEeuQUXj/DgxlO6n23YX5HRzsgEvmuM8K43zA3czjAVPlO
+         FrFkg1TSYW06Vgzo42CRIJkGP4pk8XMGattq4QEnsoyYjtTPfmjyqUiBxur0agkq7aR6
+         XIKg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785446911; x=1786051711;
+        d=1e100.net; s=20251104; t=1785459123; x=1786063923;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=8U5244hAigndAEdl7eLC13olLEushepCON12adQSRDs=;
-        b=Ouepyer3lPwrlqzuyU27WXJbqpt6Gvz84kKVn82nS7h5Jf6FmeCLDWsCltfCgggN1V
-         NWcN8Zz0eOq6UhhrBBD7YGjjYafsMCly9+sJO5r6vZQgL58GXzrNkzVSxMxMFSYflVQA
-         eBmAt11P5nLMUGgwd46zyAuV0dzj/N5Y396W5eVGrxFI0Ba+Yt+0aBUbTmNRAMUEbtJV
-         7GZjBSNvXtBr+KS8VZHwSl2pIi/YdaHYfOUmQcqQu0gOOM4njR/gBijiuDbrQnWUbnkn
-         N3R1vdKnTcWEtn5z1xMvSy16CgX1x9wipUbDEQP7ua3zT8Cmbijr0YrW2awF7w0+y4H1
-         1WLA==
-X-Forwarded-Encrypted: i=1; AHgh+RrfVqVp8SDbW9S82lk7arBMTcw6gW5mTA8NYb8ZYSNepLf881K0KXz6PWo4MbAXF2inwmm2TVAUEZY=@lists.linux.dev
-X-Gm-Message-State: AOJu0YzgBlbRhjb+++75KhJDFITicWGvJApbd0KPZ27LM8xlw9UXUTjv
-	zo/Elx8q42mLFG1jvS17SoCPvUrskVKHMKM9eWjAkz1rMWGs74KB0y4qSiHHHa6aE+PBrj/JkgO
-	ZtzanpGcZNaI+URWkJNSAqO8Hjk7BA3w=
-X-Gm-Gg: AR+sD13jR/yG39Yl59nRXHfeuqDCfeFA6dJSFSIPTzDecWlXvsb39OYYV78sbUXmHU4
-	QT7LYXTJKrQHYFWarUG9AiGFNxNVVpoiOzVs2zGx/WyM3kwJtnGZQEq5m9XW1HB5l6i8G5N7YpB
-	YPHF8lQnkle6tA/aprCvhaq+Uu5IqpZja3yI7EYdSKN2zWI24HrMvSPVzgAsgFsPdQsygUrnTDF
-	BEOiH/LbzdKM55soINIppE0MZXJeZEjhvwe2tnG2sRiZDP9BgSgW/pZLVLbfYhOKaDk9ut4zsYE
-	yuiGDJvJBrPWWt1SHL2Ssbx0k1lfqIuibhW9w27TJ8p8zYoIIdkLqS1VxMexkqM7oDUKW1RYvQ=
+        bh=vjMP6aJWfSUMo3nRh7FU/rwRMj+UFQIPHjMaWbFWddk=;
+        b=qB58S/1BP3jytHo3SK0voL+TUD8tmPD6QZVZPI3XzKmXqnpnLbjmRsnFSPsRxGtOsB
+         u14j8W41El6Ae3zNteHYnzmV5N4P43JhePywmBZ1s9aql+FZLgx4I9Q/QnReZPYAfHGv
+         XXJqkhxQRtXDmZjc+PK0XxROZ26K76VOfHuZhmEUBwE5WGPbnHThkK0xUrHl0fgoDYcI
+         OB9etzrUt0O52zIDfgdfZBsmek8i2tSh9YjaGkjEZiFtKXfnZaLjwxRKTZIh+oEc+Huu
+         +jnLSItyoV1DQ7+2p2jCG4CzVCgbyGH3l9PVWc2TTqpUU994c65f/stsJNmD7oVWIdkf
+         oekg==
+X-Forwarded-Encrypted: i=1; AHgh+RroahkZiDfW0Owp7XEyhvqFmO8GjacGiKvFnBEaIf2NcwiRjE+a2IDh1ymF3Wfpc26f3y2sQqPzZqk=@lists.linux.dev
+X-Gm-Message-State: AOJu0YyPgstri5PBbmXPWPDFfAvfozgvDDOz9aYp6awOmQ0OuQ4GMYSt
+	E0IhzX4Wd2A5hoYdXr9Yg/J8j+ZxI7YW274KemQenREiGQbXfj6boXL/zift8n2ZdO2wVvojcF7
+	qWzV1eXRmXh50Iu8DkIcSijvK+U5FO+U=
+X-Gm-Gg: AR+sD13MWI0OHXRGZbNoKzeu7/OiF7iKvVIMr+ueMrttPghpKrgyXlHB5WDWs92ysqa
+	lXTrZiY03MgSk7kbLM/Pr6Ur6KQyCGDYSbeptqPmTF3ENOIuVeFafBOoS7H/FSJV/o+YmITt35z
+	oSU+WlY+07q3KOFi2JC/0X73DCZJaj75axrDm3hc6RRvO8rX8h6jUjBGOGv47/CieK5pnLMzEQP
+	5iJit3QnbQ7YlQiFtucbeVWNDWOcKPXaLRcLNaUY/R84cL/YI9wckOfEgGIV7KcdyQ4xiaQyX8t
+	/Uz0SP6Vhu2bf8wRwGwe6qOEomC2T3oGjnzqfhb4Ggx37KhyxnkhiHsbyvbmWM09UJnEB8V7WrE
 	=
-X-Received: by 2002:a05:622a:248b:b0:51c:f3:34e3 with SMTP id
- d75a77b69052e-52b3849c151mr47267131cf.28.1785446911402; Thu, 30 Jul 2026
- 14:28:31 -0700 (PDT)
+X-Received: by 2002:a05:620a:72cb:20b0:92d:54f4:dfd1 with SMTP id
+ af79cd13be357-9349684cb9cmr10355085a.54.1785459122886; Thu, 30 Jul 2026
+ 17:52:02 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -84,23 +84,23 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-5-6b97c439eb28@gmail.com> <20260727190604.GD371693@fedora>
-In-Reply-To: <20260727190604.GD371693@fedora>
+ <20260723-vhost-user-isolated-memory-v1-7-6b97c439eb28@gmail.com> <8f37b789-fd3f-43ef-b15e-ffd44381306b@rsg.ci.i.u-tokyo.ac.jp>
+In-Reply-To: <8f37b789-fd3f-43ef-b15e-ffd44381306b@rsg.ci.i.u-tokyo.ac.jp>
 From: Connor Kite <connorkite@gmail.com>
-Date: Thu, 30 Jul 2026 14:28:20 -0700
-X-Gm-Features: AUfX_mx1j5MBaUGOE6NKwGCPoRQwCG8zc56N5iSyDBsMPzBNCOI9mFAWQ7QJtrA
-Message-ID: <CA+spn3rAiRCs3KAL55-qCJVWzUX7p+riyLW2s_dqKmS+tbX4jg@mail.gmail.com>
-Subject: Re: [PATCH RFC 05/15] vhost-user: add memory_isolation to VhostUserState
-To: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Thu, 30 Jul 2026 17:51:51 -0700
+X-Gm-Features: AUfX_mz-tdw8KKJwuR6YxYh8n0iDqjLfDogIE8aFoWVKkljVevwfK-AQZ4XgUGc
+Message-ID: <CA+spn3qp_Le_Eym7-j5v8sjdE0i3TXw137oUZrHAnKUuJonr+Q@mail.gmail.com>
+Subject: Re: [PATCH RFC 07/15] hw/virtio: iova_tree_foreach wrapper
+To: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
 	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
 	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
 	Mathieu Poirier <mathieu.poirier@linaro.org>, 
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Haixu Cui <quic_haixcui@quicinc.com>, 
-	Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
+	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
+	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
 	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
 	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Milan Zamazal <mzamazal@redhat.com>, Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
+	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
 	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
 	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
 	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
@@ -110,46 +110,20 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Jul 24, 2026 at 4:09=E2=80=AFAM Akihiko Odaki
+On Fri, Jul 24, 2026 at 4:15=E2=80=AFAM Akihiko Odaki
 <odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
 >
-> The signature of the stub for !defined(CONFIG_VHOST_USER) is not
-> updated, breaking builds.
+> GTraverseFunc stops traversal on true, but this says false ends traversal=
+.
+>
+
+...
+
+>
+> Here is an extra blank line.
 >
 > Regards,
 > Akihiko Odaki
-
-Good catch!  I have fixed this in passt.c, which I believe is the only
-location affected.
-
-On Mon, Jul 27, 2026 at 12:06=E2=80=AFPM Stefan Hajnoczi <stefanha@redhat.c=
-om> wrote:
 >
-> On Thu, Jul 23, 2026 at 03:30:04PM -0700, Connor Kite wrote:
-> > @@ -73,12 +74,14 @@ typedef struct VhostUserState {
-> >      int memory_slots;
-> >      bool supports_config;
-> >      bool supports_inflight_migration;
-> > +    bool memory_isolation;
-> >  } VhostUserState;
-> >
-> >  /**
-> >   * vhost_user_init() - initialise shared vhost_user state
-> >   * @user: allocated area for storing shared state
-> >   * @chr: the chardev for the vhost socket
-> > + * @memory_isolation: disables device access to guest memory
->
-> "Device" is confusing because it has several meanings. "vhost-user
-> back-end" would be clearer.
->
-> "Disables" is also a little confusing because the vhost-user back-end
-> still needs to access guest memory somehow. Memory access cannot be
-> completely disabled. Something like "restricts vhost-user back-end
-> access to guest memory via bounce buffers" could be clearer, but it's up
-> to you. We probably don't want to repeat the full explanation in every
-> comment about memory isolation, so it's fine to omit the details as long
-> as there is user-facing documentation somewhere that explains what the
-> feature does.
 
-Perhaps for brevity it might make sense to say "@memory_isolation: restrict
-direct access to guest memory from back-end".
+Thanks!  I will fix both of these on the next rev.

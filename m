@@ -1,184 +1,160 @@
-Received: from mx0b-0031df01.pphosted.com (mx0b-0031df01.pphosted.com [205.220.180.131])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+Received: from mail-yx1-f44.google.com (mail-yx1-f44.google.com [74.125.224.44])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 0B4C321C173
-	for <virtio-fs@lists.linux.dev>; Fri, 31 Jul 2026 08:38:48 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=205.220.180.131
-ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785487130; cv=none; b=jV5cDcCNbqfC9QYczpMP8EdTljiMfVx0P97LxakBI+GEpYTqkZOfzWGZtX5rioaDnA/qTqaI3fa01+HC7gE0ugrY93pZicubR809JyZJfThgUbonJFb04TuaIMtSC1iib6ySAiWr9MyganlYnzsR740WG/5KrGsWmmFavSj+MzY=
-ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785487130; c=relaxed/simple;
-	bh=cM1vMKDFhsfQ/ca4UAwVAxnl8iYPdj/lsz9nZU+ZMxw=;
-	h=Message-ID:Date:MIME-Version:Subject:From:To:Cc:References:
-	 In-Reply-To:Content-Type; b=cOADp/keir8Wt/3o7v0qaJyyU2moizNDqg9WNvwcHz+/ppe1ACGzPH+0Dvyc5bN43+X343gLNbE/R8+ssoB8fD0iisAP6N8IMT/0Q2BvWSX6gYqBd+sfjjwb32rj4I5SMukvWMkDU8YGVcaspxTlOoyS0Tb7D3cWtxLQoCrOy6M=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=oss.qualcomm.com; spf=pass smtp.mailfrom=oss.qualcomm.com; dkim=pass (2048-bit key) header.d=qualcomm.com header.i=@qualcomm.com header.b=jTpG/z41; dkim=pass (2048-bit key) header.d=oss.qualcomm.com header.i=@oss.qualcomm.com header.b=I7tcYv1C; arc=none smtp.client-ip=205.220.180.131
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=oss.qualcomm.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=oss.qualcomm.com
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 552BE2367D3
+	for <virtio-fs@lists.linux.dev>; Fri, 31 Jul 2026 08:58:50 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=74.125.224.44
+ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1785488331; cv=pass; b=lPlFOKkGMBqtnbXQKUYmwBldmdUuKqfE0fivLUOfgSkG1ssJSl9lsE5fJh/T3fVCD1FC6uwbvFWFiH1JrKeu4BWrpFm0WoDUe4WxJQcYXgp1OwF79pcHpUUe6S4lXDoZZzSKq9o3xRLzvGHhH04PPUzJJBfpgOvZGcGjWzv8vQE=
+ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1785488331; c=relaxed/simple;
+	bh=72eKBA0P6vSBtAScSr+34vwqBF++/QInBQAbn70sHT0=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=tF3nmERN7VmgOWSPG6fPxAu0hCt9wC9bhSExrvioafJYS3zj5YNIyU/x38E0bH+1nL0qVVjRW15jnLzXOCy0gmTq7pABUYsexzxSFS1I/hR/rQum2pF9pCjDY9q/imzB9wSzrpeZ+B46kQJ1cB4ase2MGYAPzCIMBROpDbpdV+A=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=linaro.org; spf=pass smtp.mailfrom=linaro.org; dkim=pass (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b=ukaVqoE9; arc=pass smtp.client-ip=74.125.224.44
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=linaro.org
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=linaro.org
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=qualcomm.com header.i=@qualcomm.com header.b="jTpG/z41";
-	dkim=pass (2048-bit key) header.d=oss.qualcomm.com header.i=@oss.qualcomm.com header.b="I7tcYv1C"
-Received: from pps.filterd (m0279869.ppops.net [127.0.0.1])
-	by mx0a-0031df01.pphosted.com (8.18.1.11/8.18.1.11) with ESMTP id 66V7vYaM3672641
-	for <virtio-fs@lists.linux.dev>; Fri, 31 Jul 2026 08:38:47 GMT
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=qualcomm.com; h=
-	cc:content-transfer-encoding:content-type:date:from:in-reply-to
-	:message-id:mime-version:references:subject:to; s=qcppdkim1; bh=
-	ABDS/iSM2z3ur2dcISaciA5V68ezVpBH8EIj0tIo3dc=; b=jTpG/z41eqKwy3G2
-	1iSWgwy4loDZppiE4kmv8WtcUG6lDo/dLtSNNf2ZvVppxDkFb8EhKDRQ6Ovgfxp6
-	Hk3VRFPSoayNw1q6/rL7sjXRubnhptGRdjCCLuaHQoguN4DASPCEfZqLfXZ2SZRH
-	GC1pVM0c2VYsAiXMfbalkEmbMolQ/Pps+ca0CR+ZGbMzYa1hrRuS8Qp8eSumyzmE
-	8FVIu60djf5kPO8YXyqAEUcrxIS12Zgv/757QtuqGfdu7S5buBscPvINoxYnFAfJ
-	oQNIRYJZL5fIWTn0wOxg4bpVnnkY+7UFDHChXSPRU8JacHJvJ7z+cCn/xkDpKaP4
-	EDOUJw==
-Received: from mail-qk1-f200.google.com (mail-qk1-f200.google.com [209.85.222.200])
-	by mx0a-0031df01.pphosted.com (PPS) with ESMTPS id 4frpgk0ffh-1
-	(version=TLSv1.3 cipher=TLS_AES_128_GCM_SHA256 bits=128 verify=NOT)
-	for <virtio-fs@lists.linux.dev>; Fri, 31 Jul 2026 08:38:47 +0000 (GMT)
-Received: by mail-qk1-f200.google.com with SMTP id af79cd13be357-930f5da3467so70449285a.2
-        for <virtio-fs@lists.linux.dev>; Fri, 31 Jul 2026 01:38:47 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="ukaVqoE9"
+Received: by mail-yx1-f44.google.com with SMTP id 956f58d0204a3-66807ba2f0fso1010479d50.3
+        for <virtio-fs@lists.linux.dev>; Fri, 31 Jul 2026 01:58:50 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1785488329; cv=none;
+        d=google.com; s=arc-20260327;
+        b=L9RJn2D6f5vlAWX0e9vXjMAyQA6phdRWS/mvYsfDh7JhyqZnq8A1LbUvV+4N4Gd53i
+         tR9SdUkpxlzTamnjSzEmBs1tGyioydNtesD2esDiCAydsm0Aonv3A+/Wnr54svlsudWW
+         xeGFL+gFohetAC9e2hACsju46c9upe3xppwfV+JDfJ7eltGdaSCGi/83qzjvfRAUFF0a
+         WZb6bPQQ1kTEPZmIV7caHERSAcLNLmi7IfoHC5DPuDP0LSBgSqoGlNs0hji542XHpxMC
+         2MsVMW4xiYLRJvpz1MHgh9RxO0WjeJkgEx1FJbC5KOqu4U0B+Ra1kCkMiopSt6rwSVr7
+         zSyA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=cc:to:subject:message-id:date:from:in-reply-to:references
+         :mime-version:dkim-signature;
+        bh=cjzJ3LqOhhqUQuv3Ul2oRa8Rsc/LKEczqA8n96bIPVM=;
+        fh=hVWsXe94H/4jpFqb1z8MrKaEeMBUL+8Su8oUsndINJg=;
+        b=qTdIRW2LW2em58Sptipg1XUo2m0h2G6ShBuDV6j1rPkPLWEt+nf/uf53O0XeyRJG99
+         6L+gKHJFEbU147XSk4GUx6gr4BpJ41/syoRV38a8ySI7+yFtK/7LK/DDK/2wZdAQMD6v
+         gyR5QejmhtuhNWrNoFIdGbkot2yo9MgQhJfDBpM/HaiMeuZXcYffquFjner91Y2UDzCQ
+         ZwgH2K+LqhmmIadlUIprRryLebt5fd0PHUSUTwQDQmAI0GJh2qiAkdtOfzLIFJSmZ8ZV
+         hxIdU63FeceVLOy1uZbsQajfwhkYE7ECAXTzjBplVAeXJMmX0xYRvq7MmpkhkTQkHmTp
+         TEGg==;
+        darn=lists.linux.dev
+ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=oss.qualcomm.com; s=google; t=1785487127; x=1786091927; darn=lists.linux.dev;
-        h=content-transfer-encoding:content-type:in-reply-to:references:cc:to
-         :from:content-language:subject:user-agent:mime-version:date
-         :message-id:from:to:cc:subject:date:message-id:reply-to:content-type;
-        bh=ABDS/iSM2z3ur2dcISaciA5V68ezVpBH8EIj0tIo3dc=;
-        b=I7tcYv1CG2q5ZCLEcfptNuMwFjc1RR8MLJFyC9PiyXplfFUmcJUn8xdr5DHS/l8/FB
-         6AdwktVtzblndfMnOIRei391vU4CZ2Gms8266xDEeC2uSbtlXZVO4X2AfE1GeAHbXyMM
-         0TCim2v+f0taiasZt/N5Ag8vOxerjvUDwTdB58bqH6OjfJ4AmzpLBSRpzHwLnkoUeRfn
-         p0egKN2zLW/V3dZ804DdQOiThJ/lisBrbTFQujcrMyDxlSLD5pwaD0BUS5c+8VpLItVa
-         ZMPSFejL475JyTSor4/jT4/ZID4dQc1vAhAVKpb/ncOQJUN875hDuVqlMSZnfzxFwtI9
-         Tj+Q==
+        d=linaro.org; s=google; t=1785488329; x=1786093129; darn=lists.linux.dev;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=cjzJ3LqOhhqUQuv3Ul2oRa8Rsc/LKEczqA8n96bIPVM=;
+        b=ukaVqoE9iohtK9dHUwS6gPlYhRV425j0yCsoT6MI+sOtiAM94AmLDbQ1colXUpMGps
+         ZoYNYJU0Jn1OBOX0qJD17jh5lcR5kLE41bdIx356g78UsBIOGmj9diTlQfVNjQA/suP+
+         gzmvT3z1cJEgx6kFnT1Jha2LOo0f+v5oGyEqlQT6X7sQF6l0XX7iuHq+2dwBjA4anpWE
+         kNI40gQtdT/ve8MQ9B9Iq6bruMHWkWH82W00LUtQB/BtDXIxfM/+tAzQok+bWFLJGUef
+         xJhEuQpjkUrBnR/MP4zgzWK2T+nab72U5QE6LWWhEqJeugY9yZZv5qQXOzKIRKQyjV0D
+         Vu+w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785487127; x=1786091927;
-        h=content-transfer-encoding:content-type:in-reply-to:references:cc:to
-         :from:content-language:subject:user-agent:mime-version:date
-         :message-id:x-gm-gg:x-gm-message-state:from:to:cc:subject:date
-         :message-id:reply-to:content-type;
-        bh=ABDS/iSM2z3ur2dcISaciA5V68ezVpBH8EIj0tIo3dc=;
-        b=LqAlVoFMBmxBqgrouaDrNHAA+51lUzQYcVhi8floeh/qM84GYxgxhTNDQLrzLCfBvb
-         be+pRM8rMr0GyFO/w5Rft+gNXUNNL3A2HeS2cg6oeuvY15x8OTlhK2ayacKr3q95eiRT
-         l2QmQALwoWlxNxZzuXiyDLZHu3er+F13a/WriYY7BU3qpQijKyPdW2mEaaOzhLcoEmiv
-         wAaR+mx8qnCtpqV6xmXiZ4sdGV5CvYeHsTS+cxeGIyzKxwrvXy0rKsMgEZtuGctMKvHd
-         HwdLa3B2x8x7gxjLq4r5xPyrgGc7/B9Q1M8c3oL2BEw29J6FbBzQkz86nxr19FI9aG82
-         SdBA==
-X-Forwarded-Encrypted: i=1; AHgh+Rpu1HhBwnHFE+tYmG7wfKjEMwXOvKH7JmA9bjm6J4TV9VTTTnZGJ+IQgrgg5aRiOU1nyx7hJD8UoPE=@lists.linux.dev
-X-Gm-Message-State: AOJu0YxBeRJkD8RbsTEiYV6AihrtJVQehzKuGHfX7N5kGGHKJTMXFOB9
-	vihUoz0DEVhiy0bQEtluGTlyJA6YIUTzgxFAdj+jMXYDFgnjXBtn9jMyvhsp5s4LhDLaV7B/lqX
-	5R40C8nYEqBsdTguSL3IZA688f5cZrkeIJXGWJXui9RfVH3bvdf2Tjmw7nV8nFTg=
-X-Gm-Gg: AR+sD116Mq57zkJq9DYEwXLNazB/Ai1GNAKaAGjsHSADGGuwk9lnA/IbsY/+21N8bBH
-	jRx4x2H1FPS3T4Y7GV15y2ntP0GQmX+9BSihvJvxfK08C5vvD7HYuNzDwg9ulWlCUKqqUKKlCkq
-	0uzNR1EPvsp4qWnLjwh4dbN/cbg/upick6kBI7+GOPwD4HSuJA8hYNkiRMzo/LqhCjRAkj15oY4
-	ZzNomllDliNA0WK7+mAUW9857VH+rh3TbAFEkTtuliYsfVs0Ewzu7Y7als1UqzDvLSe/JCImnCK
-	v0agD2SSOF2fWeNILmDvGfOxKN+kUleyfzNoYF8VuP/UGctGideDw4C0xihpgSLYG0jVcefqty/
-	fsHAq1jb/FYvqILZTdXvuOFsT1lpn0KweWmeCA8WTBSTkWwkN6+c=
-X-Received: by 2002:a05:622a:1f95:b0:528:3b9b:4f50 with SMTP id d75a77b69052e-52b4af40e91mr12931351cf.9.1785487127090;
-        Fri, 31 Jul 2026 01:38:47 -0700 (PDT)
-X-Received: by 2002:a05:622a:1f95:b0:528:3b9b:4f50 with SMTP id d75a77b69052e-52b4af40e91mr12931131cf.9.1785487126690;
-        Fri, 31 Jul 2026 01:38:46 -0700 (PDT)
-Received: from [192.168.69.212] (88-187-86-199.subs.proxad.net. [88.187.86.199])
-        by smtp.gmail.com with ESMTPSA id a640c23a62f3a-c1fd3c5b0efsm68261066b.10.2026.07.31.01.38.44
-        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Fri, 31 Jul 2026 01:38:45 -0700 (PDT)
-Message-ID: <b7a8f165-1d7a-4733-b8a1-1c90448dfcbe@oss.qualcomm.com>
-Date: Fri, 31 Jul 2026 10:38:43 +0200
+        d=1e100.net; s=20251104; t=1785488329; x=1786093129;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:x-gm-gg:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to:content-type;
+        bh=cjzJ3LqOhhqUQuv3Ul2oRa8Rsc/LKEczqA8n96bIPVM=;
+        b=qVTopz5VfE1LCWegMnGiP38ZYi42V+3+VQJBXu/eP/ittaOqwH/IE7u8pKEjWWkjqO
+         Y9sx4OsLaPVf4swX2c5ckh/0QzWmP/tHse28exzXHfeFlD5tiuTVG4eXN6WAtFHIhzhv
+         9T3q5LXojS2LAVVZ7a9o0evdnD8tNylh7ceFlGBSX8o7U1qy8MXHfFXpUWXTCR3ZzSDC
+         Rvp97cAMHBR7g+s45Zk/Mf9utbKD2JD545vrwMgZG/rTYX/QcuSeb/yc4h7++Nmlw2wa
+         +WCwvaS6/NBo6/phQahgQmYFG9DyK7wAjkztJVFwqnLWVgqEUswJI9mulfmXrnQM+Rdz
+         ozLA==
+X-Forwarded-Encrypted: i=1; AHgh+RqYUD+2wPvQJnMEai7tMnvzgekHEz4KRhMxqoX9pjwj9W2BuNOK+6+oXeMphXxqpYRjVYKmqjKnz3k=@lists.linux.dev
+X-Gm-Message-State: AOJu0YwGfhe+K+eiX0DXNIlwdE6IQexAKyB24eGrkn6WcN5MpTFSdQrb
+	7BeB77m7shWDDCkWsvS1uECANq2QNU1JsQheoQvBQetT/vq99KTnsyMAYj1ZipEybNCKF+LhbDN
+	hmEWByBI0hE4YUd9gwneO7vU2NruC2nmY6WyHrDXQJw==
+X-Gm-Gg: AR+sD11qrPh7Hc1ZGkELYKtzRrcahPq5CY2BgEwktYAKxC/NdSEg52BBpiGGDbbGL07
+	bWYTfv3mE+G+/D30/CFXoUQwImE35MwFV4NNU07Yvp2Rb1hUvabfhxHkO10Bz1iI7eBEywR6q8D
+	MIBdkqsE2gRinNMcD5uS1SUskicOYgSWy7JOxh4974uRsdNouJ4kQ6pljXS+E1HHPPbscPzaAVo
+	jf2sJYWtTpRVW/Q+Lr4ee/hRu4pr//syfN/pss37ZnGsdRxKO3/dghoHDkIok+N0yx2VoSDwpwW
+	v+ppP1HybnyzAgILlDXDI6jByl8tAWMnnEZx0U8b/yFg7caeVVw9zRlpsj4r9i0bfPXbgKyg6hK
+	TTQv02PZsXDQ7DywN2vCStUlZP7UQ
+X-Received: by 2002:a53:b45d:0:b0:668:2e46:41b5 with SMTP id
+ 956f58d0204a3-669454aac14mr548397d50.47.1785488329163; Fri, 31 Jul 2026
+ 01:58:49 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH v2 1/2] virtio: make virtio_add_queue() queue_size an
- unsigned int
-Content-Language: en-US
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=C3=A9?= <philmd@oss.qualcomm.com>
-To: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, Kevin Wolf <kwolf@redhat.com>,
-        =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
-        virtio-fs@lists.linux.dev, Hanna Reitz <hreitz@redhat.com>,
-        Gerd Hoffmann <kraxel@redhat.com>,
-        "Michael S. Tsirkin" <mst@redhat.com>,
-        Milan Zamazal <mzamazal@redhat.com>,
-        Christian Schoenebeck <qemu_oss@crudebyte.com>,
-        Dmitry Osipenko <dmitry.osipenko@collabora.com>,
-        =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>,
-        Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
-        Dorjoy Chowdhury <dorjoychy111@gmail.com>,
-        "Gonglei (Arei)" <arei.gonglei@huawei.com>,
-        Alexander Graf
- <graf@amazon.com>, Laurent Vivier <lvivier@redhat.com>,
-        Jason Wang <jasowangio@gmail.com>,
-        David Hildenbrand <david@kernel.org>,
-        Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
-        Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, qemu-block@nongnu.org,
-        Greg Kurz <groug@kaod.org>, Raphael Norwitz <rnorwitz@nvidia.com>,
-        Eric Auger <eric.auger@redhat.com>,
-        Stefano Garzarella
- <sgarzare@redhat.com>,
-        Kuan-Wei Chiu <visitorckw@gmail.com>, Amit Shah <amit@kernel.org>
-References: <20260730205846.19479-1-stefanha@redhat.com>
- <20260730205846.19479-2-stefanha@redhat.com>
- <eef9784f-5e68-4f1a-ba12-85ad4128116d@oss.qualcomm.com>
-In-Reply-To: <eef9784f-5e68-4f1a-ba12-85ad4128116d@oss.qualcomm.com>
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
-X-Proofpoint-ORIG-GUID: ExbYPmmivNMXsOFmo3gnogFtzF46pw8R
-X-Authority-Analysis: v=2.4 cv=P4sKQCAu c=1 sm=1 tr=0 ts=6a6c5f17 cx=c_pps
- a=hnmNkyzTK/kJ09Xio7VxxA==:117 a=4s3hRJSeHn4rkQlkrse1kQ==:17
- a=IkcTkHD0fZMA:10 a=RAioF0-LDSMA:10 a=M51BFTxLslgA:10 a=s4-Qcg_JpJYA:10
- a=VkNPw1HP01LnGYTKEx00:22 a=u7WPNUs3qKkmUXheDGA7:22 a=_glEPmIy2e8OvE2BGh3C:22
- a=20KFwNOVAAAA:8 a=hTGag2EiyIdp9CllqmUA:9 a=3ZKOabzyN94A:10 a=QEXdDO2ut3YA:10
- a=PEH46H7Ffwr30OY-TuGO:22
-X-Proofpoint-Spam-Info: AW1haW4tMjYwNzMxMDA2MiBTYWx0ZWRfX/1WQsx27AKlM
- SJVj3/n6DLeLkKYrzTnhrbwG9oYQlg8O9X8AWLMFenMDpGZlls5LylISEdwHqIqBK0qPLjWtANJ
- TTe2Wz0e/QpILiG7Cs6B3x/TqGDwaU8=
-X-Proofpoint-GUID: ExbYPmmivNMXsOFmo3gnogFtzF46pw8R
-X-Proofpoint-Spam-Details-Enc: AW1haW4tMjYwNzMxMDA2MiBTYWx0ZWRfX4s7hLwbPQ6p8
- zgxSXlpFOXThl9DobOD5+9q6hS+/nBeaNjtKbA6vsohjavMo4RoqXJG03FbwFqRcyTAW0AC/yJm
- vSbhjfT3glsBjvi7gYkQ3R69JWuhD/EUiC0qS4tKG0wxZAqK/9mv9EUTBWxBHqJ1sFU0z8LxxcQ
- qR2dJ7uXNZdVr3XE2YgG6PZ6pFbLxnL70N8EI9aN4i/HtcOe7LirDF633cV9lwji9rqeNQQtlhv
- oJGJYQPqOZsazMlBNkOC03kLzp6q9bElYc/B1BqVgCDkN1NzxKx9Qc2BvE90UJX2kyfeFD6eoFz
- VnsHdbRpgNewP2FNuCShQCviyzFlIkBkcA8QjfQPg3OUogSl/Gtp1zVdjVWpEqgp/NLajFpvQvl
- v335auO9TimT0Yix6p+bMrrHoEhFHeyTsQLlpRmNGj2XJuTrTBRKntgYr6vgebFvi8BxmKZk9uL
- cKvObDS6c7nQRdgzJ+Q==
-X-Proofpoint-Virus-Version: vendor=baseguard
- engine=ICAP:2.0.293,Aquarius:18.0.1143,Hydra:6.1.134,FMLib:17.12.100.49
- definitions=2026-07-31_03,2026-07-30_01,2025-10-01_01
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- clxscore=1011 suspectscore=0 malwarescore=0 adultscore=0 priorityscore=1501
- lowpriorityscore=0 phishscore=0 spamscore=0 impostorscore=0 bulkscore=0
- classifier=typeunknown authscore=0 authtc= authcc= route=outbound adjust=0
- reason=mlx scancount=1 engine=8.22.0-2606150000 definitions=main-2607310062
+References: <20260730205846.19479-1-stefanha@redhat.com> <20260730205846.19479-3-stefanha@redhat.com>
+In-Reply-To: <20260730205846.19479-3-stefanha@redhat.com>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Fri, 31 Jul 2026 09:58:36 +0100
+X-Gm-Features: AUfX_mxlzeSqCJD9cOWoq3g9Vs2ibL5edy5Gf9kCAY7YrqrYTBrtlQ6XwJUMXPM
+Message-ID: <CAFEAcA9Opun4GED3TGoJB-tDKFy=70raJxRK9gSSe7booz-vaQ@mail.gmail.com>
+Subject: Re: [PATCH v2 2/2] virtio: use Error for queue size validation in virtio_add_queue()
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: qemu-devel@nongnu.org, Kevin Wolf <kwolf@redhat.com>, 
+	=?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
+	virtio-fs@lists.linux.dev, Hanna Reitz <hreitz@redhat.com>, 
+	Gerd Hoffmann <kraxel@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
+	Christian Schoenebeck <qemu_oss@crudebyte.com>, Dmitry Osipenko <dmitry.osipenko@collabora.com>, 
+	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
+	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Dorjoy Chowdhury <dorjoychy111@gmail.com>, 
+	"Gonglei (Arei)" <arei.gonglei@huawei.com>, Alexander Graf <graf@amazon.com>, 
+	Laurent Vivier <lvivier@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
+	David Hildenbrand <david@kernel.org>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
+	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, qemu-block@nongnu.org, 
+	Greg Kurz <groug@kaod.org>, Raphael Norwitz <rnorwitz@nvidia.com>, Eric Auger <eric.auger@redhat.com>, 
+	Stefano Garzarella <sgarzare@redhat.com>, Kuan-Wei Chiu <visitorckw@gmail.com>, Amit Shah <amit@kernel.org>
+Content-Type: text/plain; charset="UTF-8"
 
-On 31/7/26 10:35, Philippe Mathieu-DaudÃ© wrote:
-> Hi Stefan,
-> 
-> On 30/7/26 22:58, Stefan Hajnoczi wrote:
->> virtio_add_queue()'s queue_size argument is a signed int. The
->> vdev->vq[i].vring.num and num_default fields are already declared as
->> unsigned int, so change the virtio_add_queue() argument's type for
->> consistency.
->>
->> A note on consistency: the VIRTIO specification defines queue size as an
->> unsigned 16-bit value.
-> 
-> Why not use uint16_t then?
+On Thu, 30 Jul 2026 at 21:59, Stefan Hajnoczi <stefanha@redhat.com> wrote:
+>
+> Coverity is unhappy with the code path where the x-override-queue-size
+> property value is passed to g_new0() since it is a signed int rather
+> than an unsigned int:
+>
+>       *** CID 1664271:         Error handling issues  (NEGATIVE_RETURNS)
+>       /builds/qemu-project/qemu/hw/virtio/virtio.c: 2595             in virtio_add_queue()
+>       2589         }
+>       2590
+>       2591         vdev->vq[i].vring.num = queue_size;
+>       2592         vdev->vq[i].vring.num_default = queue_size;
+>       2593         vdev->vq[i].vring.align = VIRTIO_PCI_VRING_ALIGN;
+>       2594         vdev->vq[i].handle_output = handle_output;
+>       >>>     CID 1664271:         Error handling issues  (NEGATIVE_RETURNS)
+>       >>>     "__n" is passed to a parameter that cannot be negative.
+>       2595         vdev->vq[i].used_elems = g_new0(VirtQueueElement, queue_size);
+>
+> Introduce an Error **errp argument to virtio_add_queue() and set it when
+> the queue_size argument or the x-override-queue-size property value are
+> invalid.
+>
+> At the moment none of the callers propagate the Error object. Instead
+> they are all modified to pass &error_abort so that the error message is
+> printed and the program terminates (it also terminated before). Further
+> work, especially in new device emulation code, could actually propagate
+> the Error object but is left for the future.
 
-(Otherwise size_t is more explicit for unsigned int size).
 
-> 
->> QEMU's device models variously use uint16_t,
->> uint32_t, and other unsigned types for queue size qdev properties.
->> virtio_add_queue() limits queue size to the much smaller
->> VIRTQUEUE_MAX_SIZE (1024) constant, so the different widths don't really
->> matter.
->>
->> I have checked that all callers of virtio_add_queue() pass an unsigned
->> queue size.
->>
->> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
->> ---
->>   include/hw/virtio/virtio.h | 2 +-
->>   hw/virtio/virtio.c         | 2 +-
->>   2 files changed, 2 insertions(+), 2 deletions(-)
 
+> diff --git a/hw/scsi/virtio-scsi.c b/hw/scsi/virtio-scsi.c
+> index bf64d1231a8..4045414cd2f 100644
+> --- a/hw/scsi/virtio-scsi.c
+> +++ b/hw/scsi/virtio-scsi.c
+> @@ -1317,10 +1317,13 @@ void virtio_scsi_common_realize(DeviceState *dev,
+>      s->sense_size = VIRTIO_SCSI_SENSE_DEFAULT_SIZE;
+>      s->cdb_size = VIRTIO_SCSI_CDB_DEFAULT_SIZE;
+>
+> -    s->ctrl_vq = virtio_add_queue(vdev, s->conf.virtqueue_size, ctrl);
+> -    s->event_vq = virtio_add_queue(vdev, s->conf.virtqueue_size, evt);
+> +    s->ctrl_vq = virtio_add_queue(vdev, s->conf.virtqueue_size, ctrl,
+> +                                  &error_abort);
+> +    s->event_vq = virtio_add_queue(vdev, s->conf.virtqueue_size, evt,
+> +                                   &error_abort);
+
+The virtqueue_size here is user-settable via the device property,
+and the realize function only checks that it is at least 2, not
+for any upper bound. So this one at least ought ideally to be
+propagating the error up. Still, this is no worse than the
+previous situation, where we abort() inside virtio_add_queue().
+
+thanks
+-- PMM

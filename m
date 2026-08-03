@@ -1,82 +1,82 @@
-Received: from mail-qk1-f177.google.com (mail-qk1-f177.google.com [209.85.222.177])
+Received: from mail-qt1-f178.google.com (mail-qt1-f178.google.com [209.85.160.178])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 2EA2F43AB0
-	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 18:26:43 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.222.177
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 44EA3436BFE
+	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 19:31:48 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.178
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785781604; cv=pass; b=ENN/8zOMe4s3y1fdKLQe9hsvz7W+LI5L9RoT1iMyY7FUSqSjqojQcJbVctQ/j30i0RBzQOBYFRv1BNw6I1Zdlca+i4YJ6xq4v7LxnBzhRhUb561DFYmP9HfabOeK+cB6OJ2H3WLs5j4OlNPZDRACIpyssUxlvQaVyQgt6IzQffw=
+	t=1785785509; cv=pass; b=Q+tUcISvCLTPijdpK0TJmWWPkvdCuS2i7Y+d9f/MB/fXC1d+CMTFncgtx1vAJmiDwf2/55qVgEIzQtBV5l15ao06ZEF89xCMcWkjMiAFievBgkIE+oTxzssjYnl6wmnI3jZ5DUsW0YKT/eBZp61AcxvgQMxLyPZ/SqDNYBtUUPw=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785781604; c=relaxed/simple;
-	bh=Xxdaz53LHhg8uTBJsKG9buYcTEEGlM4bzfaRSwkPp/M=;
+	s=arc-20240116; t=1785785509; c=relaxed/simple;
+	bh=VtVE4LCWMgW51okMBDbPQTy1PkmzVB+pQ/taQuKWnzc=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=ksTTjjhy0TMI4bHFOTBCNRanqfXcbBV1NPb71HkFra/RV1HU/ljXlMGn29giOuNfQtfxkKx03Afv2LGvSFn2kLqlyvnQD5nTAkzBPDxxC7jj1RC/c9jAvKqEYEHva6QJZJkvmUujXsWAYa+kodC5kzRi5cf4xrDRseGEQO3BQ0I=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=aM1IMe6k; arc=pass smtp.client-ip=209.85.222.177
+	 To:Cc:Content-Type; b=CKjegQXMzaScPssEPLfmdeesIe6R3LwTmR8wAA573ewhikCkb7PVPuFsjidFxjK6MHP63M/ZVULtgxcy5TyVpibfx3Vzuh2N2KEk/6szhH14tgkmIIKDkYVZqKPJBDl7GEAY7oldf08Eih4VF4g6oLEOt07opJTNVOmg/MkOv5U=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=rrFqfJil; arc=pass smtp.client-ip=209.85.160.178
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aM1IMe6k"
-Received: by mail-qk1-f177.google.com with SMTP id af79cd13be357-93108a3c326so12471585a.1
-        for <virtio-fs@lists.linux.dev>; Mon, 03 Aug 2026 11:26:42 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1785781602; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rrFqfJil"
+Received: by mail-qt1-f178.google.com with SMTP id d75a77b69052e-5276d598b96so18130291cf.3
+        for <virtio-fs@lists.linux.dev>; Mon, 03 Aug 2026 12:31:48 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1785785507; cv=none;
         d=google.com; s=arc-20260327;
-        b=Rrxi28TBSjPtpsA+W66dqdfDjXBJBso4BRbH56wZrw82YacBJBeeYWzE5EUsVxpeJL
-         jANDulmyn9hmDiBLzGvGbeFgd/mijgKO+EAhGRkpLTQ9EYmQHtEpGVim+oQ5G1VmHCvo
-         43V8aIvRkR8nDrUbEH4JvTFR6VOnR81zZyzmyKKZVSd5qR+w5k/QiA/GDtkmcQT6BlTd
-         Gca1natddd859Jlmg/O+0NAR9OID74CNfpZMuUna6gBeqPIJVFL/z5DhJWg06isLAQa0
-         H84UgsfIG8I5THkSXtHxXeLjBHC/pfslfHQ6OTgvgdCcsw8dbNtrfCeQBDFti3DlXJv6
-         88aw==
+        b=HofrxgSYFWjCP4Psky3+bwQCapnfE8ZZAwPLoh7f6B2baaPVd6xqvIu9dQgypw3KXi
+         IwzIvH+3JGxRkQqH+sPnz8AUsI4oEIPitn8HDSa4pBPgMQDI4rIzs/sia3Dwlu9c2dI+
+         dfJieQoBdSHaSo/MRZ0dAobWbcCnCPGXE7MbXHlcA3FZ6ehRBYQqGB8nKo5BspPZiCcx
+         JYHUxoHZuCtCIzweFzXCY8iaUxLpQnWGShJXXQgkLcHdSt5uHQ4ksGR8PAn6DtlMM33B
+         oe/mfF9A6G899ESCzbUXGr1XCvJZP5o0hXLpqcO+gZjyJKGCj3vpIup1pIecB9qDX6nB
+         B13A==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=cU2cx1htDUJjTg39cgrGf62olsMzxqfpRXt77GHEV1A=;
-        fh=MRn1TyCtcmR4TZK40YA0UlfJ2dcsx818B/I39NQE7ls=;
-        b=l0XcNiWcrcd0g1TaLs9jQeraVig1Ksk73j/D+jMDOaY1NvD8lWBRJiSecjV7+gmiqw
-         hb0G1e9pZoYGTcAumJ9yOnfjtdeZpMAEm9T3A49LjDzNJ9QYaGGYxfYwJUAqooT0u+2i
-         pTJ4ceVTAneX+3zCt569TiQaOzavBDhAPjg/bywW1yPenaZquQRKr7RoVKCObP0Awt1D
-         YVvw9rlriQygK047lbcLH9uff9I2O3TkvGJXXJx8IwnlGioKANMg62OMvJEMhAoKjxeI
-         f3Q2GdHpSylusUBIPSEVFmHo6BsaYUVpEL9vzAG+njMX2r9JS/45osM9AOaNkQtrva6E
-         KM4g==;
+        bh=reTpUjcJUOBcUsyKejOdhRFAmR5n8lMWUzjI4+Z01tU=;
+        fh=d3BogjwYiOh44bT8vVMMEIcLfXkHHHbPPTM700Rmz34=;
+        b=WRQsrVzQG3La8p3RIJcpx83WMvHfXPHo8yHssaEthM9HLxrkctCOSHgvE3ZIJuS0wX
+         /hYJ1yIHCtXmnyMAzRTbxwcCJ0qkOW+NQciwYAaSdjpj7rhVOrXPpKq19kw4bPQEAcLw
+         sDrkl7DBpFGkkoUG6l5bf1P81WrhMPxGxoRuhpuGtTf0wG5YXdJpCGEmUmYukVAQoBfN
+         VYIFYxsxnNH21gah4JTKvkq7/eHSA+ZyLuOAbu+J97P7fF5uqAcqMN6QJWAiflRNoyor
+         SdhauUoZc+qFtNL3MZJ4iMEa+WL80vXghBjc4fiqKIOMdZqGs3NgcHSlHatMoH8X8BCv
+         kJzA==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1785781602; x=1786386402; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1785785507; x=1786390307; darn=lists.linux.dev;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:from:to:cc:subject
          :date:message-id:reply-to:content-type;
-        bh=cU2cx1htDUJjTg39cgrGf62olsMzxqfpRXt77GHEV1A=;
-        b=aM1IMe6kKZYUnxwJyJBAHEy8vw/hNtGnHiv+s7aLx54dHrcly8kyz46ZRca+YFjgYd
-         FRxxBDEIytnEyDjS/OnZnsI6ueMRnoVkzDtHtSOh0lPnfw0EtA+uHzbPGJryG4dQT5Sd
-         o2Bn9aEvZUhe6aISIP7GsUPgQDXD2u8jiOo/uRcXq+6rAQdJX9370FUc4vTahlsdQb17
-         x7SHkevs6UFiXKbocRmCnfl9FWku3rhFQzrv8W+P5VnY+rjN43FOdgDzEI0M5aw75Bdx
-         1+MuqZ6OCbYgrfyi1MNurJ5+qcKRejh527HDKPWWx47Rg61j4sxlNNDqq5Tn1Rm54Q8V
-         /qYw==
+        bh=reTpUjcJUOBcUsyKejOdhRFAmR5n8lMWUzjI4+Z01tU=;
+        b=rrFqfJilVWqMtJODAgH+efMQFljVYLrdTh1DzuS4AUA8XpWXR4+082sMBL3gTtZl3r
+         NK9NFDlo+6Va0tm1CMcjEDFyM3oiGNiEVnDLyqa+Ui1aDxJStiAEQDu4DFud9bBVWZKK
+         b3UVwodS1smI8Poz379nxa6tavf5P1XJE3F69TFZ4pgWiWyS+t+nBbGItMfR6rKLktmv
+         xhqcq8ZDGGsd9bAlIQFAfqoFG23J82sOOfur888bhTFV2jTBVocY3Ydywe1Yq172MC4Y
+         SAeITLq0kcGlhX3ClIECBX7/LxYV4Gh178NdilW+1tnQTbxhF1q50LMv8JnkJAZRYKbo
+         Xx9Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785781602; x=1786386402;
+        d=1e100.net; s=20251104; t=1785785507; x=1786390307;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=cU2cx1htDUJjTg39cgrGf62olsMzxqfpRXt77GHEV1A=;
-        b=ZAOi9ljthhEzSNROvc8h8KUWvH+h2uieGdRHBUUjIRzE0FbSW0N823E2vCZ+9CyW1J
-         q0iou1qq42YFxLjmRmRIA9y9IeN+wrPFFpkU39ckd72w89daiVRXNZMie6GKPyjkF6Mb
-         /ysodfJCYVs+89o5LkfPuaaUQxjtFVUBxtYfsNqP+bDBNND/Dq+qH1DrRDElLtaq2NwH
-         2ny/rKBgZZzle7mNqwao5y4kq1tibiCF9/8U6hsmVROON16aoA6RV8ZXEjONIbH1fWF+
-         jgdZSyPN/BQi6RN9mocXnLbB6PgZXD1K6m3dBH3f1y75vfsw2m8TZUKkTc5p6SY0BTg1
-         xrLg==
-X-Forwarded-Encrypted: i=1; AHgh+RqRZOyPE9jGyxyQ3PJiGZSZzlTGqPXQH57U2cYjUiLNgWtJwWPxFBY95+NJ2MSu2DoC15LO8k7OB0E=@lists.linux.dev
-X-Gm-Message-State: AOJu0Ywcz86Vp1DLbR3uNVBj/uVY7Ha11HjqZfFIcZysKvp+02bnsC56
-	tQrgaiIo+6lVOv6ZTM47uMZ57WCCpXON4tXo6bOAm6e6lXO+duTmG5q/XN3eRDM/SvLVHIBXiQp
-	hOhTVWB3QHj4mqUKZqjH+jhmohmm11J4=
-X-Gm-Gg: AR+sD12oerJHTnMaP39XeOm87vOu4rcw2CMeGpg2r0XxOiYKzlwjU0l+QjhmpvoJ573
-	jIyJbwpR17WLSqTAKwGr14/R3MpoErDcJCTjIy4ZxATz96QjiHVj8VMhCAOOzLajutZuACLmujH
-	CYcB2EDia25gnytjBEkkGgPDyAmHL13OzcLr4kXbMbHO0YwwrA1Bjk10Ash2K6NGDcx5g+6esG6
-	UJPllhyHops1acCmHeDpQognKbhli/vkf3EE6E8NTOJvE3/IE5pEjSEB4+ByOOzZzk/LzLYOXep
-	zJZy0pQjlkDiyzzgmLvWsb14A5pY0hosqm89UvflFWGIO4ZmKS6LghX4iRO/XQtysuLq6wZ4lqp
-	e
-X-Received: by 2002:a05:622a:5a13:b0:517:146d:2cb5 with SMTP id
- d75a77b69052e-52cd35f7718mr14076591cf.20.1785781601773; Mon, 03 Aug 2026
- 11:26:41 -0700 (PDT)
+        bh=reTpUjcJUOBcUsyKejOdhRFAmR5n8lMWUzjI4+Z01tU=;
+        b=RIps44pB/XCfzujLDrXhLBwcUGJaEm1DHFUrkGQsVYoMB7OKHVZlSM/n4uFI93iw6g
+         p3d2ZkiI85CqcyUIshEB8oz4mGn9ocukvvYsk7M2552kZVCWLMm+CswPmlSe0HInFCpm
+         2i7kCg7pBZMq0WFIz7c7zfEC0oy0Au5EdDEGfEjYnPS578awftxKFglpFt+28u4THO/P
+         cIn05XzgT3VCzDqCIeGyEXSAXr5fWKL+kepJzNkenwx9AQCcrDt7PuLhsJ6ZBd+KRGOd
+         axcuGLKI0tkzcJJt7cI4YkIqsxY0IsDDKY+RAh2bAc/pbR3vH9I22WlSZYblDJK/RzDp
+         bKLA==
+X-Forwarded-Encrypted: i=1; AHgh+RqmVNOelZz9RzEhMy7Kvtzk7OSt2Z5aHZr41TR83CpT7EbGSfQYhk9XJjibQvK3/hAHNaeqeaYDmjg=@lists.linux.dev
+X-Gm-Message-State: AOJu0YxMp5PknrNq003cvzyOLSMjRT5jt4hea/BtMdsxbvmm0K9/r4O2
+	7V8okA+NRbhUONDRPmqPcJJ/M1pqGtC7U3VhToJzqlODLhjU1QhANliHaanK4MspN+Y72uAVnaV
+	w5WvHSn3sOfSSG6Jvg3stLjan5VY22f8=
+X-Gm-Gg: AR+sD11cP2oVAurTu8nR8F9RNAny0cBo2xYvhkCLt3Kmk0uxgqC7YNDVI2zS8Pg1miS
+	t5Kj4SJmtKKuKCLHx5hqTyBH+QU72U006VRxxwanMzQF/Fz6tmfu7214ytw5qHPcygIkL7efK94
+	Q6DTGUPsQ37fu6kzGoUxv4yu+i/GHVTe4eFJO6R/T8zunERpRUIg389ZVqWhKze2o3o8HfuWRMo
+	S7gKjNjm3F1Ej6WnYo1frrW8H3exsxHMI5bD1vcHdahWMT5IN/FEmeJ82eH2elDi4kaPQCCr/+H
+	Xxowt1O+5t7Ayv3XYawZAe4prrgSA+ZJmmQTR5885CH/j5imnW9j4RPXxCoJcUBID1u8XnNIj/s
+	9
+X-Received: by 2002:ac8:5ad5:0:b0:51c:2554:a8f5 with SMTP id
+ d75a77b69052e-52b56813005mr228935771cf.36.1785785506969; Mon, 03 Aug 2026
+ 12:31:46 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -84,23 +84,24 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-11-6b97c439eb28@gmail.com> <20260728175931.GI371693@fedora>
-In-Reply-To: <20260728175931.GI371693@fedora>
+ <20260723-vhost-user-isolated-memory-v1-11-6b97c439eb28@gmail.com> <b6bc052c-1bf5-449b-85d0-e1c4624a5d99@redhat.com>
+In-Reply-To: <b6bc052c-1bf5-449b-85d0-e1c4624a5d99@redhat.com>
 From: Connor Kite <connorkite@gmail.com>
-Date: Mon, 3 Aug 2026 11:26:29 -0700
-X-Gm-Features: AUfX_mw627TW1QIKX7ZVVWRqH-pVbRrnDnqjVkySiArQktWAgdvKFLa79MaLLGU
-Message-ID: <CA+spn3qkZ-2=4q2nn_6-wp85U4Xv3oaDAmCHEP_yB=N4aZSceg@mail.gmail.com>
+Date: Mon, 3 Aug 2026 12:31:35 -0700
+X-Gm-Features: AUfX_mwStaeATOZ2UGNu4P-9Q3C3gPXR9qo0n3vpFD4fsPxrpxYjrIQqimituZo
+Message-ID: <CA+spn3r9X4WST1c4LYS63xN0EFogkD1dJ6P4omk7ndMDeF9D5Q@mail.gmail.com>
 Subject: Re: [PATCH RFC 11/15] hw/virtio/vhost-user: create isolation region
-To: Stefan Hajnoczi <stefanha@redhat.com>
+To: Hanna Czenczek <hreitz@redhat.com>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
 	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
 	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
 	Mathieu Poirier <mathieu.poirier@linaro.org>, 
 	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Haixu Cui <quic_haixcui@quicinc.com>, 
-	Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
+	Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>, 
 	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
 	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Milan Zamazal <mzamazal@redhat.com>, Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
+	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
+	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
 	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
 	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
 	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
@@ -110,127 +111,139 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Jul 28, 2026 at 10:59=E2=80=AFAM Stefan Hajnoczi <stefanha@redhat.c=
-om> wrote:
-> >
+On Mon, Aug 3, 2026 at 6:25=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> w=
+rote:
+>
 > > +typedef struct IsolationRegion {
 > > +    uint64_t base_addr;
 > > +    uint64_t vring_base_addr;
 > > +    uint64_t size;
 > > +    int iso_fd;
 > > +} IsolationRegion;
->
-> The purpose of the base_addr and vring_base_addr fields is not obvious.
-> I suggest adjusting the types, names, and adding comments to make the
-> purpose clearer:
->
->   typedef struct {
->       void *mem;           /* mapped shared memory */
->       size_t size;
->       uint64_t vring_iova;
->       int fd;              /* shared memory fd */
->   } IsolationRegion;
->
-
-Agreed on adding clarification.  Is there a reason to change from uint64_t
-to void * for referencing the shared memory region address?  Most uses of
-that variable expect uint64_t currently.  Here's what I am currently thinki=
-ng:
-
-typedef struct IsolationRegion {
-    uint64_t shared_mem_addr; /* mapped shared memory */
-    uint64_t vring_iova_addr; /* beginning of vring region in shared memory=
- */
-    size_t size;
-    int fd; /* shared memory iova */
-} IsolationRegion;
-
-...
 > > +
-> > +    /* Isolated memory data*/
-> > +    struct IsolationRegion iso_memory;
->
-> struct is not necessary since there is a typedef:
->
->   IsolationRegion iso_memory;
+> Going beyond Stefan, I would say please document each field with a
+> proper doc comment, and ideally the whole struct, too.
 >
 
-Agreed!  This will be fixed.
-
-> > +    VhostIOVATree *iso_iova_tree;
->
-> The IOVA tree seems to be closely used with IsolationRegion. Maybe this
-> field should move into IsolationRegion?
->
-
-Agreed.  Since the IOVA tree is basically tracking mappings to the
-isolation regions, these can comfortably be grouped together.
+Roger.  I will comment all fields, except for perhaps size, which seems
+self-explanatory.
 
 ...
->
-> nregions is uint32_t, so i should also be uint32_t to avoid
-> signed/unsigned comparisons.
+
+> In general: Please put spaces after the leading /* and before the
+> trailing */.
 >
 
-Agreed.  Will fix this.
+Roger!  I believe I have this in a few places and will correct.
 
 ...
 
 >
-> Please avoid duplicating the memory layout calculations. When packed
-> vring support is added to vhost-shadow-virtqueue.c this will become more
-> complex and it should be done in a single place. vhost-shadow-virtque.c
-> should expose an API for the size calculation.
+> Patch 13 adds more variables to this, so I think it may make sense to
+> have a dedicated struct for these fields.
 >
 
-I think I originally did this because the svqs weren't initialized yet
-at this stage.
-However, I can cut down on the duplication with a new function in
-vhost-shadow-virtqueue that makes a dummy svq with the correct num value
-and calls the existing functions to get device and driver area sizes.
+I agree that some of these make sense to be consolidated. However,
+I think I will keep the svq array outside of the struct as the svqs don't l=
+ive
+inside of the isolation region.
+
+I guess the alternative would be to have an `isolation_mode_ctx`
+type of struct to hold all of the above.
+
+>
+> As Akihiko said, the memset() should come after this, and also...
+>
+> > +        u->iso_memory.base_addr =3D 0;
+>
+> ...this is just a subset of the memset().
+>
+
+Yes, the cleanup was not fully baked ahead of the RFC post.
+This is currently fixed on my end and will make it into the next
+rev.
+
 ...
 
-> Please make the name unique (e.g. using dev->vdev->name).
+> > +    int num;
+> > +    size_t desc_size;
+> > +    size_t avail_size;
+> > +    size_t driver_area_size;
+> > +    size_t device_area_size;
+> > +    size_t total_vring_size =3D 0;
+> > +    size_t total_mmap_size;
+>
+> Please do not mix variable declarations and normal code (style.rst calls
+> it =E2=80=9CMixed declarations=E2=80=9D).
 >
 
-I will do this by prepending "iso_mem_" to dev->vdev->name.
-
-...
-
->
-> Is it possible to use 0 as the IOVA base address so that QEMU's
-> addresses aren't leaked to the vhost-user back-end? It's good security
-> practice not to reveal memory addresses to the outside world because
-> that information can be used to defeat address space randomization or
-> infer memory addresses of other data structures.
->
-
-That should be possible.
+Got it!  This will be fixed.
 
 > > +
-> > +    assert(&u->iso_memory.iso_fd >=3D 0);
+> > +    /* Get space required for all vrings */
+> > +    for (int j =3D 0; j < dev->nvqs; j++) {
 >
-> The dereference operator should not be used here, it's the iso_fd value
-> that is being tested.
->
-
-Got it.  This will be fixed.
-
-> > +    DMAMap *map;
-> > +    DMAMap vring_map =3D {
-> > +        .perm =3D IOMMU_RW,
-> > +        .size =3D total_vring_size - 1,
-> > +        /*vrings are allocated on tree first, so will be assigned base=
- addr*/
-> > +        .translated_addr =3D u->iso_memory.base_addr
->
-> Why is this field assigned here, I think this field is used as the
-> output of vhost_iova_tree_map_alloc() rather than an input (e.g. see
-> vhost_vdpa_svq_map_rings())?
+> Why j here and i above and below?
 >
 
-Yes, I suppose this doesn't need to be assigned here.  As it currently stan=
-ds,
-that value is just getting assigned back to itself in
-vhost_iova_tree_map_alloc().  I'll fix this for the values in
-`buffer_regions`, too
+Most likely this was inside another loop on the initial implementation, and=
+ the
+iteration variable name was not changed when the outer loop was removed.
+I will change this for next rev.
+
+...
+
+> > +
+> > +    uint64_t last_addr =3D int128_get64(int128_add(u->iso_memory.base_=
+addr,
+> > +                                                 total_mmap_size - 1))=
+;
+>
+> I would like a comment why you went for a 128-bit operation here. I
+> assume it is because it checks for overflow, turning overflow into an
+> assertion failure, and it can be assumed `qemu_memfd_alloc()` must
+> naturally return a pointer such that adding the length of the allocated
+> area to it (minus one) will never overflow?
+>
+> The question is, do we even need to check for overflow then. Not that I
+> mind it, in principle, I just find it non-obvious. (The more obvious
+> check (imho) would be to just do a 64-bit operation and then
+> assert(last_addr >=3D u->iso_memory.base_addr).)
+>
+
+At the time I was concerned about potential overflow prior to application o=
+f
+the -1 operand in case the last memory location was at 0xFFFFFFFFFFFFFFFF.
+However, in that case, the -1 would cause the value to wrap back around bef=
+ore
+any use of the value, so my concern was not needed.
+
+There is a similar 128-bit op in the existing code in
+vhost-shadow-virtqueue.c at
+line 133.  To my eye, that might also be a good candidate for
+simplification unless
+I'm missing some other aspect of the use case.
+
+...
+
+> > +        map =3D &g_array_index(buffer_regions, DMAMap, i);
+>
+> God, I *really*, *really* hate this, and find it really disgusting that
+> the documentation actually recommends doing this (`&g_array_index()`)
+> instead of just offering a separate macro to get a reference.
+>
+> And existing qemu code does it all over the place, too.
+>
+> So I cannot really fault you for it.
+>
+> Still. Too ugly for me to keep completely silent about it.
+>
+> </rant>
+>
+> Hanna
+>
+
+Would you typically avoid using g_array / g_array_index?
+
+Best,
+Connor

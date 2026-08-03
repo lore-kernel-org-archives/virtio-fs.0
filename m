@@ -1,82 +1,82 @@
-Received: from mail-qt1-f172.google.com (mail-qt1-f172.google.com [209.85.160.172])
+Received: from mail-qt1-f178.google.com (mail-qt1-f178.google.com [209.85.160.178])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 65CD742A17D
-	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 20:32:54 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.172
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A1ECC3B71A4
+	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 21:13:36 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.178
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785789175; cv=pass; b=h4D5irhDJzOKUJ+UlQQTABZxU1tsWkeljy5CGMkUp79VjR5NO2U9pcVcKGYoy2J3wMMZ/1sfCueNux3ny6pVJ/YDrD60gymoj6zWLGP7NgeQbdEAuBx/S7umZ1cJYAj0j5H0zcylFM8WKjD6L/eY2pfRP4a1qrBxV/KaFDPhiHY=
+	t=1785791618; cv=pass; b=DKcBAvKd6Ui3DhLkabEF6+T7uXVux9N7Un4NXtJfqeE8uh5IMCEmox55A00/pa9Sks5neUkLMRe+VbqC7yGrYw8n6mJ7t1WzjKodfSCtI5B4qaqsfsTvgE2J+3hl33GfJ4WGA4rhqizdQ3veFNtsMnynzvKMQNn4RHPR0ft+420=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785789175; c=relaxed/simple;
-	bh=r0I90h3lL7jXiiUxa9hONJ+SIJN0Lo+ePF8bMe0foqU=;
+	s=arc-20240116; t=1785791618; c=relaxed/simple;
+	bh=t9+b5UmJWNQfiwJnZ+/wZIR/BDbMwoNsO3yUCClC9Ew=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=aOihmU0AIcLcRxBF/nb4Om1z4RSbiQ42KyhaP+SL+Ax0TLlCIy37tJpPb1QdzgSHKf3f/s/okL45hMmSVuf097oezPSZj5mahFknGCiYGf8EiGVY5YW06zx7tsCKzEMm6V9W9z8CxWxb+D+l+Cg8U9bMXQnlt91Rp75oDY87tOE=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=MYA2Nb8R; arc=pass smtp.client-ip=209.85.160.172
+	 To:Cc:Content-Type; b=giYFl5b3OEj+jeOseYtEiWqhjoLd0UvO9TBysNr7nvDKlXfhHXuILtqvgRB0TPLd6Bz9Dd9uiu3GdPCIZho9sBcqEzWz4762Z+NWxyV6T92PwzkxBcgiLQxy+lt1cY3QiNSeJBa3jzlI21DNjVMEo1Gvh2yj58jzYLWv/KOk1qk=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=Xl6r8oLZ; arc=pass smtp.client-ip=209.85.160.178
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="MYA2Nb8R"
-Received: by mail-qt1-f172.google.com with SMTP id d75a77b69052e-51c0c45c580so23090661cf.0
-        for <virtio-fs@lists.linux.dev>; Mon, 03 Aug 2026 13:32:54 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1785789173; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Xl6r8oLZ"
+Received: by mail-qt1-f178.google.com with SMTP id d75a77b69052e-52b3934af3fso37510581cf.1
+        for <virtio-fs@lists.linux.dev>; Mon, 03 Aug 2026 14:13:36 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1785791615; cv=none;
         d=google.com; s=arc-20260327;
-        b=HGXt021IFBc583BhSs8Bz9tyc3lV9plDzJLZEsEMGuZYmZ4qby3D0eQkVByvKiw/Av
-         meIMBv4FTC4yPt9030LFewJV2bgsP4ItWELh2Fhtc4qAxw4ps7ozYSg0SQ5Dd5JRyol2
-         bKrMF47JnSF+IZYxPdohXyvsyE65r3/1zIPXFp7jPgaiQ3DaYNBjEvGth0F/8EmeyZ1O
-         N9l/hup2taqROBCZkXkzzb12bhG+0jrFmPPI91jE8kOxTWadbBxL84FwE2HQ/MWreEuX
-         7ALa3W6+yDmVWu4gYP777wcdBAVe2DYHWT0SUQdf4ryXVdxtx7zVTGguXzbQOz4T1S5h
-         VT2w==
+        b=BrEORocESIWBeItCKbo/yc7B2/XjdYDp7SKgEF3WDTC0zlvFsFsQMTxU3u1nezLOi9
+         A2IdwdGPL3cYxgHSB8yPlH6+J0z1tQGPW05xU2sNAuW9DdPPZyDhCuo0Cd/urNXp8IBS
+         ddC0l6MMDgBBYatVjUZ/Qk4tafQ7oYYUFBe3I7/6rgxmv68zcMpfCbZznrUuBubqjj46
+         x+G+V5mUERycNbFXmXPQ+K6AQRxwppqMwqMWoayL3Bf6S1TbaA0AHQPwwf5ptjM9wu+X
+         ld2xsDHNJb+tAExLysnfUYvhLPOF1cdbgRA1oPqpgIcIWXd/LOnA0TK5X2Roq/aJSfCf
+         xkGw==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=hCwtTTt4p/er8EyO83nYLEPRBSYBVwZi0eOgwfYj6sM=;
-        fh=IBDk+xnwfj9ize1CWK25B6JN2JNK/fwwtDMxASPykBw=;
-        b=SlLjw6yvTwX4o++LUSSvHfIgMs8a2RF5yF5sC9l5PHHsnjZwrzB/ULbTwrQKInR7CL
-         NCB1tM1YDLMu5vpiaJNzDWajSU4XTIp0F+oZV3V2xouj6YyPlsICSmNjUJkamzPPo5Z6
-         0S1VK6dM6VN2TWFxDLdAhZdINgny4lnf4ujLlRBjb19hivFSdm28f1ImGEvF/xuDmc+H
-         RotEX1zj1M3FJiGanEVcMl91nmt0u7AaKoB7X9UPYcLkfWVMOevBXsu4Kc4DVwHaWvAG
-         NpHYMC2w5Vpzw7kYSCulJJHxBYWfFDMKJG55ESji63suFP8lBNM4WzI9nW5wDJ/xDPqy
-         jXGg==;
+        bh=hT+cJbgNjyBy4vcwWTIgV40hxtVdgcRtIAyv/2vkSGQ=;
+        fh=TeAPpOdlSy+9d6EoRkhmlwG3n6VbdszkMHrV4wh8VCk=;
+        b=GFdPzLXVIbfVttVRtxBVclXPu+ndmjxLXiQZCsUysiO8fmpgKx1L+zH9El3fYUwmwA
+         Zmp3d/juwOHbITD2drU9tv/ko+kh6twuUPXNdCzNRZevYSA5RxSunWDFJrVQxCizgEQC
+         A4Uuv/ZrdLcTPcTriyaeDDT39RyKhdxZPG+gQMayPwxgH3v5XXu6v4C1469tHMbvETGr
+         qhzzPHf48t9U4NppYRfILqC1IxGwBT9n1yh1VCkE01CPS5hYBPTq2n14nhOBDwFs0uhZ
+         TPJl4TntocdzL6qWIzswSt9TmEgShan2Uq7GJSDXjzyuj6cYE6fW6H6j/z0hbDuOcqqY
+         UXiA==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1785789173; x=1786393973; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1785791615; x=1786396415; darn=lists.linux.dev;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:from:to:cc:subject
          :date:message-id:reply-to:content-type;
-        bh=hCwtTTt4p/er8EyO83nYLEPRBSYBVwZi0eOgwfYj6sM=;
-        b=MYA2Nb8R2McNtyTLEBspSlL2x/P6hDdNtZmiN0QBds7ylbSIzyE+7ZB6cRC3SMBxaS
-         hq1SbP+nFSiH3RWKqmcIN7IiGEXT+i3cHg5VROLo/jlETUltzuaU2LWXniMkAurkSOFV
-         MGUoL6T7uFoiZvABM7h+RnYzItTA1cYULXx/0U9ZChQlxqrJmn9eRVOEs2lAvcsI1Ov2
-         CgDb9s+LSfIZGC8H2Vtt1wSLb/E2S/jh40kR/5L+K0RbQ7gnIhgVJuj9CHv1ijugwW2v
-         sIte/Pi6tEmXez8LstRrYniPoxDlhRt/+TUVcWSScUwJq8gYB40rEXpYnnmfxwizh2eK
-         62wg==
+        bh=hT+cJbgNjyBy4vcwWTIgV40hxtVdgcRtIAyv/2vkSGQ=;
+        b=Xl6r8oLZjiuQo1BoaMx3pkBmO3WvJNho7MzefyolWwA8WlfcTXJNYNuYiSKiA6oC0Q
+         Yc144QV3Qsewt6Wvg88bMU90GszBBRw1MeWh0tTr/8mfN2PxLLVH0WJ84PAJgiR8EE93
+         QHGh7FrgvBwDbagQTzRVQWWRjEr6JwQGsJZEIZ4C81/mJCSgWhHF3LhchtIplf6KkwJ4
+         E4a52i9VDC6r9vzA3hK8sRtNqTEBDyrh+imMqqJxLBxIk4l6ZAHSTOuGIOLOc3AtTEUo
+         Ui0/ZqptS9K3Y62D516vkPJYt23Vu8vnGCAhd9E8q+0XKk/Ih0/qgQD3hh9OwbPRLiWo
+         W38w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785789173; x=1786393973;
+        d=1e100.net; s=20251104; t=1785791615; x=1786396415;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=hCwtTTt4p/er8EyO83nYLEPRBSYBVwZi0eOgwfYj6sM=;
-        b=bU8dVSO02NeNLyGq0kbd3VEyrMZrpesgi6ma0WrpbBy0PZ3+G3FE8zDltoEthGdXYy
-         YVoEU+TG3RdQGicX8J9m6aNmiSrCSMEEejFUJGQRcGrUJkGM+RoaQHfnwNzFoQ1ViaAi
-         ViK3Pn5n3p+UgQUVNoLQqAwmnSUrtScsYGk4TusNAtFjNcQUPMH8CdM513R59nJpa/4y
-         Kau4/16T+G3Lpw/CUnC4Bih3l6J9COE8s6hlRksUGPgoF8UJLZ5TJclZYmZNBQTgWfbF
-         VvjVb8IW/FmoplmDm9Z0uJeKtuujrfFOe0l6+lQmUlQmRp/Sr8Ne5dcjtETBwhU0rX0O
-         9Oqg==
-X-Forwarded-Encrypted: i=1; AHgh+RoxGr8nlAtFmHKsWgqbWk3gH0W0Mq4I21Ugp82d2YELjbqd5yDGou9jdY3MN7tzTEpeQFhVNFWRZwA=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yw2h43FDtr5OPoxYAi/mWhlTxJuHXwaE46KPBCwBkTgt8tmZBYI
-	9qExuDeWUE5K2ZOhZ4HNO1URlPuYtb3D7KksDRxy7iSr4wY2xBgPshC9aURz0sR1U1AReeL8ITz
-	oJZHcADdNgiJ4xrCOGdRX65Sq2jyzzF4=
-X-Gm-Gg: AR+sD12cPYaYESgkovECtHwkpLzGD5RqXP1eiN76SvO6C3CMnqr4xJRzjtfpOLiOEhj
-	QBDPqoh5tQ5W/cj08GXHN/XKAzET3jxF02x8Wcu51D2lrRbZpZphKHkN9qna3h+lqTESP8Qj+CQ
-	4jFwkI/klUAOKaYXblIl4tw/sc9waJyCwuc77iMuXg5LQjQglvElTJOKVnclX2cVvS4826xQosr
-	hxUvhoGd/wt85bBIFf8EcdqjfcsDJWl+Dw/n+OqnFB0wbfW/I6tmD/oh0xmSjutnVvZ6f3OXQnb
-	0yH1OueUF3zkFId/4B8XD9jxd42jCq4nbv2QUu1XNAMA5InzqaLgDSlBL3wKV3rz8VtcXC37lmN
-	3
-X-Received: by 2002:a05:622a:410d:b0:528:162e:29d3 with SMTP id
- d75a77b69052e-52b5686829emr249348801cf.32.1785789173039; Mon, 03 Aug 2026
- 13:32:53 -0700 (PDT)
+        bh=hT+cJbgNjyBy4vcwWTIgV40hxtVdgcRtIAyv/2vkSGQ=;
+        b=AvjMjAr1yKzainsRwTSopqH43KkUK1G8rHeV7dV2w3dP6fdbeU5evg7jXvzgD2v/Af
+         2KHBfYbxaCVFi0CI/atkT5jx14rvm9tOQa0VbUHOTL925o2CX0snpnmRceXFcKb3vCc2
+         +28ZTTed7fyPl3aQRkK7P5MTecrHwiKI4BCNTm0bk21WkDS2Zx4E4fiWC6dsuYB/OIBb
+         TOgQzVSacCjHyyh2AIu0YCgliwYT9Hd6GAQNKPMnQjjSKN9M8XXfiFUvzVmkxXcpCC0P
+         UPMes2S4FU+eAgJTTtXebaWJ5yFzuU1KPXD5Yv3fgkkbbdxNyYYFFukN+C+U5XAN/kwC
+         znxw==
+X-Forwarded-Encrypted: i=1; AHgh+RqmyMDadKJlsRlxg9/KIhHu5wbuLrIYadDVmkBzJ4khT4c92vxDLDcCyUOJ+elUNOnKHPl1u53sDuQ=@lists.linux.dev
+X-Gm-Message-State: AOJu0Yx3no0OCNTmDyFSocrV7jk7X8A76BOsNffzlGthSx0a0v+pWRpe
+	m4CTdTXaMYq5EJHK3rm7CTXJGOkjNfcTPT9SpMBwy/nl5o2TVTjXKOcUPlNSPRIKnlCiqqcJ3ih
+	Qlc5MMTPgypv3QceQL0Q/dcptm6AQcI8=
+X-Gm-Gg: AR+sD13YG1n+GW4JLTCk++CRgqaX0A0lO7laSJEXfyLRwznGDrBrbX7j7Spi6R0ZURm
+	eGZewoIIZXkZnKDc3IjnBRnk4B4vSKcJq5HBJd1RMbEb/H2WfHuoUKBl6qCDCEeqJIuYt46UzSe
+	JjYJ9DwRPGtvnwH6QLToPyRYGyfa4IVk5nmIUB+XqGQ+ukRaXrLzuETyyhZRw6e/ve34AAjeyyh
+	289JEcGWIsoFlADVjdPoYM5RyfcuroplvEogrVMldrVJBnGrpu+VMCwjxZMi2ZtOpnt9wC9+6w4
+	6z/Asfrui1QJXWOGpoQhRQhud1bTTCNnTgXunWM5oQ+o0/ZN2ociXnnZ0U4kagAEDxuu2knloIz
+	h
+X-Received: by 2002:ac8:5c8f:0:b0:51c:2190:3b47 with SMTP id
+ d75a77b69052e-52b5666c7d8mr246614041cf.2.1785791615528; Mon, 03 Aug 2026
+ 14:13:35 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -84,21 +84,21 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-2-6b97c439eb28@gmail.com> <eb1d8424-206a-47f5-9ad5-a833a56bb3f3@redhat.com>
-In-Reply-To: <eb1d8424-206a-47f5-9ad5-a833a56bb3f3@redhat.com>
+ <20260723-vhost-user-isolated-memory-v1-6-6b97c439eb28@gmail.com> <f7776822-106c-47d0-ada9-fab75f68c76d@redhat.com>
+In-Reply-To: <f7776822-106c-47d0-ada9-fab75f68c76d@redhat.com>
 From: Connor Kite <connorkite@gmail.com>
-Date: Mon, 3 Aug 2026 13:32:39 -0700
-X-Gm-Features: AUfX_mxADHRsqJpTjVeUC1ttkitQKMfWB-ffhp4OzB1p5Jw_h04dsthg77bcW3Y
-Message-ID: <CA+spn3pLkHn_Wk+-xa-k2PKXdDSa-S9c1Dd94t=Kj5tajPyzSA@mail.gmail.com>
-Subject: Re: [PATCH RFC 02/15] vhost-user: Add memory-isolation qdev property
- to vhost-user devices
+Date: Mon, 3 Aug 2026 14:13:24 -0700
+X-Gm-Features: AUfX_mxjrOT6EN9f6nOZy_M_lmCwvv6GQNTDcDJCJ16qrlFbkhRfh-vc1CvT5tQ
+Message-ID: <CA+spn3rjAu5EcWBwG4NJmwqobdggJmZYVPrvn5Yq58Zyf0NEDA@mail.gmail.com>
+Subject: Re: [PATCH RFC 06/15] util/iova-tree: g_tree_foreach wrapper
 To: Hanna Czenczek <hreitz@redhat.com>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
 	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
 	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
 	Mathieu Poirier <mathieu.poirier@linaro.org>, 
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
-	Kevin Wolf <kwolf@redhat.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
+	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Haixu Cui <quic_haixcui@quicinc.com>, 
+	Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>, 
+	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
 	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
 	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
 	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
@@ -111,44 +111,39 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Aug 3, 2026 at 5:21=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> w=
+On Mon, Aug 3, 2026 at 5:36=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> w=
 rote:
 >
-> Should `vhost_user_vga_inst_initfn()` set up an alias for
-> "memory-isolation", like it does for "chardev" now?
 >
+> Can you document roughly what the function looks like? Because the type
+> (`GTraverseFunc`) is not defined in qemu. I know it has a boolean as a
+> return type, and that one argument of it is going to be `gpointer data`,
+> but surely it will also take a tree element.
+>
+> Hanna
 
-I am not 100% sure but I can test to see.  If an alias is needed, I suspect
-that would also apply to vhost-user-gpu-pci, right?
+I have updated the comment to describe the usage of GTraverseFunc as
+below:
 
->
-> There are four lines in here that the checkpatch script notes to be over
-> 80 characters in length, so they should be broken up.
->
-
-Got it.  This will be fixed for the next rev.
-
-> [...]
->
-> > diff --git a/hw/virtio/vhost-user-base.c b/hw/virtio/vhost-user-base.c
-> > index 90bd2903db..d2a74a2860 100644
-> > --- a/hw/virtio/vhost-user-base.c
-> > +++ b/hw/virtio/vhost-user-base.c
-> > @@ -409,7 +409,8 @@ static void vub_device_unrealize(DeviceState *dev)
-> >
-> >   /*Define common qdev properties.  Inherited by all children*/
-> >   static const Property vub_properties[] =3D {
-> > -    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev)
-> > +    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
-> > +    DEFINE_PROP_BOOL("memory-isolation", VHostUserBase, memory_isolati=
-on, false)
->
-> Nitpick: I would add a comma here. (This hunk shows specifically why
-> it=E2=80=99s a good idea: So that future additions don=E2=80=99t have to =
-change the line
-> to add the comma.)
->
-
-Ah, I was wondering why I was seeing so many hanging commas .  That makes s=
-ense.
-I will add the comma in.
+/**
+* iova_tree_foreach:
+*
+* @tree: the iova tree to traverse
+* @func: the function called at every node. A true return value ends traver=
+sal.
+*              Arguments:
+*                  gpointer key: key of current node
+*                  gpointer value: value of current node
+*                  gpointer data: data passed in at g_tree_foreach call
+*              Return: gboolean
+* @data: an argument passed to func
+*
+* Wrapper to call g_tree_foreach on the underlying g_tree. g_tree_foreach w=
+ill
+* traverse through every node of the tree, barring an early return. At each
+* node, g_tree_foreach calls func with pointers to the node key, node value=
+,
+* and a pointer to data passed in by the caller.
+*
+* Return: None
+*/

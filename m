@@ -1,36 +1,36 @@
 Received: from forwardcorp1d.mail.yandex.net (forwardcorp1d.mail.yandex.net [178.154.239.200])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id CB63E3A1682
-	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 07:29:25 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 5652B3A785C
+	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 07:29:26 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=178.154.239.200
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785742168; cv=none; b=co8U3lnQTftwherO57xmkrX12Z9/Qt7GsfjjZ4GLGfSrGSO8EpdJHL/ZNwupzAVJlt4lRb+3ccxBkjfyadpGFWgUOQNSE3Q9La+q3ZyflVP58n0OSY5yR/Po6+zGQWm3SAwNuPFqpNbA2nqRgxxTbijTKTjQXAj5YYlynnrOM+E=
+	t=1785742168; cv=none; b=XuCsgidpBjbaN1LQQzwDC8Wg99uVpbrHIWOdsewYOvd1uytNjJlcW0GEKVIhsv8Y0mJ3p5Hme+0yPalXvEN5E8RpJaAc5sorZ6dNOvczVX/8BspoO5wE7ec1+m5sd67ZBzk5ShJqpjQLTK1IlikfEqMyBMg1zYYVZ1b9YmR0/aU=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
 	s=arc-20240116; t=1785742168; c=relaxed/simple;
-	bh=wVA/r5sy4McmtXNSkUaM/CQMawmYa74RRIHkX7iy+9s=;
+	bh=d/NgMqKY16KA3a0gnvqUGSmksjYhM/0CJjZ5uYHCY/c=;
 	h=From:To:Cc:Subject:Date:Message-Id:In-Reply-To:References:
-	 MIME-Version; b=jZNHwoHI3vEUVPG5CUGzVp9duFAETy7kmdVhHDRh3N0sgXKaKtrgSCPRnemx3fVw5fSA14QnoGBxGGJTkhQSF4W86Sw0kGpBE48svVyMdXR1b46cIzo7m62rkoXEmFtkQlIcHm9WUzjdmBHKfYFA6M2CUXZZaqGyafnuM7/FAhQ=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=ToGHHgqv; arc=none smtp.client-ip=178.154.239.200
+	 MIME-Version; b=I/TdD52iICDYiSeroOOfO7ZroiW+KxquyaAagTXdO1o/4DKTuw9G31dZHxnRzULaAMcv5qN2fDc7F/gv853bSy6I7/tjZg73X7ZqbcowUST9f0qglSfHfBmrf3lunsgqtFVe77MSMvfGAdcetJL6CgEr/ft0gG+FDFTjfEHNKB4=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=xBrWYAFg; arc=none smtp.client-ip=178.154.239.200
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="ToGHHgqv"
+	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="xBrWYAFg"
 Received: from mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net (mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net [IPv6:2a02:6b8:c42:65a0:0:640:e1de:0])
-	by forwardcorp1d.mail.yandex.net (postfix) with ESMTPS id 7533380D83;
-	Mon, 03 Aug 2026 10:29:18 +0300 (MSK)
+	by forwardcorp1d.mail.yandex.net (postfix) with ESMTPS id 5815A80D93;
+	Mon, 03 Aug 2026 10:29:24 +0300 (MSK)
 Received: from dtalexundeer-nx.yandex-team.ru (unknown [2a02:6bf:8080:a53::1:f])
-	by mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net (smtpcorp) with ESMTPSA id rSdSxZ08oGk0-TjBh9Qg7;
-	Mon, 03 Aug 2026 10:29:17 +0300
+	by mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net (smtpcorp) with ESMTPSA id rSdSxZ08oGk0-tOK2oaWC;
+	Mon, 03 Aug 2026 10:29:23 +0300
 Precedence: bulk
 X-Yandex-Fwd: 1
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
-	s=default; t=1785742157;
-	bh=Pmk2TrZwjmXDYQO/Ge9UB/SVoMr6mVj7zf1SkUUI1Zk=;
+	s=default; t=1785742163;
+	bh=jmKCJp1iaPfwL9g4BXdCpfOJn8v1FlQIelet4JuFyoc=;
 	h=Message-Id:Date:In-Reply-To:Cc:Subject:References:To:From;
-	b=ToGHHgqv6Y+nvCvV+2BzWYLZEvrQv8ONW5/n5eNRLblWCRPmqMD+SftjdG6HaVj6H
-	 UhM8b2e20AQGF/wd2zX6RqUUgwKgfmgiDgMrTjizPP+YPmbzkAZfvEy3zEhh+AUrHe
-	 6NSF1jQ6wCMu2BPGhrSt+JG9CF2d/Jk2Bg8YD4Bs=
+	b=xBrWYAFgGo4O3RPDUtbj95WirrfSSW8a3x9gkhJFoyk/L8btLIMJr+JDpzZL2dgk1
+	 o6AEPjgSq92inKAFcXyqwycK3AeKIswnz1+DtsnKATnMxS9dAKB1Sz/crHfzGQcQQ7
+	 9KlJwSnf0TXb+cZRa+TDyAkHV3EH1sjT7KOCh6rU=
 Authentication-Results: mail-nwsmtp-smtp-corp-main-56.klg.yp-c.yandex.net; dkim=pass header.i=@yandex-team.ru
 From: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
 To: qemu-devel@nongnu.org
@@ -55,9 +55,9 @@ Cc: Stefano Garzarella <sgarzare@redhat.com>,
 	Pierrick Bouvier <pierrick.bouvier@linaro.org>,
 	"yc-core@yandex-team.ru" <yc-core@yandex-team.ru>,
 	Alexandr Moshkov <dtalexundeer@yandex-team.ru>
-Subject: [PATCH v6 2/6] vhost-user: add GET_VRING_BASE_SKIP_DRAIN message
-Date: Mon,  3 Aug 2026 12:28:49 +0500
-Message-Id: <20260803072853.2920007-3-dtalexundeer@yandex-team.ru>
+Subject: [PATCH v6 6/6] vhost-user-blk: use GET_VRING_BASE_SKIP_DRAIN when inflight-migration is on
+Date: Mon,  3 Aug 2026 12:28:53 +0500
+Message-Id: <20260803072853.2920007-7-dtalexundeer@yandex-team.ru>
 X-Mailer: git-send-email 2.34.1
 In-Reply-To: <20260803072853.2920007-1-dtalexundeer@yandex-team.ru>
 References: <20260803072853.2920007-1-dtalexundeer@yandex-team.ru>
@@ -69,299 +69,131 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 
-VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT was introduced to allow
-the back-end to suspend in-flight I/O during GET_VRING_BASE instead of
-draining it, enabling live migration of in-flight requests. However,
-this behaviour is tied to the protocol feature itself - once negotiated,
-there is no way for the front-end to tell the back-end to fall back to
-the normal drain behaviour on a per-stop basis.
+Currently during live migration vhost-user-blk sends GET_VRING_BASE to
+stop vrings, which causes the back-end to drain all in-flight I/O before
+returning. This blocks the migration source until all I/O completes,
+adding significant downtime proportional to the I/O load.
 
-Introduce a separate message VHOST_USER_GET_VRING_BASE_SKIP_DRAIN
-(id=45) guarded by a new protocol feature
-VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN. The message is
-identical to GET_VRING_BASE except that the back-end must immediately suspend all
-in-flight I/O and record it in the inflight region. This way the
-front-end has explicit per-call control: send GET_VRING_BASE for normal drain,
-send GET_VRING_BASE_SKIP_DRAIN when immediate suspend is needed.
+When inflight-migration is enabled, send GET_VRING_BASE_SKIP_DRAIN
+instead. This instructs the back-end to immediately suspend in-flight
+I/O and record it in the shared inflight region, which is then migrated
+to the destination host along with the rest of the device state.
 
-The new feature requires both
-VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT
-and VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD to be negotiated.
+Since inflight-migration can only be toggled while the VM is running,
+i2ts value at stop time reliably reflects the intent set on a live VM.
+There is no need to check migration runstate to decide whether to skip
+draining. Using GET_VRING_BASE_SKIP_DRAIN on a regular VM stop is
+safe - the back-end records any in-flight requests in the shared
+inflight region, and they will be resubmitted when the VM starts again
+via SET_INFLIGHT_FD.
+
+If the back-end does not support
+VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN,
+migration is aborted with an error in pre_save rather than hitting an
+assert at runtime.
 
 Signed-off-by: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
 ---
- docs/interop/vhost-user.rst       | 88 +++++++++++++++++++------------
- hw/virtio/vhost-user.c            | 44 ++++++++++++++--
- hw/virtio/vhost.c                 |  2 +-
- include/hw/virtio/vhost-backend.h |  1 +
- include/hw/virtio/vhost-user.h    |  1 +
- 5 files changed, 95 insertions(+), 41 deletions(-)
+ hw/block/vhost-user-blk.c      | 29 +++++++++++++++++++++++------
+ hw/virtio/vhost-user.c         |  3 +--
+ include/hw/virtio/vhost-user.h |  1 -
+ 3 files changed, 24 insertions(+), 9 deletions(-)
 
-diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-index c83ae2accb..d2e0efaeaa 100644
---- a/docs/interop/vhost-user.rst
-+++ b/docs/interop/vhost-user.rst
-@@ -445,6 +445,7 @@ replies, except for the following requests:
- * ``VHOST_USER_GET_FEATURES``
- * ``VHOST_USER_GET_PROTOCOL_FEATURES``
- * ``VHOST_USER_GET_VRING_BASE``
-+* ``VHOST_USER_GET_VRING_BASE_SKIP_DRAIN``
- * ``VHOST_USER_SET_LOG_BASE`` (if ``VHOST_USER_PROTOCOL_F_LOG_SHMFD``)
- * ``VHOST_USER_GET_INFLIGHT_FD`` (if ``VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD``)
- 
-@@ -523,7 +524,7 @@ must start a ring upon receiving a kick (that is, detecting that file
- descriptor is readable) on the descriptor specified by
- ``VHOST_USER_SET_VRING_KICK`` or receiving the in-band message
- ``VHOST_USER_VRING_KICK`` if negotiated, and stop a ring upon receiving
--``VHOST_USER_GET_VRING_BASE``.
-+``VHOST_USER_GET_VRING_BASE`` or ``VHOST_USER_GET_VRING_BASE_SKIP_DRAIN``.
- 
- Rings can be enabled or disabled by ``VHOST_USER_SET_VRING_ENABLE``.
- 
-@@ -1101,29 +1102,30 @@ Protocol features
- 
- .. code:: c
- 
--  #define VHOST_USER_PROTOCOL_F_MQ                       0
--  #define VHOST_USER_PROTOCOL_F_LOG_SHMFD                1
--  #define VHOST_USER_PROTOCOL_F_RARP                     2
--  #define VHOST_USER_PROTOCOL_F_REPLY_ACK                3
--  #define VHOST_USER_PROTOCOL_F_MTU                      4
--  #define VHOST_USER_PROTOCOL_F_BACKEND_REQ              5
--  #define VHOST_USER_PROTOCOL_F_CROSS_ENDIAN             6
--  #define VHOST_USER_PROTOCOL_F_CRYPTO_SESSION           7
--  #define VHOST_USER_PROTOCOL_F_PAGEFAULT                8
--  #define VHOST_USER_PROTOCOL_F_CONFIG                   9
--  #define VHOST_USER_PROTOCOL_F_BACKEND_SEND_FD         10
--  #define VHOST_USER_PROTOCOL_F_HOST_NOTIFIER           11
--  #define VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD          12
--  #define VHOST_USER_PROTOCOL_F_RESET_DEVICE            13
--  #define VHOST_USER_PROTOCOL_F_INBAND_NOTIFICATIONS    14
--  #define VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS     15
--  #define VHOST_USER_PROTOCOL_F_STATUS                  16
--  #define VHOST_USER_PROTOCOL_F_XEN_MMAP                17
--  #define VHOST_USER_PROTOCOL_F_SHARED_OBJECT           18
--  #define VHOST_USER_PROTOCOL_F_DEVICE_STATE            19
--  #define VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT 20
--  #define VHOST_USER_PROTOCOL_F_GPA_ADDRESSES           21
--  #define VHOST_USER_PROTOCOL_F_SHMEM_MAP               22
-+  #define VHOST_USER_PROTOCOL_F_MQ                         0
-+  #define VHOST_USER_PROTOCOL_F_LOG_SHMFD                  1
-+  #define VHOST_USER_PROTOCOL_F_RARP                       2
-+  #define VHOST_USER_PROTOCOL_F_REPLY_ACK                  3
-+  #define VHOST_USER_PROTOCOL_F_MTU                        4
-+  #define VHOST_USER_PROTOCOL_F_BACKEND_REQ                5
-+  #define VHOST_USER_PROTOCOL_F_CROSS_ENDIAN               6
-+  #define VHOST_USER_PROTOCOL_F_CRYPTO_SESSION             7
-+  #define VHOST_USER_PROTOCOL_F_PAGEFAULT                  8
-+  #define VHOST_USER_PROTOCOL_F_CONFIG                     9
-+  #define VHOST_USER_PROTOCOL_F_BACKEND_SEND_FD           10
-+  #define VHOST_USER_PROTOCOL_F_HOST_NOTIFIER             11
-+  #define VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD            12
-+  #define VHOST_USER_PROTOCOL_F_RESET_DEVICE              13
-+  #define VHOST_USER_PROTOCOL_F_INBAND_NOTIFICATIONS      14
-+  #define VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS       15
-+  #define VHOST_USER_PROTOCOL_F_STATUS                    16
-+  #define VHOST_USER_PROTOCOL_F_XEN_MMAP                  17
-+  #define VHOST_USER_PROTOCOL_F_SHARED_OBJECT             18
-+  #define VHOST_USER_PROTOCOL_F_DEVICE_STATE              19
-+  #define VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT   20
-+  #define VHOST_USER_PROTOCOL_F_GPA_ADDRESSES             21
-+  #define VHOST_USER_PROTOCOL_F_SHMEM_MAP                 22
-+  #define VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN 23
- 
- Front-end message types
- -----------------------
-@@ -1320,17 +1322,11 @@ Front-end message types
-   set to 0.
- 
-   By default, the back-end must complete all inflight I/O requests for the
--  specified vring before stopping it.
--
--  If the ``VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT`` protocol
--  feature has been negotiated, the back-end may suspend in-flight I/O
--  requests and record them as described in :ref:`Inflight I/O tracking
--  <inflight_io_tracking>` instead of completing them before stopping the vring.
--  How to suspend an in-flight request depends on the implementation of the back-end
--  but it typically can be done by aborting or cancelling the underlying I/O
--  request. The ``VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT``
--  protocol feature must only be negotiated if
--  ``VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD`` is also negotiated.
-+  specified vring before stopping it. If the
-+  ``VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN`` protocol feature has
-+  been negotiated, the front-end may instead use
-+  ``VHOST_USER_GET_VRING_BASE_SKIP_DRAIN`` to request the back-end to
-+  suspend in-flight I/O immediately.
- 
- ``VHOST_USER_SET_VRING_KICK``
-   :id: 12
-@@ -1833,6 +1829,28 @@ Front-end message types
- 
-   * The size may be 0 if the region is unused.
- 
-+``VHOST_USER_GET_VRING_BASE_SKIP_DRAIN``
-+  :id: 45
-+  :equivalent ioctl: N/A
-+  :request payload: vring state description
-+  :reply payload: vring descriptor index/indices
-+
-+  This message requires the ``VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN``
-+  protocol feature to be negotiated.
-+
-+  Identical to ``VHOST_USER_GET_VRING_BASE`` except that the back-end
-+  must not wait for inflight I/O requests to complete before stopping
-+  the vring.  Instead, the back-end must immediately suspend all
-+  in-flight I/O requests and record them as described in
-+  :ref:`Inflight I/O tracking <inflight_io_tracking>`. How to suspend
-+  an in-flight request depends on the implementation of the back-end,
-+  but it typically can be done by aborting or cancelling the underlying
-+  I/O request.
-+
-+  The ``VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN`` protocol feature
-+  must only be negotiated if both ``VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT``
-+  and ``VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD`` are also negotiated.
-+
- Back-end message types
- ----------------------
- 
-diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-index d627351f45..58b142cbee 100644
---- a/hw/virtio/vhost-user.c
-+++ b/hw/virtio/vhost-user.c
-@@ -101,6 +101,7 @@ typedef enum VhostUserRequest {
-     VHOST_USER_SET_DEVICE_STATE_FD = 42,
-     VHOST_USER_CHECK_DEVICE_STATE = 43,
-     VHOST_USER_GET_SHMEM_CONFIG = 44,
-+    VHOST_USER_GET_VRING_BASE_SKIP_DRAIN = 45,
-     VHOST_USER_MAX
- } VhostUserRequest;
- 
-@@ -167,6 +168,7 @@ static const char *vhost_req_name(VhostUserRequest req)
-     VHOST_USER_CASE(GET_SHARED_OBJECT)
-     VHOST_USER_CASE(SET_DEVICE_STATE_FD)
-     VHOST_USER_CASE(CHECK_DEVICE_STATE)
-+    VHOST_USER_CASE(GET_VRING_BASE_SKIP_DRAIN)
-     default:
-         return "<unknown>";
-     }
-@@ -1399,12 +1401,18 @@ static VhostUserHostNotifier *fetch_notifier(VhostUserState *u,
-     return g_ptr_array_index(u->notifiers, idx);
- }
- 
--static int vhost_user_get_vring_base(struct vhost_dev *dev,
--                                     struct vhost_vring_state *ring)
-+static int get_vring_base(struct vhost_dev *dev,
-+                          struct vhost_vring_state *ring,
-+                          bool skip_drain)
+diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
+index 7a7e1a6d19..6a11dc23c3 100644
+--- a/hw/block/vhost-user-blk.c
++++ b/hw/block/vhost-user-blk.c
+@@ -135,10 +135,7 @@ static bool vhost_user_blk_inflight_needed(void *opaque)
  {
-     int ret;
-+    int request = VHOST_USER_GET_VRING_BASE;
-+    if (skip_drain) {
-+        request = VHOST_USER_GET_VRING_BASE_SKIP_DRAIN;
-+    }
-+
-     VhostUserMsg msg = {
--        .hdr.request = VHOST_USER_GET_VRING_BASE,
-+        .hdr.request = request,
-         .hdr.flags = VHOST_USER_VERSION,
-         .payload.state = *ring,
-         .hdr.size = sizeof(msg.payload.state),
-@@ -1424,9 +1432,9 @@ static int vhost_user_get_vring_base(struct vhost_dev *dev,
-         return ret;
-     }
+     struct VHostUserBlk *s = opaque;
  
--    if (msg.hdr.request != VHOST_USER_GET_VRING_BASE) {
-+    if (msg.hdr.request != request) {
-         error_report("Received unexpected msg type. Expected %d received %d",
--                     VHOST_USER_GET_VRING_BASE, msg.hdr.request);
-+                     request, msg.hdr.request);
-         return -EPROTO;
-     }
- 
-@@ -1440,6 +1448,25 @@ static int vhost_user_get_vring_base(struct vhost_dev *dev,
-     return 0;
+-    bool inflight_migration = virtio_has_feature(s->dev.protocol_features,
+-                               VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT);
+-
+-    return inflight_migration;
++    return s->inflight_migration;
  }
  
-+static int vhost_user_get_vring_base(struct vhost_dev *dev,
-+                                     struct vhost_vring_state *ring)
-+{
-+    return get_vring_base(dev, ring, false);
-+}
+ 
+@@ -239,11 +236,13 @@ static int vhost_user_blk_stop(VirtIODevice *vdev)
+         return 0;
+     }
+ 
++    bool skip_drain = vhost_user_blk_inflight_needed(s);
 +
-+static int vhost_user_get_vring_base_skip_drain(struct vhost_dev *dev,
-+                                     struct vhost_vring_state *ring)
+     force_stop = s->skip_get_vring_base_on_force_shutdown &&
+                  qemu_force_shutdown_requested();
+ 
+     ret = force_stop ? vhost_dev_force_stop(&s->dev, vdev, true) :
+-                       vhost_dev_stop(&s->dev, vdev, true, false);
++                       vhost_dev_stop(&s->dev, vdev, true, skip_drain);
+ 
+     err = k->set_guest_notifiers(qbus->parent, s->dev.nvqs, false);
+     if (err < 0) {
+@@ -375,7 +374,6 @@ static int vhost_user_blk_connect(DeviceState *dev, Error **errp)
+     vhost_dev_set_config_notifier(&s->dev, &blk_ops);
+ 
+     s->vhost_user.supports_config = true;
+-    s->vhost_user.supports_inflight_migration = s->inflight_migration;
+     ret = vhost_dev_init(&s->dev, &s->vhost_user, VHOST_BACKEND_TYPE_USER, 0,
+                          errp);
+     if (ret < 0) {
+@@ -598,10 +596,29 @@ static struct vhost_dev *vhost_user_blk_get_vhost(VirtIODevice *vdev)
+     return &s->dev;
+ }
+ 
++static bool vhost_user_blk_pre_save(void *opaque, Error **errp)
 +{
-+    bool skip_drain_supported = vhost_user_has_protocol_feature(dev,
++    VHostUserBlk *s = VHOST_USER_BLK(opaque);
++
++    bool inflight_migration_enabled = vhost_user_has_protocol_feature(&s->dev,
 +                               VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN);
 +
-+    if (!skip_drain_supported) {
-+        return 0;
++    if (vhost_user_blk_inflight_needed(s) && !inflight_migration_enabled) {
++        error_setg(errp, "can't migrate vhost-user-blk device: "
++                         "backend doesn't support "
++                         "VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN "
++                         "protocol feature");
++        return false;
 +    }
 +
-+    return get_vring_base(dev, ring, true);
++    return true;
 +}
 +
- static int vhost_set_vring_file(struct vhost_dev *dev,
-                                 VhostUserRequest request,
-                                 struct vhost_vring_file *file)
-@@ -2551,6 +2578,12 @@ static int vhost_user_backend_init(struct vhost_dev *dev, void *opaque,
-                                VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT);
+ static const VMStateDescription vmstate_vhost_user_blk_inflight = {
+     .name = "vhost-user-blk/inflight",
+     .version_id = 1,
+     .needed = vhost_user_blk_inflight_needed,
++    .pre_save_errp = vhost_user_blk_pre_save,
+     .fields = (const VMStateField[]) {
+         VMSTATE_VHOST_INFLIGHT_REGION(inflight, VHostUserBlk),
+         VMSTATE_END_OF_LIST()
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index 58b142cbee..c8a3d184c8 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -2571,8 +2571,7 @@ static int vhost_user_backend_init(struct vhost_dev *dev, void *opaque,
+             }
          }
  
+-        if (!u->user->supports_inflight_migration ||
+-            !virtio_has_feature(protocol_features,
 +        if (!virtio_has_feature(protocol_features,
-+                             VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT)) {
-+            protocol_features &= ~(1ULL <<
-+                             VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN);
-+        }
-+
-         /* final set of protocol features */
-         u->protocol_features = protocol_features;
-         err = vhost_user_set_protocol_features(dev, u->protocol_features);
-@@ -3409,6 +3442,7 @@ const VhostOps user_ops = {
-         .vhost_set_vring_num = vhost_user_set_vring_num,
-         .vhost_set_vring_base = vhost_user_set_vring_base,
-         .vhost_get_vring_base = vhost_user_get_vring_base,
-+        .vhost_get_vring_base_skip_drain = vhost_user_get_vring_base_skip_drain,
-         .vhost_set_vring_kick = vhost_user_set_vring_kick,
-         .vhost_set_vring_call = vhost_user_set_vring_call,
-         .vhost_set_vring_err = vhost_user_set_vring_err,
-diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
-index 2a62550222..2c7f464d55 100644
---- a/hw/virtio/vhost.c
-+++ b/hw/virtio/vhost.c
-@@ -1502,7 +1502,7 @@ static int do_vhost_virtqueue_stop(struct vhost_dev *dev,
- {
-     if (skip_drain) {
-         assert(vhost_user_has_protocol_feature(dev,
--               VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT));
-+               VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN));
-     }
-     int vhost_vq_index = dev->vhost_ops->vhost_get_vq_index(dev, idx);
-     struct vhost_vring_state state = {
-diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio/vhost-backend.h
-index d878d7b733..daa979a1aa 100644
---- a/include/hw/virtio/vhost-backend.h
-+++ b/include/hw/virtio/vhost-backend.h
-@@ -190,6 +190,7 @@ typedef struct VhostOps {
-     vhost_set_vring_num_op vhost_set_vring_num;
-     vhost_set_vring_base_op vhost_set_vring_base;
-     vhost_get_vring_base_op vhost_get_vring_base;
-+    vhost_get_vring_base_op vhost_get_vring_base_skip_drain;
-     vhost_set_vring_kick_op vhost_set_vring_kick;
-     vhost_set_vring_call_op vhost_set_vring_call;
-     vhost_set_vring_err_op vhost_set_vring_err;
+                                 VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD)) {
+             protocol_features &= ~(1ULL <<
+                                VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT);
 diff --git a/include/hw/virtio/vhost-user.h b/include/hw/virtio/vhost-user.h
-index 06c360af18..47c13f8677 100644
+index 47c13f8677..78b4fba27f 100644
 --- a/include/hw/virtio/vhost-user.h
 +++ b/include/hw/virtio/vhost-user.h
-@@ -36,6 +36,7 @@ enum VhostUserProtocolFeature {
-     VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT = 20,
-     VHOST_USER_PROTOCOL_F_GPA_ADDRESSES = 21,
-     VHOST_USER_PROTOCOL_F_SHMEM = 22,
-+    VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN = 23,
-     VHOST_USER_PROTOCOL_F_MAX
- };
+@@ -73,7 +73,6 @@ typedef struct VhostUserState {
+     GPtrArray *notifiers;
+     int memory_slots;
+     bool supports_config;
+-    bool supports_inflight_migration;
+ } VhostUserState;
  
+ /**
 -- 
 2.34.1
 

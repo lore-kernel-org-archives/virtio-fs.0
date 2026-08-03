@@ -1,73 +1,73 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 0746F32AAA0
-	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 12:42:17 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 823FD32AAA0
+	for <virtio-fs@lists.linux.dev>; Mon,  3 Aug 2026 12:48:44 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785760939; cv=none; b=esf63Vccgd0Cd2RZ0lCVlK05+XwCjKmOP0clQA5FBbrORWNMkZ7ir2MMe/kQkCjL5Q0SB3yIIgEl+ZB9b11UM/MHbw0BGKtU7IwC+UKfeMkbDIyOYhdcTJNPkQlkRT12HcH9BkKmIJnpnJFvkNiMvCFxqtljlRUks64xH14THOM=
+	t=1785761325; cv=none; b=KljGblB4wT8uaxvAft9Q/w9Wf2hIKvhUdFIekGSjRecMcE46rbelmAOX7+q8fZUj0D9GrMXxNxlS7jg+r+1uFd/goC97C7oB6eIjaGNaw6KMX84YcOzNSseyuI9CInjWng+LI8ZjAfKyepZoYoRQf2b30caesHk2WqWvjG20GOA=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785760939; c=relaxed/simple;
-	bh=BWneUHTTrzx8HgQQXIvwBY4qBT+6AoTsJm994F6Wh2A=;
+	s=arc-20240116; t=1785761325; c=relaxed/simple;
+	bh=LahwUC7y1uwUNXOYT8iCNl4+8oIPeqA47b1n8edCeM8=;
 	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=sBTFkW6sAXdQZIS/xoXmLxbHqPRSB7H4+wcPvbU75xCJRwkCnNhpgOJGcU5dRKWlTNeXYcah3zHawL1On20e+eUzUQ72UOyxR4eJr9a7NGZXBh3rGbHjoANTbVt9i5TTT8hcVrn1PNgQCcjFhDsoViUSHDrwukYckrfz5kywLCY=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=BT4ILBPS; arc=none smtp.client-ip=170.10.129.124
+	 In-Reply-To:Content-Type; b=dlRvkYnjezZ/CuVqo+50YB3xDibxPnW6Pd+Yg02vdTLtNBZ6Fopz7O7JGCmr82BLZgsc2fVS0YdctTSYndti1uOFVol+Vd7UWFs8Goo4Pz1rNwg9FQTxvuZ0/fuAANEKDUymfwTTbJLEKtLRXkswbkmRmtRaDTmpP7bj4orvU3M=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=Ba0PWXqM; arc=none smtp.client-ip=170.10.133.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="BT4ILBPS"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="Ba0PWXqM"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1785760937;
+	s=mimecast20190719; t=1785761323;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 content-transfer-encoding:content-transfer-encoding:
 	 in-reply-to:in-reply-to:references:references;
-	bh=MD5L2RI6FXBTDArIKOWoWQi83VBLigF6a+njSU+nb0s=;
-	b=BT4ILBPSOhGJRIZCWDuiGnSNgmyzTdC2ixoaM+Dbw2fhC+IM0LEvKWvL0VQPEkQoLp7JfG
-	C0rCuL6kGa7QYkNqXIiYM1h0rXYa69CmGall0hXz3FW2ENf4dceYqYbBBrwxG4Acp3jFXD
-	vpmWinKXLkqoJG/8zEjejXVcySPOn8Y=
-Received: from mail-lf1-f70.google.com (mail-lf1-f70.google.com
- [209.85.167.70]) by relay.mimecast.com with ESMTP with STARTTLS
+	bh=EylLULFFNIyW9QFwnCcRwYfOQ+N8tY2o7WCX2WWXMfM=;
+	b=Ba0PWXqMxbaBVnELlnWcj0orIzZHjRislfbszsc/cs/j7NkCBZfPmAnsSESX7m64gpWOc1
+	IjidcRVTOd+DvP7Xwn9OgpSCGw5OEZ6n5yAo419lljvp6ZUordMNPWUYkFBUBUtlxIP81G
+	Oc6yVdV+tychfkz7bcHqCgHTLWFHSU4=
+Received: from mail-wr1-f71.google.com (mail-wr1-f71.google.com
+ [209.85.221.71]) by relay.mimecast.com with ESMTP with STARTTLS
  (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-91-_6m0GKQNN4WF3gheWgDpGw-1; Mon, 03 Aug 2026 08:42:03 -0400
-X-MC-Unique: _6m0GKQNN4WF3gheWgDpGw-1
-X-Mimecast-MFC-AGG-ID: _6m0GKQNN4WF3gheWgDpGw_1785760922
-Received: by mail-lf1-f70.google.com with SMTP id 2adb3069b0e04-5aeb72bda2aso1797829e87.2
-        for <virtio-fs@lists.linux.dev>; Mon, 03 Aug 2026 05:42:03 -0700 (PDT)
+ us-mta-386-ssURRzHlOVaftoPjlKK7Ag-1; Mon, 03 Aug 2026 08:48:39 -0400
+X-MC-Unique: ssURRzHlOVaftoPjlKK7Ag-1
+X-Mimecast-MFC-AGG-ID: ssURRzHlOVaftoPjlKK7Ag_1785761318
+Received: by mail-wr1-f71.google.com with SMTP id ffacd0b85a97d-47f90dbaf84so3161268f8f.1
+        for <virtio-fs@lists.linux.dev>; Mon, 03 Aug 2026 05:48:38 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785760922; x=1786365722;
+        d=1e100.net; s=20251104; t=1785761318; x=1786366118;
         h=content-transfer-encoding:content-type:in-reply-to:from
          :content-language:references:cc:to:subject:user-agent:mime-version
          :date:message-id:x-gm-gg:x-gm-message-state:from:to:cc:subject:date
          :message-id:reply-to:content-type;
-        bh=MD5L2RI6FXBTDArIKOWoWQi83VBLigF6a+njSU+nb0s=;
-        b=aJGvH7ti73qa+BDRC4YDYfmihdQJWn9jy2pbVcvn1VLC0qGD5cFQynh3PJlN0ScCjX
-         +Jtq6B4DI8B1LLQCCKs8NPBUDU3ljic9oyvTjKgybIudynCq3TfReZ0qjFeenysLy/A0
-         rSfiHQLU60WaYlavJX33ohn4shCVDeAYlUv11gnFOeyS0WQZMsLu6ujUIkxkQmO/4Vhu
-         qQByDr9YeDq/vcDjl0llxVeYFTP+VpBmAjjpAEaveYQFZhNvQpI6qZWW+BjKD9f1jgGO
-         rAyqMJ0B41nYE3nr80QC4kJctCGjTpzge4Q1NPXE8tJRhzTLLI/EVy9ljGeEq6rSBTZm
-         ZGBw==
-X-Forwarded-Encrypted: i=1; AHgh+Rr51SAq+QWereZtXSJ5uGq6AWIUi/2QF/Upx6AHqO7q742lXokSXWCjot95owrbNbAttv7UZ59Udg0=@lists.linux.dev
-X-Gm-Message-State: AOJu0YwHyOjYHwebWK+Am3j3tMN2DN4M0evjVleU24RYkJQhYuIL1I3U
-	glLksh843wamfh/yF+DYLmYTJpOYjDAuVQMCqgdxC0YAMOyI7fwFflN53Ojb2SRStHi+ojA3BZc
-	3eZPRQXnnUebegI8wWkQ8+IGQ0u3edCUfPOpTzYR6EYSCbtXbhLYKsYB644bpqw==
-X-Gm-Gg: AR+sD12oIePn3i3wCULC4s7ZEDNcZ9AKD6AMg0Yjd+U3k6EyfMoKCDuSe3CSPDlmmkH
-	H18/29uhgF3GI+N42sPVoIlhDuhR9OFMZCbwdsdSQaWOmzw3ic+1pWt6BfwshHUJ7P1ezZ9EQNa
-	b2qSpTVuCA+/gEYreVqQhyzCKCyLZ8j81XSJWECjINZR+ScM666FRWF53IbFWeSXfn5SJI2V/5t
-	f8jBEzF4XSndTmeKtjCmejYZfSzT0p92NPEIVmvBrB8XtywLOZxP2IW0VdsYqS8fTMWWlQji9+R
-	KnToijC0BZFERJVW8jD2+Fpi08N//AY03j8wGcNvNBULNs1xddfRYdYCLpbNloa0wkji2TWiN13
-	ZQeLrb/uKTOtdNv2xuxQQ88rVrsU4YoJehGXBjo1pCL8TebIlYNzuVZbhGUmlAUC3MmvfvynxEA
-	xiMQeVbRhr1LCYFysDiPdQrrefEbvmew==
-X-Received: by 2002:ac2:4c53:0:b0:5b2:e956:b459 with SMTP id 2adb3069b0e04-5b2e956b575mr1077193e87.12.1785760922318;
-        Mon, 03 Aug 2026 05:42:02 -0700 (PDT)
-X-Received: by 2002:ac2:4c53:0:b0:5b2:e956:b459 with SMTP id 2adb3069b0e04-5b2e956b575mr1077168e87.12.1785760921925;
-        Mon, 03 Aug 2026 05:42:01 -0700 (PDT)
+        bh=EylLULFFNIyW9QFwnCcRwYfOQ+N8tY2o7WCX2WWXMfM=;
+        b=fueeJTnERTGrFC6Bqyp1Z9zKRLohYHdNCS1KlgP70vnyh+X3OIVOVdjdUFOkonuu/M
+         fsUQtvoJ+UiLBWOXT3ndugZjZv+o8/I6O4F5BOkXsbZ+sm8kb/0grh4V1YIh8S0z8A6z
+         5/y1yRvH/vdd7sU+b+jF9d4NQIhBNAVQwXMUC9EM9IDDrsExZf8w17LC/KHjA3q5/2Qs
+         i6diRe3kKvoVdKEdaqXXiXu3zmj8zQkHxZjulKpiZVVS8NDHCDRoJ4w7hPpqO9AqZLT9
+         0vGa2TSCIn59nIert8JR4N6tO4Z8MQhUl9aiAtuAzy9QEwchjc15EJNUPiA3VQ6aTWXI
+         ecZQ==
+X-Forwarded-Encrypted: i=1; AHgh+RpU/STeLy4XkfwsqOndEFaXrw2iva97WTIlVh9PjnFFoIKpqMIANoZFaBDVu5ck0GTDvY6K7zprfNE=@lists.linux.dev
+X-Gm-Message-State: AOJu0Yx62vgYcno2UhjL2vfuUzBuCA10AfZpA39s10h9xGr/WaEmEj79
+	h5+VNSbEia379W/6ESeLgCNQzd0L5PGHS48ufqnS7gClHXFIrwakreNJ9cLFtfkN+wbp7+eWYkU
+	GF4Ks/oL13SrDXhjN4f17EPZUh975HV3VDr1iFdJi5CdtjV3C9TDqOEBn/iLaOg==
+X-Gm-Gg: AR+sD10qe/lR0fupECvWmKL0/TgYdhPpx9fSGlw9TrghzQfbd6kTVYmdeIASQvlxDVX
+	Jq+CIzeY8/b7/gnGuJeN+C44oMvz66Htc+14TKpXQtpAZuQzjUvsrOLf+xHxZRcjkhrZMJHCqSH
+	/Gu8zNqxb45Pa0mn4jR+CC+zeMVBSZt5dEzfJ785GnOPGxLxSKel7O0e8ti8JxCOUd6Zw/TNziY
+	j+RzF24BUIi6J7VBop6e1TrLpGo6pupFBaXcGuP2a/wI4SLd5hT3dJiFZc0BC+AU5XunqWYcGHU
+	7pi7yEdMdbacWprkWups6eYpi+IxFZdHsFDXvW58FWb6dE6Bwylu0EFPRjx17muW+kjFHWy547+
+	Stc4ZMnz2Fj1glzjAs6pSx1OcXmbTcL7fWg+7ABOP6jA8cG3RFwtidDCR4NCTtwG8JA12/92o5O
+	Rg8de7AMPVFkdcvXXvRUj6jMpskaRZfQ==
+X-Received: by 2002:a05:6000:2c10:b0:47f:7e7d:eb0 with SMTP id ffacd0b85a97d-47fd72a8788mr24185964f8f.19.1785761317868;
+        Mon, 03 Aug 2026 05:48:37 -0700 (PDT)
+X-Received: by 2002:a05:6000:2c10:b0:47f:7e7d:eb0 with SMTP id ffacd0b85a97d-47fd72a8788mr24185894f8f.19.1785761317540;
+        Mon, 03 Aug 2026 05:48:37 -0700 (PDT)
 Received: from ?IPV6:2003:cf:d73d:549a:e584:7c7b:2611:32a1? (p200300cfd73d549ae5847c7b261132a1.dip0.t-ipconnect.de. [2003:cf:d73d:549a:e584:7c7b:2611:32a1])
-        by smtp.gmail.com with ESMTPSA id 2adb3069b0e04-5b2e245653csm2066246e87.72.2026.08.03.05.41.58
+        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-47fd4068fb7sm33919027f8f.0.2026.08.03.05.48.35
         (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Mon, 03 Aug 2026 05:42:01 -0700 (PDT)
-Message-ID: <39200a6f-8241-4033-ba7a-5c9bbbdc8ff1@redhat.com>
-Date: Mon, 3 Aug 2026 14:41:57 +0200
+        Mon, 03 Aug 2026 05:48:36 -0700 (PDT)
+Message-ID: <3fa5a8c6-a803-4b28-a45c-26a71dd99b7d@redhat.com>
+Date: Mon, 3 Aug 2026 14:48:34 +0200
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -75,7 +75,8 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC 08/15] hw/virtio/vhost-shadow-virtqueue: used handler
+Subject: Re: [PATCH RFC 09/15] hw/virtio/vhost-shadow-virtqueue: specified
+ vring placement
 To: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  Stefano Garzarella <sgarzare@redhat.com>,
@@ -98,32 +99,39 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  <eperezma@redhat.com>, Alyssa Ross <hi@alyssa.is>,
  Demi Marie Obenour <demiobenour@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-8-6b97c439eb28@gmail.com>
+ <20260723-vhost-user-isolated-memory-v1-9-6b97c439eb28@gmail.com>
 From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <20260723-vhost-user-isolated-memory-v1-8-6b97c439eb28@gmail.com>
+In-Reply-To: <20260723-vhost-user-isolated-memory-v1-9-6b97c439eb28@gmail.com>
 X-Mimecast-Spam-Score: 0
-X-Mimecast-MFC-PROC-ID: 4HUZto-IqRK3sPux7ATQsfGKSM-ENQRJ2qCoYZlUa-w_1785760922
+X-Mimecast-MFC-PROC-ID: spOM-D4TDEGjjH3ywZXcediaYMK0Mlb9_jnO7dG01sU_1785761318
 X-Mimecast-Originator: redhat.com
 Content-Language: en-US
 Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
+Content-Transfer-Encoding: 7bit
 
 On 24.07.26 00:30, Connor Kite wrote:
-> Adds a handler callback to shadow virtqueues in order to enable
-> non-default processing of used vring elements from the device.
+> By default svq vrings are placed in an anonymous memory map. As svqs
+> will be leveraged to enable memory isolation in vhost-user, it is useful
+> to be able to place the vrings in a shared isolation memory region.
+>
+> Adds the option to specify vring placement by providing a vring base
+> address before starting the svq.
 >
 > Signed-off-by: Connor Kite <connorkite@gmail.com>
 > ---
->   hw/virtio/vhost-shadow-virtqueue.c |  4 ++++
->   hw/virtio/vhost-shadow-virtqueue.h | 14 ++++++++++++++
->   2 files changed, 18 insertions(+)
+>   hw/virtio/vhost-shadow-virtqueue.c | 22 +++++++++++++++-------
+>   hw/virtio/vhost-shadow-virtqueue.h |  3 +++
+>   2 files changed, 18 insertions(+), 7 deletions(-)
 
-The avail handler replaces `vhost_svq_add_element()`. I find it a bit 
-unintuitive that this handler does not replace `virtqueue_fill()`, i.e. 
-that it is not a “mirror” of the avail handler; that the avail handler 
-actually handles avail elements, whereas the used handler is “just” a 
-callback on each used element. Was that intentional? (If so, I think the 
-comment should be explicit about this choice.)
+I would go beyond Stefan and say that I do really ask for explicit 
+bounds checking on the area.
+
+Besides that, `vhost_svq_stop()` still always calls `munmap()` on `desc` 
+and `used` and that must absolutely not be done in case a fixed location 
+was provided.
+
+Also, it would be nicer to have a function to set the base address 
+instead of having to modify the svq object directly.
 
 Hanna
 

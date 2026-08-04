@@ -1,148 +1,150 @@
 Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A95AD459ADF
-	for <virtio-fs@lists.linux.dev>; Tue,  4 Aug 2026 11:05:04 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 025733EC2E3
+	for <virtio-fs@lists.linux.dev>; Tue,  4 Aug 2026 18:17:18 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785841508; cv=none; b=sbUSBHGwc0vQp3X/OiVBTLMN42rlZNiafok6TUb4ayPbB9DJujfCnPp8/l2rIDAAP2mLsifLzoPU5nc0IEjCnD92BUp2klq3fMHZ2ypcfHyc/ddF1Su9qx8DgpjavKSSyA/KUQexg6iZjTLqQvoUbFvZFc9okAM1zfoHl95+iLI=
+	t=1785867442; cv=none; b=IU+6mHnpTIvus8M/gHZQWqIh9TtdRcAZcYU/SeezPa8nVQ82aGD9vPFB4IeP6F7f5AAvrLzDtYR2XmmLuwBAhJgCZk37FdACAzRnbFIpYY9CRsD6ATaTo/vSi9AE0aVFAdl13j4rZkcphJhhifTHf1dHTeSii+RLMzs0MLt8gtY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785841508; c=relaxed/simple;
-	bh=eV6BhAH7+JY+LKmu52ijxR37ul8FRzZdZBonFccFTAc=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=I44NYPDJzWgTnfBf7s6S5c+TXpMH31kNremR698aAoO9x79VctjZ7E8Uu3ZV/WeO5+Vy0Ljs+zhtEU9B8Ta6dfOeX3wWPdgFme9c/nIKEeuIqlbuE8j6/LSfCGT/2BL5MTc3CV98Fe4cjnyf6l6QbkhaksRk7HAOAW9bc5+LfFw=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=PH6gVu4q; arc=none smtp.client-ip=170.10.133.124
+	s=arc-20240116; t=1785867442; c=relaxed/simple;
+	bh=3lWhPtOAxXJzeBBLIl6OODawf1Z59FlsChaST9EYacc=;
+	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
+	 Content-Type:Content-Disposition:In-Reply-To; b=VQpUtAZNCi0Tmt/UCBe7u1aTAGOl8yJInQnPKMrbRYdr+0jnzc7s1XCMvBZLJgYoiWQO/3kR2bHBicPXDr833Zv6hEhtkgH9GwHHtR0GH3TRzMq3NBIRx3H+Hbbzc62Hr17LJy4Hvl7WaetDSah9WaZtxyKzYv27MifOzDeudXc=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=HVJ/MTYr; arc=none smtp.client-ip=170.10.133.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="PH6gVu4q"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="HVJ/MTYr"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1785841501;
+	s=mimecast20190719; t=1785867437;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	 content-transfer-encoding:content-transfer-encoding:
 	 in-reply-to:in-reply-to:references:references;
-	bh=ZPso8bybjvlzpSiniMJSg48FKCs4+i7LpgHDKwGEwWY=;
-	b=PH6gVu4qkLHrGcedf4ePjad0/JbP/cnmzZDePb8CkyRIiZlx5B68h3i0kwi9pmpMpDhK7y
-	vJhYmpkpj9GZjWohEboKJFdhHHr1O5KEIr3ALyRRLpuNcinmCqiQlINVD+widdQH1jt9wm
-	2mTZUFGZbFYjNfmbWehRqlLLWA+xhS4=
-Received: from mail-wm1-f71.google.com (mail-wm1-f71.google.com
- [209.85.128.71]) by relay.mimecast.com with ESMTP with STARTTLS
- (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-586-c-n7m8IbPH-ceE1xtE9klA-1; Tue, 04 Aug 2026 07:04:59 -0400
-X-MC-Unique: c-n7m8IbPH-ceE1xtE9klA-1
-X-Mimecast-MFC-AGG-ID: c-n7m8IbPH-ceE1xtE9klA_1785841499
-Received: by mail-wm1-f71.google.com with SMTP id 5b1f17b1804b1-49808ea1b64so11585745e9.1
-        for <virtio-fs@lists.linux.dev>; Tue, 04 Aug 2026 04:04:59 -0700 (PDT)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785841498; x=1786446298;
-        h=content-transfer-encoding:content-type:in-reply-to:from
-         :content-language:references:cc:to:subject:user-agent:mime-version
-         :date:message-id:x-gm-gg:x-gm-message-state:from:to:cc:subject:date
-         :message-id:reply-to:content-type;
-        bh=ZPso8bybjvlzpSiniMJSg48FKCs4+i7LpgHDKwGEwWY=;
-        b=lkuft+b6yrvxFe6CgmYnZBc/HMAeduRhfKgQCEGbu9ELFr1RTnS2pIMq72NV5U1TvF
-         m9jXwizqInmfE6Lhxze7grLOpAjXQMYV/0J1qL03ZWPJ4AeZtCR4jAtKvwa57/GYwe4v
-         29+iQ+msafEbNLPRwsLvnKdu0+mJtZpG+dB4AiYE6zF/MJHNcJqT1xT67+KZpHDnjL70
-         Y4zuiZ5I5YKF3gjE6pRqFDYt3E04CkrTQhifVY737doeTCLrE2okY1p9JekZ5EIeaWws
-         TfFFnpMVheDMBDgkwcO/yAHMy/tbl8TauR9uks0dDJBRz9B8DW2SoDjMRwrLfcYYlGlD
-         RZmg==
-X-Forwarded-Encrypted: i=1; AHgh+RpcBPth3Vu8piQEQ4SKU/dC+TGVdOVo+x4LqzoRyAw+d/qLSsLZqkYUMBa0IzXHwLqUHf9A/vJH5Hc=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yxw6vsglIYPuAPMebRvCiFSA+Bwtnkc1lbIGQUYGxSNDcwtfNJk
-	Xj+ZLgOGmh5KMcaN7yXPZ2S2DxkZ/ZKCBN0HZun0JNZkwkh7jcs63XkA9Rx3qVJwZjJ3arCpk+n
-	BF3w54SHK1IXLk6npGTty+4GHQ9B4GGe7NNKoV9fmNpY7sx1SsQ98TaW2QIU8yw==
-X-Gm-Gg: AR+sD129PG05P7fMQaT7NAgefCFIMumiN3U9NS7koA2F95FBo1rIg4Q+N1D6wSWOe1e
-	euGt3Dx8P3ATFYJJYW2jaWl7v3NqhcnOyeA46/oOmU4UQGENB0K8oUY4qxi69uvV+lXnzdswAdn
-	VfV0EgT9eZP8+QIg6mCu+NZ+96s/KBSnSvMpJ7Lkt/N5t9L6kqO82s6cGaaoXofJC90Ly1H6++O
-	3bZtOCsyLrxRYpAg2192F6kKed3eb1nAfMbRDXl+20qeqnXoWNqSnh0dxXNI4jv03ey9ZKRD+gS
-	aj8iMB/qtTir8Yyp7q6Hbz7Ci682R0SjUsf3e48qWwG1JG5QnnmYjOJtHTeyoJp4Mo5/0NHZoAN
-	FA4NNy67cHmc6eniIWbi2xu7MZEVYIVOnt0DftPjKFSPkJ4q9KEMhHzF5yBOjOIAR8ajGC8ffFk
-	DcqXw/mN7pKlw/G2f5b32Y43LXHWsMcQ==
-X-Received: by 2002:a05:600c:798:b0:495:58fe:88e5 with SMTP id 5b1f17b1804b1-49949fd988dmr60940585e9.2.1785841498604;
-        Tue, 04 Aug 2026 04:04:58 -0700 (PDT)
-X-Received: by 2002:a05:600c:798:b0:495:58fe:88e5 with SMTP id 5b1f17b1804b1-49949fd988dmr60939745e9.2.1785841498235;
-        Tue, 04 Aug 2026 04:04:58 -0700 (PDT)
-Received: from ?IPV6:2003:cf:d73d:54bb:1189:33b6:6950:ef97? (p200300cfd73d54bb118933b66950ef97.dip0.t-ipconnect.de. [2003:cf:d73d:54bb:1189:33b6:6950:ef97])
-        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-47fd456a6besm40240584f8f.22.2026.08.04.04.04.56
-        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Tue, 04 Aug 2026 04:04:57 -0700 (PDT)
-Message-ID: <c449898e-4159-4c30-ae5c-87af9c2645d5@redhat.com>
-Date: Tue, 4 Aug 2026 13:04:55 +0200
+	bh=PW24GpLjdxocxVmbrxYcONmZtLw2HMPyNF1/hlL8Uo4=;
+	b=HVJ/MTYr4apeAFR1pnH1rTI9wzd2y28I3hYM+bz7pm1DjkkEZdz1hVr8bTVQeCpV8fVx81
+	oPvwcDXN3w89+V/RW+T8J5KgmI3ermhsPyvkFrIrtrJdRu9Ru1+9sDBR2ft6HDkbzaM7yP
+	H5lxJiq005OiTBuQtgx99uEV3kHhu3U=
+Received: from mx-prod-mc-01.mail-002.prod.us-west-2.aws.redhat.com
+ (ec2-54-186-198-63.us-west-2.compute.amazonaws.com [54.186.198.63]) by
+ relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
+ cipher=TLS_AES_256_GCM_SHA384) id us-mta-336-itBefzPcPV2eoo6VCQb6Fw-1; Tue,
+ 04 Aug 2026 14:17:07 -0400
+X-MC-Unique: itBefzPcPV2eoo6VCQb6Fw-1
+X-Mimecast-MFC-AGG-ID: itBefzPcPV2eoo6VCQb6Fw_1785867425
+Received: from mx-prod-int-03.mail-002.prod.us-west-2.aws.redhat.com (mx-prod-int-03.mail-002.prod.us-west-2.aws.redhat.com [10.30.177.12])
+	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
+	(No client certificate requested)
+	by mx-prod-mc-01.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id A9B17195605E;
+	Tue,  4 Aug 2026 18:17:03 +0000 (UTC)
+Received: from localhost (unknown [10.2.16.106])
+	by mx-prod-int-03.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTP id 82CDD1956087;
+	Tue,  4 Aug 2026 18:17:00 +0000 (UTC)
+Date: Tue, 4 Aug 2026 14:16:59 -0400
+From: Stefan Hajnoczi <stefanha@redhat.com>
+To: Connor Kite <connorkite@gmail.com>
+Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
+	Stefano Garzarella <sgarzare@redhat.com>,
+	Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>,
+	Viresh Kumar <viresh.kumar@linaro.org>,
+	Gerd Hoffmann <kraxel@redhat.com>,
+	Mathieu Poirier <mathieu.poirier@linaro.org>,
+	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
+	Haixu Cui <quic_haixcui@quicinc.com>,
+	Raphael Norwitz <rnorwitz@nvidia.com>,
+	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>,
+	=?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>,
+	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
+	Milan Zamazal <mzamazal@redhat.com>,
+	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>,
+	Dmitry Osipenko <dmitry.osipenko@collabora.com>,
+	qemu-block@nongnu.org, virtio-fs@lists.linux.dev,
+	"Gonglei (Arei)" <arei.gonglei@huawei.com>,
+	zhenwei pi <zhenwei.pi@linux.dev>,
+	Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>,
+	Eric Blake <eblake@redhat.com>,
+	Markus Armbruster <armbru@redhat.com>,
+	Jason Wang <jasowangio@gmail.com>, Peter Xu <peterx@redhat.com>,
+	Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>,
+	Alyssa Ross <hi@alyssa.is>,
+	Demi Marie Obenour <demiobenour@gmail.com>
+Subject: Re: [PATCH RFC 11/15] hw/virtio/vhost-user: create isolation region
+Message-ID: <20260804181659.GB488200@fedora>
+References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
+ <20260723-vhost-user-isolated-memory-v1-11-6b97c439eb28@gmail.com>
+ <20260728175931.GI371693@fedora>
+ <CA+spn3qkZ-2=4q2nn_6-wp85U4Xv3oaDAmCHEP_yB=N4aZSceg@mail.gmail.com>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC 06/15] util/iova-tree: g_tree_foreach wrapper
-To: Connor Kite <connorkite@gmail.com>
-Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
- Stefano Garzarella <sgarzare@redhat.com>,
- =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
- Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>,
- Mathieu Poirier <mathieu.poirier@linaro.org>,
- Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
- Haixu Cui <quic_haixcui@quicinc.com>, Raphael Norwitz <rnorwitz@nvidia.com>,
- Kevin Wolf <kwolf@redhat.com>,
- =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>,
- Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
- Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>,
- Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>,
- Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org,
- virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
- zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?=
- <berrange@redhat.com>, Eric Blake <eblake@redhat.com>,
- Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>,
- Peter Xu <peterx@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?=
- <eperezma@redhat.com>, Alyssa Ross <hi@alyssa.is>,
- Demi Marie Obenour <demiobenour@gmail.com>
-References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-6-6b97c439eb28@gmail.com>
- <f7776822-106c-47d0-ada9-fab75f68c76d@redhat.com>
- <CA+spn3rjAu5EcWBwG4NJmwqobdggJmZYVPrvn5Yq58Zyf0NEDA@mail.gmail.com>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <CA+spn3rjAu5EcWBwG4NJmwqobdggJmZYVPrvn5Yq58Zyf0NEDA@mail.gmail.com>
-X-Mimecast-Spam-Score: 0
-X-Mimecast-MFC-PROC-ID: njPeXnYGPeu4RRj4lrDuWYjrH06HkQbDXgn9S78ozzY_1785841499
-X-Mimecast-Originator: redhat.com
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="CCi6ZsUm/3bY9z1X"
+Content-Disposition: inline
+In-Reply-To: <CA+spn3qkZ-2=4q2nn_6-wp85U4Xv3oaDAmCHEP_yB=N4aZSceg@mail.gmail.com>
+X-Scanned-By: MIMEDefang 3.0 on 10.30.177.12
 
-On 03.08.26 23:13, Connor Kite wrote:
-> On Mon, Aug 3, 2026 at 5:36 AM Hanna Czenczek <hreitz@redhat.com> wrote:
->>
->> Can you document roughly what the function looks like? Because the type
->> (`GTraverseFunc`) is not defined in qemu. I know it has a boolean as a
->> return type, and that one argument of it is going to be `gpointer data`,
->> but surely it will also take a tree element.
->>
->> Hanna
-> I have updated the comment to describe the usage of GTraverseFunc as
-> below:
->
-> /**
-> * iova_tree_foreach:
-> *
-> * @tree: the iova tree to traverse
-> * @func: the function called at every node. A true return value ends traversal.
-> *              Arguments:
-> *                  gpointer key: key of current node
-> *                  gpointer value: value of current node
-> *                  gpointer data: data passed in at g_tree_foreach call
-> *              Return: gboolean
-> * @data: an argument passed to func
-> *
-> * Wrapper to call g_tree_foreach on the underlying g_tree. g_tree_foreach will
-> * traverse through every node of the tree, barring an early return. At each
-> * node, g_tree_foreach calls func with pointers to the node key, node value,
-> * and a pointer to data passed in by the caller.
-> *
-> * Return: None
-> */
+--CCi6ZsUm/3bY9z1X
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Awesome, thanks!
+On Mon, Aug 03, 2026 at 11:26:29AM -0700, Connor Kite wrote:
+> On Tue, Jul 28, 2026 at 10:59=E2=80=AFAM Stefan Hajnoczi <stefanha@redhat=
+=2Ecom> wrote:
+> > >
+> > > +typedef struct IsolationRegion {
+> > > +    uint64_t base_addr;
+> > > +    uint64_t vring_base_addr;
+> > > +    uint64_t size;
+> > > +    int iso_fd;
+> > > +} IsolationRegion;
+> >
+> > The purpose of the base_addr and vring_base_addr fields is not obvious.
+> > I suggest adjusting the types, names, and adding comments to make the
+> > purpose clearer:
+> >
+> >   typedef struct {
+> >       void *mem;           /* mapped shared memory */
+> >       size_t size;
+> >       uint64_t vring_iova;
+> >       int fd;              /* shared memory fd */
+> >   } IsolationRegion;
+> >
+>=20
+> Agreed on adding clarification.  Is there a reason to change from uint64_t
+> to void * for referencing the shared memory region address?  Most uses of
+> that variable expect uint64_t currently.  Here's what I am currently thin=
+king:
 
-Hanna
+The shared memory region address is a C pointer where the shared memory
+is mmapped and the type for an arbitrary C pointer is void *. The casts
+needed around qemu_memfd_alloc() and qemu_memfd_free() suggest that
+uint64_t is not the natural type for this.
+
+Keeping this as a C pointer helps differentiate the address from an
+IOVA, making the code clearer.
+
+Also, with the comments about base_addr below addressed, the
+hwaddr/uint64_t uses will be reduced.
+
+--CCi6ZsUm/3bY9z1X
+Content-Type: application/pgp-signature; name=signature.asc
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCgAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmpyLJsACgkQnKSrs4Gr
+c8hsiAf+O8eM6Cm6J6F5SQQRKO0xloi/SxDmc8rg8+3ejKgi0Op58cDsYH1QmPSs
+Uht7u5Rl2m+Ams45gEXKW+IFfGgc1hZVW1IxqGdJ2FIgcfdUADQojWUoCmUF1MHR
+o7J6tJHssUOpbLYuob6Lms2+K1LOVQabsvgCo1ZlRAMIvv5keZFcEtAj63G9S9tq
+LKZQSNZpkhCa78yguOzWMgQxuTBxbSvgPyzkQP5Md6aKq+Dqui7i8O59qyvXQS/1
+YGD24AAEtT96qzl5N5/wtowy4J13gIQTJmgnfGo0pUF9dxtn+oxiXD2gdZTraGWX
+/Y/2w+Ik+ph8gDiOqQQoHbzXR0b8Fg==
+=42sH
+-----END PGP SIGNATURE-----
+
+--CCi6ZsUm/3bY9z1X--
 

@@ -1,149 +1,171 @@
-Received: from mail-qt1-f174.google.com (mail-qt1-f174.google.com [209.85.160.174])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 504023812E9
-	for <virtio-fs@lists.linux.dev>; Thu,  6 Aug 2026 04:28:43 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.174
-ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785990524; cv=pass; b=p7yv1c6Umx4Mbn2tGX2a2UlF5j5asJjL2n4TQVSD4GvLVzvDo3IZWu+YkFdC4Byl9wMkYHf8lTXvWpI0GGkHV/wctGWgCR6246Q2ZIY+yyWr1KGiWoWgfX7qQ1zVi2q1tXH0HB/5zlLwlziEKUq7sOtPn5/C5cGgPZoo13YS5Vc=
-ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785990524; c=relaxed/simple;
-	bh=K/o9mrHR8QZ+3FxE98tvwR9KIWXjlSPJsckoKrYZV+s=;
-	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=u5tSgm84PGMHu0DvwiMdZs5nbn//tEYFzJzEUAhSbZrGc72v5aFcfnoQNBr5Kyw9ZH5aV3qp9jXBJ8rGvylGQOOUKnD3GySgz/FomSYTwW/XyLoecIQYh7cf4qTpAq1DyaRHvjijq+MXXFoG2XMiGqFo9ObBscjrjbGDR9IeKVY=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=HC36WWXN; arc=pass smtp.client-ip=209.85.160.174
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 7149443A819
+	for <virtio-fs@lists.linux.dev>; Thu,  6 Aug 2026 10:28:23 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1786012105; cv=none; b=sOOO57d1WZrKaOHwrMUcJn4c5AqZZuIiNlB/bB1VywHGXGJ5ybLCH0xA9OGQXlQt+QvlVlc+aCsrTyUC2AtNi+WeNPtPS8jkaMJZUyD22H0QVUp409Cx/MXymmK71JGRnKpB5GfcE6f/vUst3eUIUv23KaRpqd0TKa3EvlDZ7tQ=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1786012105; c=relaxed/simple;
+	bh=SUz9xIIWo0a0TyRKUM4kLBNNcqRyaypfZT5J2/wArcg=;
+	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
+	 In-Reply-To:Content-Type; b=dqlWU2q4I8UjZtIJ0cIWHzmlKhLx76NJeD4Awal9XsIQmSzWCT3kPjiWmTVMFRxRuuuH5nJKfO0UmmwG5pUJdfH/wsRnjOzqJXMc1cjXpGZF2b/UfCaXd4qQTHfRs7/fj+gLSbidNefQJDxV/yQODILnffJiIqJQgzlNrsZ9Tec=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=V0eYz1hA; arc=none smtp.client-ip=170.10.133.124
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HC36WWXN"
-Received: by mail-qt1-f174.google.com with SMTP id d75a77b69052e-52cd38ddcdfso10468861cf.3
-        for <virtio-fs@lists.linux.dev>; Wed, 05 Aug 2026 21:28:43 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1785990522; cv=none;
-        d=google.com; s=arc-20260327;
-        b=qtJaaJsrsJmS/xztLAPeNULwWGSv0jlBe+2pyLxhy37vXyfcXu0XLwlWG2qMtYcn6p
-         guBB87g6mG05VglJVYZik3YLDDfIvCp0wTqzQA87w6j+/g/nJ8lZiw8tsI0fFGmsTxNH
-         0Lr8dkyFXtRDki22F+e61DSeswFe9ciE/VBDFsS8MHtvKxbHpIJixDm6pkZscdTGwQMN
-         VEqY0zGtCtyUrsnRniVz0zcUyidbjqfKf+H6/S1g5dkEXv0vv/iM3Ypsjo2qufrY5+iU
-         XQ/xAZxAfg1QdmAxFlcLQOtJ7tDxBXYuBrP9kYXryQE+znprLt+Ut8O5xTH0IR2OHfVc
-         O5dg==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
-        h=content-transfer-encoding:cc:to:subject:message-id:date:from
-         :in-reply-to:references:mime-version:dkim-signature;
-        bh=7HTjUuWuz1hkJDPG/7b0LR7ioyQYvKyyRtXzOalkgX0=;
-        fh=FFAcyuvV9YaBRPsqQCEGGKKQ5rH4eHnOT5c1f7nrno8=;
-        b=s/me+SexhL+j3HcOfHKlgeLUl11uk1pGgA6FkdOjil5SF2zkyaBhWXJV2F04kCN+/z
-         arplVzUfimJ1JrRlagYF3HURRirZHKLb3KCI0+bTlFcY7jT8LNPWpGqry/wcPIHt8Fyt
-         TFMclt3U4KzVq78uw02Tmzm4U/t8mH9ls73cYLw167OK/UijkNz4mGETCFZSQb1lqy7I
-         xGtEs0ujk71tfMX5ht0N7qpebgU4btRy5d7q2JuyX70F3us5bcsJRG38Q9+yxkUg3JBi
-         CIH+Ui0MnZt7pghG9/JdU4D3clW/1azPYR20+1lZdOsadzVyI0BIGCVPmVI6fxjwtnyM
-         RhnA==;
-        darn=lists.linux.dev
-ARC-Authentication-Results: i=1; mx.google.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1785990522; x=1786595322; darn=lists.linux.dev;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
-         :date:message-id:reply-to:content-type;
-        bh=7HTjUuWuz1hkJDPG/7b0LR7ioyQYvKyyRtXzOalkgX0=;
-        b=HC36WWXNi7TP/Ujg9ho1HegCdsCFy/Zw/AjKt8W2U4QtiQI6aOUF0BZ3L1lOvBoXpD
-         qtWCRPW2aAeWtXIrb94Hcz+UTB/B9o991w1H6Vip7p+pofiAdh2U8TN983CfU9LGQuE1
-         D4782UzKsnc0Wo7n2J4JDKlTXCqvZNGi8/Sf8V9Co3q8bnyoB567IG6ABMFGr6ZJqnpr
-         7JHRJIHb8PMN9PLf4fyIYeQsG3sMiraALUq3MMi2wlIg531mS7jV0UeVkglHErKfxfP6
-         4SpspDTZNjqqhbH/nyqhpX21mPR3Qx1DZIwMTafPMkA2g5D95HCg2W79MTOb5IZvqFO1
-         m+Qw==
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="V0eYz1hA"
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
+	s=mimecast20190719; t=1786012102;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	 content-transfer-encoding:content-transfer-encoding:
+	 in-reply-to:in-reply-to:references:references;
+	bh=Mhw1/EUHAkm8HexVtFz8Jxi41Jjd/FjijtMau9/paKQ=;
+	b=V0eYz1hA7TUj1XbtDndzIJGXVLAXZ9pWrD29YmFThd4YEu+SnDh26RJAOkXoIJhFFij8H+
+	6PLvpHzauRWhs0rs8XiBuOwUQc9PxJwKUc7HMdBbZmA/N4M5zNyH98DgzASPf/1lsEpRaj
+	qUH6zoWJaS97dd/QWvWqwXd7siy7Dl4=
+Received: from mail-wr1-f69.google.com (mail-wr1-f69.google.com
+ [209.85.221.69]) by relay.mimecast.com with ESMTP with STARTTLS
+ (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
+ us-mta-320-4f6tne6ZPCqU06roG3AJ3A-1; Thu, 06 Aug 2026 06:28:19 -0400
+X-MC-Unique: 4f6tne6ZPCqU06roG3AJ3A-1
+X-Mimecast-MFC-AGG-ID: 4f6tne6ZPCqU06roG3AJ3A_1786012098
+Received: by mail-wr1-f69.google.com with SMTP id ffacd0b85a97d-4740be00302so1628101f8f.2
+        for <virtio-fs@lists.linux.dev>; Thu, 06 Aug 2026 03:28:18 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785990522; x=1786595322;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:x-gm-gg
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
-         :content-type;
-        bh=7HTjUuWuz1hkJDPG/7b0LR7ioyQYvKyyRtXzOalkgX0=;
-        b=Opu6rVVVDGX+m1S36TQp0xn/EIo5pfTeUeuSTdZUCXZ5DU2sRgDozBm0S9WWo2oBgh
-         6d1X48zEgLe/SJ6MTdF4p9PUg0dgVC2ZP0EgbTQzzjnv8GYnz7HDt/EWasSj01v5eQw7
-         D/wTu40ClE5bxtjPEYYAAY4KWd0qgo+FG9GUcLDgPxlWs1RIn6VQxxjU62YBNHfd10/a
-         mKB0pZkBh+rPUzxriRMXnRWhJvaVjdAXuai4Wgq3kloNIRogNIuXVOr2zJHs/oOEJg61
-         rLxJPh+h247F6tZq0gexJzgQ6X67cAAUrqbD6OjXi9A6CzVkKk4g4HSoFSXTXKkO1m/k
-         DjFw==
-X-Forwarded-Encrypted: i=1; AHgh+RqzMXV56cjHT+LcyDV9ptPKgvApbHwVyC9yGjnTl/FyuUAwhTbx+NmGSBAWUIi/IB6NtexhEhs/894=@lists.linux.dev
-X-Gm-Message-State: AOJu0YwAUZwkKhP0tNMIp9eZ6TU7ZbKCWg/bfYvdwZjVEimnw8FJlXRe
-	0I6r5H5665M8FJEqHPQuYjn5PDlmeWFOTllxRPDK6wA2WO90qz+x0L3p2LXUdUFFJ6vjRrZ47rN
-	rSy7vAmoFyYEY0diM0BxPE2P7bHrH3vQ=
-X-Gm-Gg: AR+sD13d3+r3nWhnGSAo2zNwX2fjORdYnFYzfVa9nvjff+46hKOJi8oPvm6cW5vAK+1
-	Dpk8HVI7KsbAN15DjtAmcZYifayGn/XKshLByX8EK9ePKjfBkutb5d5jjn9Iu1dM3iXeAWJPA2+
-	LrtiJa8m9bfVTbjfG0On77iG3zPa5qAImjgGn+V4/zdQUbgwfre2FhZRK5nra7cDy0pxynicRFd
-	5WS6sUIiuErK/DvxhXaw/ql+sc64p2mWlc13Zk/bfBDFnTo8w4RqTPmDRkpVdFzFWQJDuyCc0+R
-	Ilpw3YxO7T7LA4YeV5P+Gn5cgh/Do0Kqj3sNGSGeWoiHVKZFPw152CcKOG0oHaJAbMtqfxV4ZBi
-	VyA==
-X-Received: by 2002:ac8:5808:0:b0:517:71d2:37d2 with SMTP id
- d75a77b69052e-52ce5e00f67mr121953401cf.0.1785990522167; Wed, 05 Aug 2026
- 21:28:42 -0700 (PDT)
+        d=1e100.net; s=20251104; t=1786012098; x=1786616898;
+        h=content-transfer-encoding:content-type:in-reply-to:from
+         :content-language:references:cc:to:subject:user-agent:mime-version
+         :date:message-id:x-gm-gg:x-gm-message-state:from:to:cc:subject:date
+         :message-id:reply-to:content-type;
+        bh=Mhw1/EUHAkm8HexVtFz8Jxi41Jjd/FjijtMau9/paKQ=;
+        b=USkAIPut4spPoQZSDZPq5PEcbWd4m5gYSk4mP+7Ueim1Bx4nAOCCKOcX+rJ3PJXT0g
+         MAcChDZGE4uA3p0CXt9HiYRRft+PspPtD9xSrDq2ImfQ5vgUChL9SbTScjzCtSxvzTNs
+         JXgWUNPprfKt76MEdZpxps6A6NIbYwthAzzbnQv2f1bizTiOEW0BtZWfKlMBRZMss6bi
+         8Ns6GOC7T7CdAL3CrNT7NlbrTySwoeZMJPz+q1nHkHBgNMJPnbS7Ji41JiZ22rpW0QY0
+         2jwjPFCMecUJm4eqHs5JbnStykv4VY3StgeaL4Hh8jfa2/rC+Xz2ZVik+dDamlyzO8N+
+         WLYg==
+X-Forwarded-Encrypted: i=1; AHgh+RqaTawJl6sDfpNCkSqPUE/htTETrlkLMCR9gmqDBZ5fuc7j4EI8NwMPMdoQYM6QZ/N856Q6JMAVIEk=@lists.linux.dev
+X-Gm-Message-State: AOJu0YxtftWRg5623SJ3KOrp+KWBsgI4jrTdoZ9o80BwKa3d7k28yAGc
+	g8+Fg5J7tlXA5h6IR/8xqOuLu+kTVKiwq5nv9BmdP9OmGcKJu0qCoUHLacvaDYJ5nIThlDBnjR6
+	PhXe/T3zJiz1rpbWm7t/+fzqhAU4wILJIKTlhdsBEVeDUavXCPvw0FOQ3y4CNmw==
+X-Gm-Gg: AR+sD12k54LYwJHfe6cYJtJZY7bN6piARUm1+TxJ+Nk6TAgGgVUXlY9vYylJmJ3gWgv
+	uHAeD5U5Zcp6ffpbqYe+hwNLBY2c/ApdYlz70BE4/Tm2wyU+8gQy8ZAcTkEwPKOXlItAU9zKqDO
+	MtCYWTLPXmiE4VRYeGAB4wLPFsQYd+F0911MDzAUCH9nH9XpPLyW+VV/1GpWlvkRxH8ah3mNolC
+	rk8eyoY42jNGMAIQ+ZetRSnzVfTGDNAT3Yvgn6ngORV5Bx3tMsRxf34H0U8D82lI6tPL2XE75+c
+	Yz24Lhw6sznzAM/vFvCtU3T7iuduqs4/svYzzfoEEZR9bPDk9mSIm0R9Dv5z4hlCQ+JPjW5+fCJ
+	bfDqhHKcgkC2OgJUULkAL0ZACWmoRs5wjBxLqJS7mXMG7XCMzUjEmj+xSD8gOaEN5k2rxZkccwm
+	727bmdi9+nHHoNo+AHFAMPOIyDBP3mRg==
+X-Received: by 2002:a05:6000:1cd0:b0:47f:51bc:efe2 with SMTP id ffacd0b85a97d-47fec4f11d9mr17735628f8f.11.1786012097686;
+        Thu, 06 Aug 2026 03:28:17 -0700 (PDT)
+X-Received: by 2002:a05:6000:1cd0:b0:47f:51bc:efe2 with SMTP id ffacd0b85a97d-47fec4f11d9mr17735562f8f.11.1786012097276;
+        Thu, 06 Aug 2026 03:28:17 -0700 (PDT)
+Received: from ?IPV6:2003:cf:d706:f1b0:892a:16ba:c1b8:17c4? (p200300cfd706f1b0892a16bac1b817c4.dip0.t-ipconnect.de. [2003:cf:d706:f1b0:892a:16ba:c1b8:17c4])
+        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-47ff79a718bsm5586258f8f.5.2026.08.06.03.28.15
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Thu, 06 Aug 2026 03:28:16 -0700 (PDT)
+Message-ID: <738737aa-64ed-479b-bba7-1b0326ef30c0@redhat.com>
+Date: Thu, 6 Aug 2026 12:28:14 +0200
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
+User-Agent: Mozilla Thunderbird
+Subject: Re: [PATCH RFC 08/15] hw/virtio/vhost-shadow-virtqueue: used handler
+To: Connor Kite <connorkite@gmail.com>
+Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
+ Stefano Garzarella <sgarzare@redhat.com>,
+ =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>,
+ Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
+ Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>,
+ =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>,
+ Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
+ Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>,
+ Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>,
+ Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org,
+ virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
+ zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?=
+ <berrange@redhat.com>, Eric Blake <eblake@redhat.com>,
+ Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>,
+ Peter Xu <peterx@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?=
+ <eperezma@redhat.com>, Alyssa Ross <hi@alyssa.is>,
+ Demi Marie Obenour <demiobenour@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-2-6b97c439eb28@gmail.com>
- <eb1d8424-206a-47f5-9ad5-a833a56bb3f3@redhat.com> <CA+spn3pLkHn_Wk+-xa-k2PKXdDSa-S9c1Dd94t=Kj5tajPyzSA@mail.gmail.com>
- <95fe9d1a-dab1-477f-948f-4a42a1e3f09e@redhat.com>
-In-Reply-To: <95fe9d1a-dab1-477f-948f-4a42a1e3f09e@redhat.com>
-From: Connor Kite <connorkite@gmail.com>
-Date: Wed, 5 Aug 2026 21:28:30 -0700
-X-Gm-Features: AUfX_myeq4cgveTvA9QN9nMYHZdXFkIN8zO2K-kwrIi3nII0KCENKjPycV7-1m4
-Message-ID: <CA+spn3r=75BCypgw-D=MB7RA7EcET5QfvCtY10f+Azw+xMCUxQ@mail.gmail.com>
-Subject: Re: [PATCH RFC 02/15] vhost-user: Add memory-isolation qdev property
- to vhost-user devices
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
-	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
-	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
-	Mathieu Poirier <mathieu.poirier@linaro.org>, 
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
-	Kevin Wolf <kwolf@redhat.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
-	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
-	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
-	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
-	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
-	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
-	Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
-	Peter Xu <peterx@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, 
-	Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+ <20260723-vhost-user-isolated-memory-v1-8-6b97c439eb28@gmail.com>
+ <39200a6f-8241-4033-ba7a-5c9bbbdc8ff1@redhat.com>
+ <CA+spn3p-Fc_uLO1bwSXC39kmQ-iR-OpB-a6cjMTphb-_Ant-_w@mail.gmail.com>
+From: Hanna Czenczek <hreitz@redhat.com>
+In-Reply-To: <CA+spn3p-Fc_uLO1bwSXC39kmQ-iR-OpB-a6cjMTphb-_Ant-_w@mail.gmail.com>
+X-Mimecast-Spam-Score: 0
+X-Mimecast-MFC-PROC-ID: mUw4FjbP3FuvreikTbg2sqAld7Aiawc7H6U5Ohzq-I0_1786012098
+X-Mimecast-Originator: redhat.com
+Content-Language: en-US
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 8bit
 
-On Tue, Aug 4, 2026 at 3:46=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> w=
-rote:
+On 06.08.26 04:50, Connor Kite wrote:
+> On Fri, Jul 24, 2026 at 4:29 AM Akihiko Odaki
+> <odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
+>>
+>> The error of the handler that may have left elem stale is ignored here.
+>>
+>> Regards,
+>> Akihiko Odaki
+> I have now added in a check that returns on error without setting the guest
+> notifier.  So essentially the call is ignored.  Maybe this could be expanded
+> on to handle errors more gracefully depending on the error code.
 >
-> On 03.08.26 22:32, Connor Kite wrote:
-> > On Mon, Aug 3, 2026 at 5:21=E2=80=AFAM Hanna Czenczek <hreitz@redhat.co=
-m> wrote:
-> >> Should `vhost_user_vga_inst_initfn()` set up an alias for
-> >> "memory-isolation", like it does for "chardev" now?
-> >>
-> > I am not 100% sure but I can test to see.  If an alias is needed, I sus=
-pect
-> > that would also apply to vhost-user-gpu-pci, right?
+> On Tue, Jul 28, 2026 at 8:06 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+>>> +/**
+>>> + * Callback to handle a used buffer
+>>> + *
+>>> + * @svq: Shadow virtqueue
+>>> + * @elem: Element placed in the queue by the device
+>>> + * @vq_callback_opaque: Used to pass arguments to callback
+>>> + *
+>>> + * Returns 0 if the vq is running as expected
+>> The doc comment should mention what non-0 look like. Are errors reported
+>> as a negative errno?
+>>
+> Yes, a negative errno is expected on failure.  I have added clarification to the
+> comment.
 >
-> Right, that makes sense. (If your testing confirms that it=E2=80=99s need=
-ed.)
->
-> Hanna
->
+> On Mon, Aug 3, 2026 at 5:42 AM Hanna Czenczek <hreitz@redhat.com> wrote:
+>> On 24.07.26 00:30, Connor Kite wrote:
+>>> Adds a handler callback to shadow virtqueues in order to enable
+>>> non-default processing of used vring elements from the device.
+>>>
+>>> Signed-off-by: Connor Kite <connorkite@gmail.com>
+>>> ---
+>>>    hw/virtio/vhost-shadow-virtqueue.c |  4 ++++
+>>>    hw/virtio/vhost-shadow-virtqueue.h | 14 ++++++++++++++
+>>>    2 files changed, 18 insertions(+)
+>> The avail handler replaces `vhost_svq_add_element()`. I find it a bit
+>> unintuitive that this handler does not replace `virtqueue_fill()`, i.e.
+>> that it is not a “mirror” of the avail handler; that the avail handler
+>> actually handles avail elements, whereas the used handler is “just” a
+>> callback on each used element. Was that intentional? (If so, I think the
+>> comment should be explicit about this choice.)
+>>
+>> Hanna
+>>
+> I implemented it as a more narrowly-focused callback since virtqueue_fill
+> needs to be called regardless.  If I instead called virtqueue_fill
+> from the handler,
+> I would need to pass in the elem index and length via svq->ops_opaque,
+> which is a bit awkward as vhost_user defines ops_opaque when registering
+> the callback.  That's certainly not impossible to do, but this way felt cleaner.
+> For now, I will add a comment explaining that the callback should not be used
+> to add elements to the underlying vq's used ring.
 
-Testing with both vhost-user-gpu-pcu and vhost-user-vga, the
-memory_isolation property is getting
-properly set in vhost_user without adding an alias.  In both cases,
-dev->vdev refers to
-a VhostUserGpu, which has the memory_isolation qdev property set as in
-other vhost-user front-ends.
+Then I personally wouldn’t call it a “handler” if it does not handle the 
+element like the avail handler does. Maybe “callback”.
 
-Unlike most vhost-user front-ends, vhost-user-gpu does not define a
-"chardev" qdev property.  Maybe that
-is why the "chardev" property needs to be aliased?  However, I don't
-understand why "chardev" is not a qdev
-property as vhost-user-gpu already makes use of many of them.
+Hanna
 
-Best,
-Connor

@@ -1,82 +1,82 @@
-Received: from mail-qt1-f178.google.com (mail-qt1-f178.google.com [209.85.160.178])
+Received: from mail-qt1-f174.google.com (mail-qt1-f174.google.com [209.85.160.174])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id EB196175A83
-	for <virtio-fs@lists.linux.dev>; Thu,  6 Aug 2026 02:51:04 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.178
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 504023812E9
+	for <virtio-fs@lists.linux.dev>; Thu,  6 Aug 2026 04:28:43 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.174
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1785984666; cv=pass; b=lAiTChmb6a6VqkVJPshBHgG2Vi/adNTXLFWN5QntdPzn2tU2XxLthab6gzsw6ivvRDgTHhEfbV+ltRiksooZeevsweQYkTKvu2/XJ2Jtw6sjz6H2RruV+99WWxMkecfYnxQkct00dUbcB/DKLR+u0TgfZsHmWhME+mk+VmY8xGI=
+	t=1785990524; cv=pass; b=p7yv1c6Umx4Mbn2tGX2a2UlF5j5asJjL2n4TQVSD4GvLVzvDo3IZWu+YkFdC4Byl9wMkYHf8lTXvWpI0GGkHV/wctGWgCR6246Q2ZIY+yyWr1KGiWoWgfX7qQ1zVi2q1tXH0HB/5zlLwlziEKUq7sOtPn5/C5cGgPZoo13YS5Vc=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1785984666; c=relaxed/simple;
-	bh=/KuIAlLmkwjYe02EBicjMGBp4Z2mkQF1m+EuAqyCHOE=;
+	s=arc-20240116; t=1785990524; c=relaxed/simple;
+	bh=K/o9mrHR8QZ+3FxE98tvwR9KIWXjlSPJsckoKrYZV+s=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=KbQkDBh3U7wuDgaCrB4aNFqrYx2tMA40UGiZUMcghrY6s9JB35L2Z1SUkAfcVWW/jmFOgMj1CyispgQ8gVfEdmp3BChjU3a9gTZo2wQTC0K/33R/HrwTLd1zzFjpwFjlCBkDkQkoOSORaAoeL+mjImSVZy0V1PXh8SR88VU2XsU=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=aXt4JD+x; arc=pass smtp.client-ip=209.85.160.178
+	 To:Cc:Content-Type; b=u5tSgm84PGMHu0DvwiMdZs5nbn//tEYFzJzEUAhSbZrGc72v5aFcfnoQNBr5Kyw9ZH5aV3qp9jXBJ8rGvylGQOOUKnD3GySgz/FomSYTwW/XyLoecIQYh7cf4qTpAq1DyaRHvjijq+MXXFoG2XMiGqFo9ObBscjrjbGDR9IeKVY=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=HC36WWXN; arc=pass smtp.client-ip=209.85.160.174
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aXt4JD+x"
-Received: by mail-qt1-f178.google.com with SMTP id d75a77b69052e-529a1ee0e62so11065621cf.2
-        for <virtio-fs@lists.linux.dev>; Wed, 05 Aug 2026 19:51:04 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1785984664; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HC36WWXN"
+Received: by mail-qt1-f174.google.com with SMTP id d75a77b69052e-52cd38ddcdfso10468861cf.3
+        for <virtio-fs@lists.linux.dev>; Wed, 05 Aug 2026 21:28:43 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1785990522; cv=none;
         d=google.com; s=arc-20260327;
-        b=rNypkjiFWOIODc7t81dAcXQbGA0uM4thQ0YY/6uFmsdlgnjktc7EIguisOUR7Ek+12
-         0wdchxkuTTRjZcOhatmdBjn3jI42yabueQi1wUya8plmjmgb0vn7ye0vOC6LmlFHrgyY
-         2bywteK5oM8pCp6wbF+s56LsvoYpZBnJVTSeP1hjVkAL7DtzTb52iC9I4ywpTWoFIH7t
-         luKqnzT4VxK0jz0Kf3qrE2tfPqPmFjnNxFnmRwpDfcs89gLQbGJpT5YDZGtUY9pKtYwL
-         eM696FKtagtW1nRgbJpfTYNNKmuJb90NquJQ+1TuW31D3JFJyMHW9WBv2WZQWqliDgLR
-         0uRw==
+        b=qtJaaJsrsJmS/xztLAPeNULwWGSv0jlBe+2pyLxhy37vXyfcXu0XLwlWG2qMtYcn6p
+         guBB87g6mG05VglJVYZik3YLDDfIvCp0wTqzQA87w6j+/g/nJ8lZiw8tsI0fFGmsTxNH
+         0Lr8dkyFXtRDki22F+e61DSeswFe9ciE/VBDFsS8MHtvKxbHpIJixDm6pkZscdTGwQMN
+         VEqY0zGtCtyUrsnRniVz0zcUyidbjqfKf+H6/S1g5dkEXv0vv/iM3Ypsjo2qufrY5+iU
+         XQ/xAZxAfg1QdmAxFlcLQOtJ7tDxBXYuBrP9kYXryQE+znprLt+Ut8O5xTH0IR2OHfVc
+         O5dg==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=y8B4/ecGO2Mq14LjwKIDLibLrauS6XdTr/m0chUgNdg=;
-        fh=niUnwlO3D5Ku8zcuzYwsVBe6JTDSARatZJf5xsVq1HY=;
-        b=dLFuNcz1IlO4qmrDMc73+o3/988iYfWnooxQc20QMJjxwYGJXhyebGtRzXb/ES9UEu
-         g9KmuQNNnQeXRpF8wiyWkoB8z2AWBfi0XBO8PadPW9H8NyZBFFeEFc2Xe4HGtsPQt2YF
-         H4WIYDw1qoG8HyziQO6n43owOyqTBufbocqtGpEnj80mgKcBCPEOWfM76QvyvMpepvgh
-         DZ2RCqo4E4HiqjCsyao1Y4KKDuNILafc6VnZfrHsp5oFV8z/2WXA0HSOiwDmbWTEcSet
-         hUwRyDKP4RxgfeGY3WcNA7Yr0+b645o57UW6o3K3d67H6yZXVPAWA16hAIElxN+c0m+d
-         voVA==;
+        bh=7HTjUuWuz1hkJDPG/7b0LR7ioyQYvKyyRtXzOalkgX0=;
+        fh=FFAcyuvV9YaBRPsqQCEGGKKQ5rH4eHnOT5c1f7nrno8=;
+        b=s/me+SexhL+j3HcOfHKlgeLUl11uk1pGgA6FkdOjil5SF2zkyaBhWXJV2F04kCN+/z
+         arplVzUfimJ1JrRlagYF3HURRirZHKLb3KCI0+bTlFcY7jT8LNPWpGqry/wcPIHt8Fyt
+         TFMclt3U4KzVq78uw02Tmzm4U/t8mH9ls73cYLw167OK/UijkNz4mGETCFZSQb1lqy7I
+         xGtEs0ujk71tfMX5ht0N7qpebgU4btRy5d7q2JuyX70F3us5bcsJRG38Q9+yxkUg3JBi
+         CIH+Ui0MnZt7pghG9/JdU4D3clW/1azPYR20+1lZdOsadzVyI0BIGCVPmVI6fxjwtnyM
+         RhnA==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1785984664; x=1786589464; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1785990522; x=1786595322; darn=lists.linux.dev;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:from:to:cc:subject
          :date:message-id:reply-to:content-type;
-        bh=y8B4/ecGO2Mq14LjwKIDLibLrauS6XdTr/m0chUgNdg=;
-        b=aXt4JD+xkISItFwL8PtHvCgIchKXr92Vx+H7sXpFkv9t/ZTGJSXEAQaG6U6EDZv5lh
-         Cw0o91TNcyGVWj5iQOknHdzHkGdoCuG1QXZfxuKZa4G9CBLVfr7iE7H7eoCIQx2YrW0I
-         k8+fOtCfwDtBUnu7oow2V6yLM2ahMLovFb0uTV7yeZHerS98Jt72VUHt5XZk/UnxHYht
-         /+/VNw5HtUswUlAYQXljjxO5KVxaw0531m2wNRKsaoMv7ke/xIMWHANf3mIRpurif7s1
-         hM52rErFvbwC0aGhZykmHjcACj0eSmcwLM3euivOKw+cgiqYyQDVjCpnZQFLqd1gCwWi
-         JR8Q==
+        bh=7HTjUuWuz1hkJDPG/7b0LR7ioyQYvKyyRtXzOalkgX0=;
+        b=HC36WWXNi7TP/Ujg9ho1HegCdsCFy/Zw/AjKt8W2U4QtiQI6aOUF0BZ3L1lOvBoXpD
+         qtWCRPW2aAeWtXIrb94Hcz+UTB/B9o991w1H6Vip7p+pofiAdh2U8TN983CfU9LGQuE1
+         D4782UzKsnc0Wo7n2J4JDKlTXCqvZNGi8/Sf8V9Co3q8bnyoB567IG6ABMFGr6ZJqnpr
+         7JHRJIHb8PMN9PLf4fyIYeQsG3sMiraALUq3MMi2wlIg531mS7jV0UeVkglHErKfxfP6
+         4SpspDTZNjqqhbH/nyqhpX21mPR3Qx1DZIwMTafPMkA2g5D95HCg2W79MTOb5IZvqFO1
+         m+Qw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1785984664; x=1786589464;
+        d=1e100.net; s=20251104; t=1785990522; x=1786595322;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=y8B4/ecGO2Mq14LjwKIDLibLrauS6XdTr/m0chUgNdg=;
-        b=EP9rcfeAcMMJmAGSdutgs6pFA0Si4LyvJ5HEkQw4rrRCMXmlKdqwU/i/L+t/eHULS/
-         qackbN8BInXcsn/A0a3vVK6UVe+P7P459PwM4IQeVIWOYhV5s77l75ja60rcIBELUyeQ
-         PR/J7MrwCd65ka3Jo5icv0r+VctMnt/kfoAWq3qGXWnZcoDmV5IhkCvfkdyUZ1nLpAxU
-         ZQ8WUtFihjlRE54kmei43FfnHch6NGWKGqBVce3duW+DIg4u5WMw3NjnvSJ7FJL7pqQG
-         xugnA/BlqfSo/AXvIhnF8Ow/Q4T/+P/FNz3hk6u+iXVuxaNpZkB6lj29aF4AfTa0RM8S
-         USaA==
-X-Forwarded-Encrypted: i=1; AHgh+RrzhbkXoTKfogEYA26kxw3o4Wu6Up0a/gCKM/SNMl5zzjgT8ns2+v54kkOOHEfzlwxjgiR8o3AMjT0=@lists.linux.dev
-X-Gm-Message-State: AOJu0Ywy1wKbHQDbzbNnl7CGNr1QrudPokw4Sbh02o+FLjn9rW6IdeWG
-	fXZ1H5RLyCvgBvPydDQYFYBJ60zU83Q8BrwXSDSVhgarXGY2RB9n0LA4UMhsYnm36lEBg51TySn
-	s7JOFcPMXHG8dOE9aCdIHuootjdbszxU=
-X-Gm-Gg: AR+sD10GncqjHTrtw4UVEkbV2pYQew76U/f/rTIFu+Czcd/LgLHtXWmU9CovX5sQy09
-	Y6iW9AlGLzXUe2lE5573Va+hZQCv/3lixQF3HFYERbALfu/5WMMV88lHymMrLjVKbV44XTQ0hsa
-	XtcghlkNGXwFAbzo6S7GwkTKoVJU5YMtFBWKOU0djZjLkgWhlZsdGS4ZxeJyAn8IUPTRa/ZT3rH
-	69kgIfheKS6HP2aZBZNDvDzCoJUMYT3N6iUYXjWjd42JJdqLe40TxJsxD5yb6Pr3sdl6KMwccxC
-	+V8JWR8H/bPsC3aVb3QS+UN+8+74GJGW72/gByWf4ncX0QBjsZTM36T1Sf5MQfiTPY+Vn9s784j
-	rkg==
-X-Received: by 2002:a05:622a:2307:b0:517:7e26:36a4 with SMTP id
- d75a77b69052e-52ce61df7dfmr124407901cf.34.1785984663704; Wed, 05 Aug 2026
- 19:51:03 -0700 (PDT)
+        bh=7HTjUuWuz1hkJDPG/7b0LR7ioyQYvKyyRtXzOalkgX0=;
+        b=Opu6rVVVDGX+m1S36TQp0xn/EIo5pfTeUeuSTdZUCXZ5DU2sRgDozBm0S9WWo2oBgh
+         6d1X48zEgLe/SJ6MTdF4p9PUg0dgVC2ZP0EgbTQzzjnv8GYnz7HDt/EWasSj01v5eQw7
+         D/wTu40ClE5bxtjPEYYAAY4KWd0qgo+FG9GUcLDgPxlWs1RIn6VQxxjU62YBNHfd10/a
+         mKB0pZkBh+rPUzxriRMXnRWhJvaVjdAXuai4Wgq3kloNIRogNIuXVOr2zJHs/oOEJg61
+         rLxJPh+h247F6tZq0gexJzgQ6X67cAAUrqbD6OjXi9A6CzVkKk4g4HSoFSXTXKkO1m/k
+         DjFw==
+X-Forwarded-Encrypted: i=1; AHgh+RqzMXV56cjHT+LcyDV9ptPKgvApbHwVyC9yGjnTl/FyuUAwhTbx+NmGSBAWUIi/IB6NtexhEhs/894=@lists.linux.dev
+X-Gm-Message-State: AOJu0YwAUZwkKhP0tNMIp9eZ6TU7ZbKCWg/bfYvdwZjVEimnw8FJlXRe
+	0I6r5H5665M8FJEqHPQuYjn5PDlmeWFOTllxRPDK6wA2WO90qz+x0L3p2LXUdUFFJ6vjRrZ47rN
+	rSy7vAmoFyYEY0diM0BxPE2P7bHrH3vQ=
+X-Gm-Gg: AR+sD13d3+r3nWhnGSAo2zNwX2fjORdYnFYzfVa9nvjff+46hKOJi8oPvm6cW5vAK+1
+	Dpk8HVI7KsbAN15DjtAmcZYifayGn/XKshLByX8EK9ePKjfBkutb5d5jjn9Iu1dM3iXeAWJPA2+
+	LrtiJa8m9bfVTbjfG0On77iG3zPa5qAImjgGn+V4/zdQUbgwfre2FhZRK5nra7cDy0pxynicRFd
+	5WS6sUIiuErK/DvxhXaw/ql+sc64p2mWlc13Zk/bfBDFnTo8w4RqTPmDRkpVdFzFWQJDuyCc0+R
+	Ilpw3YxO7T7LA4YeV5P+Gn5cgh/Do0Kqj3sNGSGeWoiHVKZFPw152CcKOG0oHaJAbMtqfxV4ZBi
+	VyA==
+X-Received: by 2002:ac8:5808:0:b0:517:71d2:37d2 with SMTP id
+ d75a77b69052e-52ce5e00f67mr121953401cf.0.1785990522167; Wed, 05 Aug 2026
+ 21:28:42 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -84,13 +84,16 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-8-6b97c439eb28@gmail.com> <39200a6f-8241-4033-ba7a-5c9bbbdc8ff1@redhat.com>
-In-Reply-To: <39200a6f-8241-4033-ba7a-5c9bbbdc8ff1@redhat.com>
+ <20260723-vhost-user-isolated-memory-v1-2-6b97c439eb28@gmail.com>
+ <eb1d8424-206a-47f5-9ad5-a833a56bb3f3@redhat.com> <CA+spn3pLkHn_Wk+-xa-k2PKXdDSa-S9c1Dd94t=Kj5tajPyzSA@mail.gmail.com>
+ <95fe9d1a-dab1-477f-948f-4a42a1e3f09e@redhat.com>
+In-Reply-To: <95fe9d1a-dab1-477f-948f-4a42a1e3f09e@redhat.com>
 From: Connor Kite <connorkite@gmail.com>
-Date: Wed, 5 Aug 2026 19:50:52 -0700
-X-Gm-Features: AUfX_mwdgfZNtUVKN2fr62b4CYdJBKHGSJqFmOuYnQn3J4JowOt9nqgKAcaQl7Q
-Message-ID: <CA+spn3p-Fc_uLO1bwSXC39kmQ-iR-OpB-a6cjMTphb-_Ant-_w@mail.gmail.com>
-Subject: Re: [PATCH RFC 08/15] hw/virtio/vhost-shadow-virtqueue: used handler
+Date: Wed, 5 Aug 2026 21:28:30 -0700
+X-Gm-Features: AUfX_myeq4cgveTvA9QN9nMYHZdXFkIN8zO2K-kwrIi3nII0KCENKjPycV7-1m4
+Message-ID: <CA+spn3r=75BCypgw-D=MB7RA7EcET5QfvCtY10f+Azw+xMCUxQ@mail.gmail.com>
+Subject: Re: [PATCH RFC 02/15] vhost-user: Add memory-isolation qdev property
+ to vhost-user devices
 To: Hanna Czenczek <hreitz@redhat.com>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
 	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
@@ -110,73 +113,37 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Jul 24, 2026 at 4:29=E2=80=AFAM Akihiko Odaki
-<odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
->
->
-> The error of the handler that may have left elem stale is ignored here.
->
-> Regards,
-> Akihiko Odaki
-
-I have now added in a check that returns on error without setting the guest
-notifier.  So essentially the call is ignored.  Maybe this could be expande=
-d
-on to handle errors more gracefully depending on the error code.
-
-On Tue, Jul 28, 2026 at 8:06=E2=80=AFAM Stefan Hajnoczi <stefanha@redhat.co=
-m> wrote:
->
-> >
-> > +/**
-> > + * Callback to handle a used buffer
-> > + *
-> > + * @svq: Shadow virtqueue
-> > + * @elem: Element placed in the queue by the device
-> > + * @vq_callback_opaque: Used to pass arguments to callback
-> > + *
-> > + * Returns 0 if the vq is running as expected
->
-> The doc comment should mention what non-0 look like. Are errors reported
-> as a negative errno?
->
-
-Yes, a negative errno is expected on failure.  I have added clarification t=
-o the
-comment.
-
-On Mon, Aug 3, 2026 at 5:42=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> w=
+On Tue, Aug 4, 2026 at 3:46=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> w=
 rote:
 >
-> On 24.07.26 00:30, Connor Kite wrote:
-> > Adds a handler callback to shadow virtqueues in order to enable
-> > non-default processing of used vring elements from the device.
-> >
-> > Signed-off-by: Connor Kite <connorkite@gmail.com>
-> > ---
-> >   hw/virtio/vhost-shadow-virtqueue.c |  4 ++++
-> >   hw/virtio/vhost-shadow-virtqueue.h | 14 ++++++++++++++
-> >   2 files changed, 18 insertions(+)
+> On 03.08.26 22:32, Connor Kite wrote:
+> > On Mon, Aug 3, 2026 at 5:21=E2=80=AFAM Hanna Czenczek <hreitz@redhat.co=
+m> wrote:
+> >> Should `vhost_user_vga_inst_initfn()` set up an alias for
+> >> "memory-isolation", like it does for "chardev" now?
+> >>
+> > I am not 100% sure but I can test to see.  If an alias is needed, I sus=
+pect
+> > that would also apply to vhost-user-gpu-pci, right?
 >
-> The avail handler replaces `vhost_svq_add_element()`. I find it a bit
-> unintuitive that this handler does not replace `virtqueue_fill()`, i.e.
-> that it is not a =E2=80=9Cmirror=E2=80=9D of the avail handler; that the =
-avail handler
-> actually handles avail elements, whereas the used handler is =E2=80=9Cjus=
-t=E2=80=9D a
-> callback on each used element. Was that intentional? (If so, I think the
-> comment should be explicit about this choice.)
+> Right, that makes sense. (If your testing confirms that it=E2=80=99s need=
+ed.)
 >
 > Hanna
 >
 
-I implemented it as a more narrowly-focused callback since virtqueue_fill
-needs to be called regardless.  If I instead called virtqueue_fill
-from the handler,
-I would need to pass in the elem index and length via svq->ops_opaque,
-which is a bit awkward as vhost_user defines ops_opaque when registering
-the callback.  That's certainly not impossible to do, but this way felt cle=
-aner.
-For now, I will add a comment explaining that the callback should not be us=
-ed
-to add elements to the underlying vq's used ring.
+Testing with both vhost-user-gpu-pcu and vhost-user-vga, the
+memory_isolation property is getting
+properly set in vhost_user without adding an alias.  In both cases,
+dev->vdev refers to
+a VhostUserGpu, which has the memory_isolation qdev property set as in
+other vhost-user front-ends.
+
+Unlike most vhost-user front-ends, vhost-user-gpu does not define a
+"chardev" qdev property.  Maybe that
+is why the "chardev" property needs to be aliased?  However, I don't
+understand why "chardev" is not a qdev
+property as vhost-user-gpu already makes use of many of them.
+
+Best,
+Connor

@@ -1,82 +1,82 @@
-Received: from mail-qv1-f52.google.com (mail-qv1-f52.google.com [209.85.219.52])
+Received: from mail-qt1-f179.google.com (mail-qt1-f179.google.com [209.85.160.179])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A5C0F2777FC
-	for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 01:39:17 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.219.52
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id C0E392E7389
+	for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 02:33:06 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.179
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1786412359; cv=pass; b=pXtZKs6IApsidhwaeAJwHoq3AL8G2b13EV8VRqyAUsyqr9QfQsFfqelGILSn16Zb9/I7ER9bz4eTv3JuGDJ1QFSQyzioLNQH1qyUfd1S5P2VCIMs6U4eTeyOOloAF3NnywGIoF4/VavDEpYkqAaaPYJ74EyV0VvH3ZQCH7sp7AQ=
+	t=1786415588; cv=pass; b=MCYFMIaJNz3chLNB8NBXpqtNb7ZFn6KdBErWKWvE78VIfVqYvv42rZdJmvfbUINAFWVCeR/PS7MfIaG1eGS8RI3rhs3qhg91rGjRUUOAt95gTEVLkzKVqSKlt64/lwWU/sbrqNzQ2pliffgua+CrUK6YIn7Hk1Eld/72LDBNoEk=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1786412359; c=relaxed/simple;
-	bh=QalwuqvStqnXeEiC+s5hf07RUka0a2XF9C2gpknLJow=;
+	s=arc-20240116; t=1786415588; c=relaxed/simple;
+	bh=EjziMU5SkwVThvh12csVBMSUAMYA69uMHi5XHVj5ol8=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=Y3HqjaRkvPL+8AIPt0nZCOJQ+SntbGUNfE6MtXeqWJJy+aWKBV1mA4hJaNsW/3MY0YmpXIlUKcv/a1II4cFUERF6cY/tvh76DZOg+oVB789aiE7AnW0GizzQYtDgr9aW5UfF7Ky9F83Nzefe2mlrLQquPjnjgy8z1Js9IMQNZRo=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=X06vnY7Q; arc=pass smtp.client-ip=209.85.219.52
+	 To:Cc:Content-Type; b=rQbqHi2Zw0frZ8MZXQy4djaI4+hY1Pw6wqbS+02bJGfAY6rEJJyTCHeAxKxJz0heUs8SDxHFx/pPX5kVBTsVVrYj2keXUkF8353DOqj/aHu/PYEMlstrbtnEGpcCKn1gXRo2hpwKgxbGSgwE6PTiagh9Yi+8VkSIIFg2CRlGd4A=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=CPuDh5fm; arc=pass smtp.client-ip=209.85.160.179
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="X06vnY7Q"
-Received: by mail-qv1-f52.google.com with SMTP id 6a1803df08f44-907ae240ac3so10121876d6.0
-        for <virtio-fs@lists.linux.dev>; Mon, 10 Aug 2026 18:39:17 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1786412356; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="CPuDh5fm"
+Received: by mail-qt1-f179.google.com with SMTP id d75a77b69052e-51c2a76536bso23819131cf.1
+        for <virtio-fs@lists.linux.dev>; Mon, 10 Aug 2026 19:33:06 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1786415585; cv=none;
         d=google.com; s=arc-20260327;
-        b=rTjtj9HYWbYfNky4FiEwmeuiUFSGgpJ/9ddZyl216ey+H4P+RbK4usZM4qy+RtlcZX
-         yCextWvk/cL8BX6Sup0tW7xd6tMZFJs7mcpLV7A7su91fVjQWYGCT0gCOK8+vupm5Xrt
-         T0nro5RSv3qvUgvpMqonoBvYAATZQo9GEi9LmNesNPevh7NVCaUc2mgwXJHtV5qVGIed
-         g+TyIlJM4yCQdUdAfkTqQmBYnenq4o1tk7b60yep6r3r57aqJGh4eg5SvxyH3qkf4o1+
-         4Z20RuqBDXMeD4Q8oIlocrl3qw8xNsaWWxJHXZylPe2ea3e8ixgK5X1RU+C2B6z4mzBm
-         LNPQ==
+        b=Az75GbQxOtaXPwaDtuuvvaVRyxOS9voHVX4e6+QvJUuG497leo0mfsZ2Ez/jsbamR+
+         fBu4RirOAStQJbTZz9/iy8jEF8e4/Dl/KQ78KORxuKoPj+k4n5Hhgh5pp27sEplWuajP
+         fuw/68JWB+ujtq3exbpMPX7e3MqMRe1c57Rp910QFEnZy8JRt1OWbvXauvUNXagT1IWR
+         4z44SGCAoaDO3uuGu1+1vLmwD4Ry1WYTPGlZmm8T0rJ6ZqTVajlRtUDuDjpdHpnBmQQ5
+         NmFTerYLlwRU//WQmC4MQB1DPVbdSS68IjIKGUd4hoL3Ka2oLmbXo7UnTB2gesJCMmo9
+         ffAQ==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=9NCE/aAr/j2nF8iV3xtU3OsC8CpqBZM5ZBeXyoA4OLA=;
-        fh=JUuNXlhBrkwsFfCC148Mmy4nwSVP+NrcwLQs55nw3Pw=;
-        b=m2lFyEe1YZ63zO7kREG4M9IyN7OPiKzN50GAuyiMgHYblBhhONg3Ny/hZ4A/iygXkD
-         jEm8OY3hn7XfSsIF54gqgLKpIL7EsZuKLtqeIYEhPSqzplcVDA2QbCGJoYvBHPG8wAlb
-         zC7tSyKjeXerySu0E7aq6NMockRc4LXCISKMyVfb5D4aguC5Edc/Vtf4ebvQBL8vQxrm
-         9++3jPSqUSeaqlXJms3efVeYOAXyTAOY6L/FA6Wvp1csvskCzLYI0tepqj6HtZk9CPUY
-         qLWYzdj4+SKjR5XRUIhwRjktH4ZQ9pF2cQfjmiqcDekFSJPFiTt8x78OVilFTol4lBWX
-         9cxw==;
+        bh=l47ouiWxP5ccdaTdd4P/MDEyQu/nWl9Vr1nsGjRMchM=;
+        fh=jbHE0qMT8UJvd/dC6rDw4gwSdvjvA+/wTTcjt5nL3i0=;
+        b=cy9kbCP6B5wEsdLLcva1IEcVGHfrYMAbLoiAdOvwwPQx1R3Gg2OPb7FeupfkCIPa3h
+         W3LKsnjBmX6klHCurMBjOTkeKXjDy9kCnjzgV7xqLUSYFfanYKBdhhb7a3FNulUvl6vr
+         THFLVDCREDJb9M4OqvapstnLkp5TC+4yolBUTBgACYUAXKE8KQqrZjCH0+T8ppny4FwV
+         7px3hyb7NpiMcDwXi7yS0JFqikixJzg/Jv5ecwTYgAl7vRdw3jXuXDQHFjg332iM2+aQ
+         SqmCQuQRli4NUla86kZkLtE+0X4m3ekQvskXQ6HJjsvvP/1qyQobueokBVPc86T9CkVi
+         IfFw==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1786412356; x=1787017156; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1786415585; x=1787020385; darn=lists.linux.dev;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:from:to:cc:subject
          :date:message-id:reply-to:content-type;
-        bh=9NCE/aAr/j2nF8iV3xtU3OsC8CpqBZM5ZBeXyoA4OLA=;
-        b=X06vnY7QLfW6ZXw/slGIzY1jcbc4zOMZ851pvFB/JhDOXxYG724qjoAfMnunsiTIpi
-         zKaUrEJOs2EfR0Qm7wuzngurpGuDNzOPs/BKfVi/UbiltflOfuEqNyDd5C/0LMCsIk1T
-         WsidUaDnGBAmTfLQ95mDYVkJf3G/KxVOh8UeNkO9WqdaZdVxF+WemeDppx+ejzH564US
-         14AAK1pfIERO/qO+Oz3Qb6/OtSYNP8czoQFfHBw63fzYxDhov+CLFqzo7dJm2gD5eU2E
-         dG//14pgOKx16MDONDl+zDD1F44/c14d5+WVDb+7YSFsoN5+ccyxzse10tpiHgh+Wccm
-         u0SQ==
+        bh=l47ouiWxP5ccdaTdd4P/MDEyQu/nWl9Vr1nsGjRMchM=;
+        b=CPuDh5fmbgJWG/6ReGlQUGH3FwpTb5T6Ka+7HkuMmIQau7Kj7rATU6wlogz0/0/wEK
+         zH5081U18W9EZAdPuUzsL9mwWmh2WgYVba96M8K1AaiFlqBr2Or0DPMkCQaYzP0rJF4t
+         B9Fz6EiJl0p1Zo9aop+BgxmzblpfDz4UcJxYKs/YqXXccY7ys1sHfjmMIzMB7XgCGeN9
+         TfJe7VpxCK0ujbqRtuFPVrd1dKqXtgK87oHT88MBUYYnMhy302D5U9MlObbuYL3eeF5n
+         fpc3fE734xmoCgncTHRjCEcJF22Eqx9sIJw2MfVeyheQ/5et2pp6d5tq9u1yvUwYnN7E
+         xvUg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1786412356; x=1787017156;
+        d=1e100.net; s=20251104; t=1786415585; x=1787020385;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=9NCE/aAr/j2nF8iV3xtU3OsC8CpqBZM5ZBeXyoA4OLA=;
-        b=PGR1ZdV5SSwX0mwVzC5yjO7z98TQl2kzvB774HnsDWJ6UUWyulD0YxAvEAN+vWk3S6
-         2UAY9fo1NMuZ1sbhsWqsW09lLvjUlhw8Y+lK/CGYoIKQWthlpmbnUT7IyGzd8wJ7Kd89
-         3wjGbooe2Ekx1LOUuFQdhpr59s1+d65At1N85o3MY/wdmRH4PmUyp7N19kVqtYhaWnTv
-         yoIS91sQMXJiw8jFuibPX1/os68FW6TdRJuAoIc69WE87CAVOSvTQ/U6spPH86zfYDmb
-         IikiU0RRwGeDN16z7oi+oxOW7E4kBQZt7VqCvV8AVYs1KjFW3SS9ZYVAuZ5TbjbsKYOE
-         R+Jg==
-X-Forwarded-Encrypted: i=1; AHgh+RoN7tZ/WlOrDMLX7OTr25pGQdCMc9QbaFaj/U+T6WB+NULiwq1afGsfCYjdMBkIvGOo5+EBLYxPyQQ=@lists.linux.dev
-X-Gm-Message-State: AOJu0YzbhMkiTPNmIJGCecFX1CC0c76G02zytObBwq3XBPItXAqsuy7B
-	OlyCK3CQC+MH+Z3PWitze61iPvZn0LIMcADUfe5sSjAjOejVBc2fz3OS0xfg21RC2j/KZh4aI1q
-	QUn5u4GfPMK0sNoGcSc0pPuwZn7/XbvU=
-X-Gm-Gg: AR+sD10ZTt4sMqcAwdi9VBIKmQujGDHG2WalTWUT9/cf5VuqO11XA4wd22rVcMsmgnf
-	0zCvw3G8vK2asLeZbUzCTuikRaSngtPh9OMGj/1qYNPbmc26Lq9RUffV9MtsbYLoTkY5mSNTtAl
-	xHnBOo6tUk1TFpabkeHSuaQtZPGY0h3sX34oWB0iI3egRNYA5ctFVL8U/Lj9hdZ2fIOaoAShshL
-	E7bb6wRpzujZlHr01/KdcYT98+zcKly+KIZVrSsD+XJQIKAuw81DqAn+YWXCFNTc1YCmC1V6MKc
-	/Wumjiaw+AmqSISQLTf679IY5JJ0m3jiPIzWvx5UVSn4nIg1drmLN4qnNM+JzyTnapDHyn3CDAV
-	JtEO5oLkaNTcuEA==
-X-Received: by 2002:ad4:5ce4:0:b0:8f2:860f:4dec with SMTP id
- 6a1803df08f44-908a70877b6mr315196116d6.15.1786412356388; Mon, 10 Aug 2026
- 18:39:16 -0700 (PDT)
+        bh=l47ouiWxP5ccdaTdd4P/MDEyQu/nWl9Vr1nsGjRMchM=;
+        b=kj/JG1vA/dbYyOiVE0+u3W8daJmH/hYIN2RqGaMEsxMugq35g9YSJzwfeEhSDfvF5q
+         lPOFKTSSHAyIGZhHB0L3Swm1rrcTROlqUe86lo37iiy3+C2Ds8otA6YV8eH30GEoeFpj
+         FKTq1xOC9P3RO5FHEIDiO2o8ep/XUS26zNfj0NR5Mm8fbKEPEx+RhbD+MQd4GYFH/tGy
+         orNv55qCRDb2yk0J9InOv0JmokEuWwqH1XS+ncjqYN0d1/YIRwd464mxND1Y3vbGvqQG
+         Epo78QYuANRgrMxdd3C79oQ0hbFudced6683g6Sw0Nkt0avkoNpEyqmHvYEz+H09Hvet
+         pwrA==
+X-Forwarded-Encrypted: i=1; AHgh+RoiWHK2qsSyfdhihz9bgIrxVgPf23onU7n3Pv3WH5lgxowHDzSIYLYBD1C64ay1RLGi0AEdEIxJBBk=@lists.linux.dev
+X-Gm-Message-State: AOJu0YwCvqTH9oOA4BrM6Yol6ZFIBh2TMla2AaIuRaZ5UD698w8PSKSN
+	IKl7xIDUvuVUxJs/6NaV0LuIhcB1TCKePP4A8zM/7PajPkRpyTnSVGeBm2vtiRzkuUUknAZ+2qz
+	z1mh4OBFfyJeC36ofNd3Zr0+/7+0uVh4=
+X-Gm-Gg: AR+sD11z6SPdVsYL7AVrNmHrRGHvqNCLeQ8zaX2bMFTbbLMGHYrRKUGrXXDFqr+hUDL
+	l0HVmq6tY4VEkfRbGlRV1wxpxObxRsKkp38O44w4NJRfe6Da3/HY72qGoWj44NA8tF3tD+9A1yP
+	nsD/Rk1HcfXW/iTfECMRfm5FWws/uEoI4PKySRhM/vTkefjJtGqBQWM2NS9qryWy6w/3Q066LWU
+	s7fYh6z94q9cPewtlCJKPs8LeAA+5llA3hFTr5/ZquGmP0e2GlGes86NxVFsfQHkiQS+QJR2clF
+	bHcae++7U7H+bcnV+33Hah9huo90m9w6WjqmucxTAvRib4WDvXR8u5DkTuocsjltinSzAX/vN3P
+	9t0o=
+X-Received: by 2002:ac8:5d06:0:b0:51c:1ff:2512 with SMTP id
+ d75a77b69052e-52d58670614mr1275201cf.33.1786415585557; Mon, 10 Aug 2026
+ 19:33:05 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -84,24 +84,24 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-13-6b97c439eb28@gmail.com> <20260728194145.GK371693@fedora>
-In-Reply-To: <20260728194145.GK371693@fedora>
+ <20260723-vhost-user-isolated-memory-v1-13-6b97c439eb28@gmail.com> <13594665-16ec-47e5-9075-f7bd5552b0a3@redhat.com>
+In-Reply-To: <13594665-16ec-47e5-9075-f7bd5552b0a3@redhat.com>
 From: Connor Kite <connorkite@gmail.com>
-Date: Mon, 10 Aug 2026 18:39:05 -0700
-X-Gm-Features: AUfX_mwk7yXwRwfuX1L7sbLLsvBOJi32lYVTZ-YIqGXA6JKERxD-feww-OPuB2Q
-Message-ID: <CA+spn3oU7dtEPO_5-hT6x1-n+4HYxO9a8_aes7Jy3afWDDY_Ag@mail.gmail.com>
+Date: Mon, 10 Aug 2026 19:32:54 -0700
+X-Gm-Features: AUfX_mwJzLB3L_tUMvJyoXZYiw6uHtEY3ibxhzMN-VRQUCLkfnI52lB5oLNIv00
+Message-ID: <CA+spn3r7+pEb7e6=8JixTpk7M3rNhWv=JkGZchj2-3FK9ZQGYQ@mail.gmail.com>
 Subject: Re: [PATCH RFC 13/15] hw/virtio/vhost-user: add shadow virtqueues and
  eventfd intercepts
-To: Stefan Hajnoczi <stefanha@redhat.com>
+To: Hanna Czenczek <hreitz@redhat.com>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
 	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
 	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
 	Mathieu Poirier <mathieu.poirier@linaro.org>, 
 	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
-	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
-	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
+	Kevin Wolf <kwolf@redhat.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
 	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Milan Zamazal <mzamazal@redhat.com>, Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
+	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
+	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
 	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
 	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
 	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
@@ -111,29 +111,25 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Jul 28, 2026 at 12:42=E2=80=AFPM Stefan Hajnoczi <stefanha@redhat.c=
-om> wrote:
+On Mon, Aug 3, 2026 at 6:52=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> w=
+rote:
 >
-> > +
+> > +    struct vhost_user *u =3D dev->opaque;
+> > +    int svq_idx =3D file->index - dev->vq_index;
+> > +    if (u->user->memory_isolation) {
+> > +        VhostShadowVirtqueue *svq =3D g_ptr_array_index(u->shadow_vqs,
+> > +                                                      svq_idx);
+>
+> Bounds checking via `vhost_user_get_vq_index()` would be nice. (Same belo=
+w.)
+>
+
+Adding the bounds checking outside of the memory-isolation only code path, =
+since
+file->index wasn't being checked previously.
+
 > > +        if (svq->hdev_kick.initialized =3D=3D false) {
 > > +            int r =3D event_notifier_init(&svq->hdev_kick, 0);
->
-> Where is event_notifier_cleanup() called?
->
-
-I have added in to the error code paths when calling
-vhost_user_set_vring_kick.
-
-I left most cleanup to the end of the patch series, and it was underdevelop=
-ed at
-the time this went out for RFC, with the intent of getting feedback on
-the overall
-approach.  In hindsight, it is probably better practice to implement
-cleanup at the
-same time as the init/start code, per Hanna's comment.
-
-I will pull the svq cleanup code forward to this patch.
-
 > > +            if (r) {
 > > +                error_report("Failed to create kick event notifier");
 > > +                return r;
@@ -142,14 +138,12 @@ I will pull the svq cleanup code forward to this patch.
 > > +
 > > +        file->fd =3D event_notifier_get_fd(&svq->hdev_kick);
 >
-> Modifying the function argument is probably not expected but
-> vhost_virtqueue_start() doesn't use it after this call, so there is no
-> immediate problem. It would be safer to have a local struct
-> vhost_vring_file that can be modified without affecting the caller's
-> copy.
+> What if `file->fd` was -1, i.e. `VHOST_FILE_UNBIND`? Should we put a
+> real FD here then or just continue with -1?
 >
 
-That makes sense.  Swapped over to a local struct.
+Good point!  I think we need to propagate the -1 to the backend device, and
+run event_notifier_cleanup on the existing svq->hdev_kick.
 
 ...
 
@@ -157,23 +151,33 @@ That makes sense.  Swapped over to a local struct.
 > > +        if (svq->hdev_call.initialized =3D=3D false) {
 > > +            int r =3D event_notifier_init(&svq->hdev_call, 0);
 >
-> Where is event_notifier_cleanup() called?
+> Do we need to check if the call event FD is already active?
 >
 
-Same as when setting the kick.
+Do you mean, do we need to call event_notifier_test_and_clear to see if it'=
+s
+been set and potentially run the call handler at this stage?
 
-> > +            if (r) {
-> > +                error_report("Failed to create call event notifier");
-> > +                return r;
-> > +            }
-> > +        }
-> > +
-> > +        file->fd =3D event_notifier_get_fd(&svq->hdev_call);
+If so, this might be where some of the intricacies of when things happen in
+vhost-user vs in vhost would require some extra care, unless isolation mode
+implementation moved up into vhost.
+
+...
+
+> > +    /*Modified from vhost-vdpa*/
+> > +    u->shadow_vqs =3D g_ptr_array_new_full(dev->nvqs, vhost_svq_free);
+> > +    for (int i =3D 0; i < dev->nvqs; i++) {
+> > +        VhostShadowVirtqueue *svq;
+> > +        svq =3D vhost_svq_new(NULL, NULL);
 >
-> Same as above.
+> Patch 15 adds clean-up for this; I would squash it into here, as far as
+> possible. Ideally, a patch series can be stopped at any step and not
+> break anything, so if an allocation is added, the accompanying freeing
+> should come with it.
+>
+> Hanna
 >
 
-Swapped over to a local struct as above.
-
-Thanks!
-Connor
+In hindsight I shouldn't have considered cleanup a separate stage in the
+development.  Too easy to introduce bugs that way.  I'll move cleanup up
+and comment in the Patch 15 thread.

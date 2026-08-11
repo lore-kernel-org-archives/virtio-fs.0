@@ -1,73 +1,73 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
+Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id AB12442901E
-	for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 11:04:13 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4D226434409
+	for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 11:42:08 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1786446255; cv=none; b=XqePokRIlqD8M5PNBy2Wnk4ys4mLpU9AnM32xnTvEbEo+i6HYnZ8U8knJub5JUPUttTPyaAAN8nInpOI20j/WAKPSfHQqJuZAX8Iy78HQwhCVu/RIX3FjkrdH5YzOkYoqUcBQy9k6cWts6Jh1pWlorXz5dLIDUY7JiRA0sy28XY=
+	t=1786448529; cv=none; b=LhLj3RHVJIbO5wE2HeQDUNlXCSXqUHhtoFJ/yXNBiG4LXHGYxs8/e1IeuHqaiVxZ+vKgYSox/nni6vN5t1S2GXtMdxAV9fvwD5pLJIKm2RaAEVZXPxEgzzwc2DtINnnmGnlN/P6Aat6yNOUf14I8M9dU7IC8nM9HLasXfvJ59nk=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1786446255; c=relaxed/simple;
-	bh=IjpG86barOhhg9z8eBEd8wfF5exo4XZ8ucJY5U0nlyg=;
+	s=arc-20240116; t=1786448529; c=relaxed/simple;
+	bh=9tWgvo/v+8h0ckmaBnjUiH3GTEi67n7RfkcCkJwgErw=;
 	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=EI1yOEKL6VFv2BlLRlDSeU2ms2UMYBty/i3/6S7U5BXdYsEBbg94LhG4bYLhaBCZtnIZaE4K8q7OlMrSwbFGj6PABD3PwkwjYXQRU8OiG0EePsDrnzPKmxYdHzOy8XgMmpq/4AZ+3CQAqNVFhawi0hKzT4tyAcfIGSVUFWOJIu4=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=OtnWgMcg; arc=none smtp.client-ip=170.10.133.124
+	 In-Reply-To:Content-Type; b=FgoowQOF8wKB4dfRTBgEw2vKRoN0aziQtI7KecHrNYLOmGdhvCdI58HJJMId+lBgALxip/Z1VGqBjsvBZyghgfzx7H6AoUwYNiNP6QP0BZGRfwpBl5Jam31gf3ljCP95ckde4scxZ1A2G1tRVbsFVhAIOH5WNWj8vgN4Jh4jYMs=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=N/eBRVuc; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="OtnWgMcg"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="N/eBRVuc"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1786446252;
+	s=mimecast20190719; t=1786448527;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 content-transfer-encoding:content-transfer-encoding:
 	 in-reply-to:in-reply-to:references:references;
-	bh=x+FkPEdueLwHWFyrKrhKgCEWI0VHQD9Y7/FLtdLDcRU=;
-	b=OtnWgMcgvbPUbaXqKuxcRvJaKDwzugwiNXDFHTwtC0t+iTsTykJRPZ+6om15IythIB0gTh
-	koTcXhaUDujcGCQg7bclLev0sFdyuY3rZWhKv/f3/z+o6krAqBFuplZDRvLF8w5QDNvFuX
-	QTGFd5aWj1bKXIKCxRyJfCJGpKsuGKM=
-Received: from mail-wr1-f69.google.com (mail-wr1-f69.google.com
- [209.85.221.69]) by relay.mimecast.com with ESMTP with STARTTLS
+	bh=83Z7giIsXRjL+pG88JPHrWsQSLh0SWtxmdOYGdneAnU=;
+	b=N/eBRVucu5RVQeS3y+Nz0EVzrtSei3RVyRvnR/9i0zRkKS79VpW/dtMsqbVFJLJbyCNv25
+	Fjdmf3IlRt848SoQShkPgW6cTft4PZqHvOGxZElZpAaDC+Ld0S5Ym2k5TVTjOSwr77jJub
+	QSqaPk1q9f+aWVJt3Nb5h2cgH0S7zAE=
+Received: from mail-wr1-f70.google.com (mail-wr1-f70.google.com
+ [209.85.221.70]) by relay.mimecast.com with ESMTP with STARTTLS
  (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-114-Ez13XM4HM0muf_u7p9U1AQ-1; Tue, 11 Aug 2026 07:04:09 -0400
-X-MC-Unique: Ez13XM4HM0muf_u7p9U1AQ-1
-X-Mimecast-MFC-AGG-ID: Ez13XM4HM0muf_u7p9U1AQ_1786446248
-Received: by mail-wr1-f69.google.com with SMTP id ffacd0b85a97d-473ac08a6a4so2032841f8f.0
-        for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 04:04:08 -0700 (PDT)
+ us-mta-303-yP5WQTFzPYuxqyCD-qSaeg-1; Tue, 11 Aug 2026 07:42:05 -0400
+X-MC-Unique: yP5WQTFzPYuxqyCD-qSaeg-1
+X-Mimecast-MFC-AGG-ID: yP5WQTFzPYuxqyCD-qSaeg_1786448524
+Received: by mail-wr1-f70.google.com with SMTP id ffacd0b85a97d-47f4bff865cso448709f8f.0
+        for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 04:42:05 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1786446248; x=1787051048;
+        d=1e100.net; s=20251104; t=1786448524; x=1787053324;
         h=content-transfer-encoding:content-type:in-reply-to:from
          :content-language:references:cc:to:subject:user-agent:mime-version
          :date:message-id:x-gm-gg:x-gm-message-state:from:to:cc:subject:date
          :message-id:reply-to:content-type;
-        bh=x+FkPEdueLwHWFyrKrhKgCEWI0VHQD9Y7/FLtdLDcRU=;
-        b=b2aMPBtSU4BtkTkqd/7Stm0A9CqyhmKnjLKqBDjDAf9KDi6DVazUCsEZldDZ+9aMRa
-         lYl5EyzCoBBLYTuPenLocWfA/YuBe1PXDsHFf4LNT+L1lHqzrHXgFFpWAGX0XhAkPqsv
-         9815PHK8XuwPxqs5gUuzJTtIM3FiAZvlqOotFvRhlsfzsL1l9iiX4V77IN/n5ASRVrU/
-         oWcdQdWzuze3AGh9vcgDXEMJKZ31PAcONwuXAwCEBx2gMmkYDgX0kvoTv4IW+vF0+6uo
-         PVhkDIdpOZmnKV+fA7t8vhqfphLlYitnrld737DMxOsHYzQbPFGDPKqs561gApr1tt0r
-         vh8Q==
-X-Forwarded-Encrypted: i=1; AHgh+Rr3luoaAt41le2CQohl7iaCBJp30abkff4bKFygadRI/U4PXsG8J0Ae4PH+5ueL5WxCgKGQUntnrIs=@lists.linux.dev
-X-Gm-Message-State: AOJu0YyOmN+bBD49nbR430xTA2cUU0U4War9gNJW5siE84wy/CnrdVqH
-	V/8sWA11cbfrMJrx+wF6wmjmDO5Osce1jnqly5wlivxWvB0erxFLu18VDhqfU4ajMuS3i4clgfh
-	ooOh74nfEcIMWjleXEGq24yRDGznisxlLgM4BSPKHQSbRzcxLQT7gCmWL8v+CmQ==
-X-Gm-Gg: AR+sD13kXF+8ynMjMP7Fy99/clGq7VecPR0TAoYMhbYFCs93uoPYfFc1T3UmiVI4TK+
-	6o+tx3jo6XQYF0VhQVYMfK+2hWeRVYfQ38m6YT8AOhmkfLs6blE+tawv9q+Q/b6v7QVoxbjmmsA
-	5OBGDaJ7mzmVNqQf19Gc9CUxqicQNQgLraWxoAkDr0AL+Tqms/YcABmaUH8wcC94XKTd6uV8qHV
-	GbGqQCoYRK8c5V12O//JsppHa5/RCCi2f4aasOux7VQ55TZ3iIGb2p5vaKxiuWO07IohWRKqbrE
-	OYicVhSnNFhHvMgdJTHnihX3zfUiL7NUN1xJpSVtEmnen57vtXsAToVM000+z68GedEBWr4ZBuD
-	Suibt/aTmvMBwpYJsSQe8oaxdclo/SeYSCa3KD7QYAcPqqtIAdQU5M8GG8RaNUZXAtEumCE14TY
-	ePFgwc/i0e7OsH2UERnFR8DYuXV4eO9w==
-X-Received: by 2002:a05:6000:18ab:b0:481:45ed:cb50 with SMTP id ffacd0b85a97d-4814adc2590mr4032315f8f.16.1786446247854;
-        Tue, 11 Aug 2026 04:04:07 -0700 (PDT)
-X-Received: by 2002:a05:6000:18ab:b0:481:45ed:cb50 with SMTP id ffacd0b85a97d-4814adc2590mr4032229f8f.16.1786446247445;
-        Tue, 11 Aug 2026 04:04:07 -0700 (PDT)
+        bh=83Z7giIsXRjL+pG88JPHrWsQSLh0SWtxmdOYGdneAnU=;
+        b=kvhtdqkWnG7ueMTY+lajuBAtnhIOWVj252ND6/qwiXrEM8IfexXnkB9V3nHkSgNrJ4
+         eY4uI3tvxNSpzPfJnnsdhpK8gsKoR4oHlcLwJ195XtDVy6aEymbCAt5UNjAZCMPLG2gi
+         9bSISvBlR6RXVJMZi1k9PwiR3aJMeJCN2X+bOyTNBZqq4JT9psJl2oiUU0Q2HdQo+Aya
+         7cNVDzjNPnGGYU/WrIIzG4ILLjl9cDvIbyeWs5JRMg/v7H/zhmiyubVh69NXa4dZlQGP
+         SK+TnArYk4OVy3nY4MjBLvT6rvi8Of7tkl7pnkWGEdXIKiG9iVMb50cPJD5ZcNF4Kzgs
+         qj9g==
+X-Forwarded-Encrypted: i=1; AHgh+RrN1Mz0oLhKLVxUorSeXpFKmoVIAZ7JOfitxZ6nij8Ft9rxgYrEaHsIlFo+dETqY6LuRnF1NTJPyyk=@lists.linux.dev
+X-Gm-Message-State: AOJu0YzAWlWnciF48D5sjOm2jItxiyU6pX/qi1NpF2GxDwF0o2uMYXMm
+	XXhBfkpokpysOeDmgh81cxvbZhXSd+SVyCV01OiWVuP0WNlhsdvT+540Hjb70i9VPMuTGpl53Ol
+	ioo5/H2CBZE6cnQwXxq6s4cqa1oYCRqsa64FQxjcV578drbcZB7PcYoJZ5zxNgCsJ86Av5A==
+X-Gm-Gg: AR+sD10277I/ADUaxtpt7xcXvszRMWOr0RFQ4h29xNNpAx140AeKwtDlX622vYW1iit
+	kZKmKgwemRnCp3Krd7kQuF7zFlibmSBmU+MHol621Pezwjg6Z//mEgp41/+nhS2gcaBMm+fzfZP
+	5ciujq6fnLssXU0IVQ8SRqPo9k1Vg3ZIyzKHbmR/V95EWOXKzxShXTZH1IBUfi8wldTSV5jQgYd
+	jLX8kLItkpcWZ1/Z8wG0lxdpA2Va+h+zXqXpzJOj6iSio/S1oFtIqlIYQVPuEF1eJ5y5+lqppgl
+	kNMBToN8728RInGTC9AWyoE3P9ZGrt+qo9irtgY51un9+wkVNKG/Fp0jqOr1ALJ2Dkogl+wT36X
+	pXp5lm/05JHWrpE6lwl6M3b0eOO6ce1wRUmmYwupafgp+us2OtRBn5Yl2YTutioIrFEoXeH5e5u
+	FPCn++J+GqcawkDus6P5LIMEO2669fRA==
+X-Received: by 2002:a05:6000:60c:b0:481:98d:b24 with SMTP id ffacd0b85a97d-4814adbd65amr3736973f8f.19.1786448524447;
+        Tue, 11 Aug 2026 04:42:04 -0700 (PDT)
+X-Received: by 2002:a05:6000:60c:b0:481:98d:b24 with SMTP id ffacd0b85a97d-4814adbd65amr3736878f8f.19.1786448523950;
+        Tue, 11 Aug 2026 04:42:03 -0700 (PDT)
 Received: from ?IPV6:2003:cf:d706:f1cb:272a:2c7d:bb01:94e8? (p200300cfd706f1cb272a2c7dbb0194e8.dip0.t-ipconnect.de. [2003:cf:d706:f1cb:272a:2c7d:bb01:94e8])
-        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-4814a5ac6cfsm3224864f8f.4.2026.08.11.04.04.05
+        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-4814a709624sm4220464f8f.22.2026.08.11.04.42.02
         (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
-        Tue, 11 Aug 2026 04:04:06 -0700 (PDT)
-Message-ID: <1355454f-0dfb-463a-86d8-a09ef6204dea@redhat.com>
-Date: Tue, 11 Aug 2026 13:04:04 +0200
+        Tue, 11 Aug 2026 04:42:03 -0700 (PDT)
+Message-ID: <c549061c-8e9e-48a6-a149-2da743154c10@redhat.com>
+Date: Tue, 11 Aug 2026 13:42:00 +0200
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -75,8 +75,8 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC 10/15] hw/virtio/vhost-shadow-virtqueue: range
- boundary in translation
+Subject: Re: [PATCH RFC 13/15] hw/virtio/vhost-user: add shadow virtqueues and
+ eventfd intercepts
 To: Connor Kite <connorkite@gmail.com>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
  Stefano Garzarella <sgarzare@redhat.com>,
@@ -98,45 +98,97 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
  <eperezma@redhat.com>, Alyssa Ross <hi@alyssa.is>,
  Demi Marie Obenour <demiobenour@gmail.com>
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-10-6b97c439eb28@gmail.com>
- <ba6158dd-7b7b-4457-9256-497ab60a27d3@redhat.com>
- <CA+spn3qP1xahLRTNutmOLvDEXJXHh9W1tMeGeKiiDiz-ntyknw@mail.gmail.com>
+ <20260723-vhost-user-isolated-memory-v1-13-6b97c439eb28@gmail.com>
+ <13594665-16ec-47e5-9075-f7bd5552b0a3@redhat.com>
+ <CA+spn3r7+pEb7e6=8JixTpk7M3rNhWv=JkGZchj2-3FK9ZQGYQ@mail.gmail.com>
 From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <CA+spn3qP1xahLRTNutmOLvDEXJXHh9W1tMeGeKiiDiz-ntyknw@mail.gmail.com>
+In-Reply-To: <CA+spn3r7+pEb7e6=8JixTpk7M3rNhWv=JkGZchj2-3FK9ZQGYQ@mail.gmail.com>
 X-Mimecast-Spam-Score: 0
-X-Mimecast-MFC-PROC-ID: rIFJXWqq_APal9jfIof7Dc1pWC5tzLoNESGTeOjZN4A_1786446248
+X-Mimecast-MFC-PROC-ID: fsrQd-hJ3lVEwy0ABYLKo0fR5a_fHhvrs1X2tSHtb0s_1786448524
 X-Mimecast-Originator: redhat.com
 Content-Language: en-US
 Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 8bit
 
-On 08.08.26 07:52, Connor Kite wrote:
-> On Mon, Aug 3, 2026 at 5:56 AM Hanna Czenczek <hreitz@redhat.com> wrote:
+On 11.08.26 04:32, Connor Kite wrote:
+> On Mon, Aug 3, 2026 at 6:52 AM Hanna Czenczek <hreitz@redhat.com> wrote:
+>>> +    struct vhost_user *u = dev->opaque;
+>>> +    int svq_idx = file->index - dev->vq_index;
+>>> +    if (u->user->memory_isolation) {
+>>> +        VhostShadowVirtqueue *svq = g_ptr_array_index(u->shadow_vqs,
+>>> +                                                      svq_idx);
+>> Bounds checking via `vhost_user_get_vq_index()` would be nice. (Same below.)
 >>
->> It’s not immediately obvious what is ensuring that `iov_len` can never
->> be 0. Sure, it would be wrong and makes no sense, but that is why I
->> think an `assert(iovec[i].iov_len > 0)` would be appropriate.
+> Adding the bounds checking outside of the memory-isolation only code path, since
+> file->index wasn't being checked previously.
+>
+>>> +        if (svq->hdev_kick.initialized == false) {
+>>> +            int r = event_notifier_init(&svq->hdev_kick, 0);
+>>> +            if (r) {
+>>> +                error_report("Failed to create kick event notifier");
+>>> +                return r;
+>>> +            }
+>>> +        }
+>>> +
+>>> +        file->fd = event_notifier_get_fd(&svq->hdev_kick);
+>> What if `file->fd` was -1, i.e. `VHOST_FILE_UNBIND`? Should we put a
+>> real FD here then or just continue with -1?
 >>
->> (Looks like `virtqueue_map_desc()` is what rejects zero length, but that
->> is not really local to this code path, so not immediately obvious.)
+> Good point!  I think we need to propagate the -1 to the backend device, and
+> run event_notifier_cleanup on the existing svq->hdev_kick.
+>
+> ...
+>
+>>> +
+>>> +        if (svq->hdev_call.initialized == false) {
+>>> +            int r = event_notifier_init(&svq->hdev_call, 0);
+>> Do we need to check if the call event FD is already active?
+>>
+> Do you mean, do we need to call event_notifier_test_and_clear to see if it's
+> been set and potentially run the call handler at this stage?
+
+Yes, that is what I’m wondering. `vhost_svq_set_svq_kick_fd()` has this 
+comment:
+
+ > event_notifier_set_handler already checks for guest's notifications if
+ > they arrive at the new file descriptor in the switch, so there is no
+ > need to explicitly check for them.
+
+So it sounds like there is some mechanism that will ensure that when the 
+kick FD is set on a shadow virtqueue, it is checked for activity 
+(notification), and if it is active, this is… handled? Which I suppose 
+means the installed handler will be called.
+
+But it’s entirely possible I misunderstand something because the same 
+code in `vhost_svq_set_svq_kick_fd()` also just calls 
+`event_notifier_set(svq_kick)`, so… kinda always emulates a kick, I assume?
+
+In any case, there seems to be worry about pending checking kicks from 
+the guest in this switch, and so I wonder if the same needs to be done 
+for the call FD.
+
+Hanna
+
+> If so, this might be where some of the intricacies of when things happen in
+> vhost-user vs in vhost would require some extra care, unless isolation mode
+> implementation moved up into vhost.
+>
+> ...
+>
+>>> +    /*Modified from vhost-vdpa*/
+>>> +    u->shadow_vqs = g_ptr_array_new_full(dev->nvqs, vhost_svq_free);
+>>> +    for (int i = 0; i < dev->nvqs; i++) {
+>>> +        VhostShadowVirtqueue *svq;
+>>> +        svq = vhost_svq_new(NULL, NULL);
+>> Patch 15 adds clean-up for this; I would squash it into here, as far as
+>> possible. Ideally, a patch series can be stopped at any step and not
+>> break anything, so if an allocation is added, the accompanying freeing
+>> should come with it.
 >>
 >> Hanna
 >>
->  From the QEMU Coding Style guidelines on error-handling it looks like
-> errors that
-> could be initiated by a malfunctioning guest should not cause Qemu to
-> exit. Would it be
-> more appropriate to return false when zero-length is detected?  That follows
-> the existing error path returning up to vhost_handle_guest_kick, which
-> renders the svq
-> unresponsive to future kicks.
-
-Sure, but it’s necessary only *if* a malfunctioning guest could cause 
-this. As I said, it looks like `virtqueue_map_desc()` already rejects 
-zero-length descriptors, so an assert should be sufficient.
-
-Then again, if you can handle it benignly either way (without an 
-assert), that’s always a good option.
-
-Hanna
+> In hindsight I shouldn't have considered cleanup a separate stage in the
+> development.  Too easy to introduce bugs that way.  I'll move cleanup up
+> and comment in the Patch 15 thread.
+>
 

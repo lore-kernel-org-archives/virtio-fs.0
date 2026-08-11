@@ -1,82 +1,82 @@
-Received: from mail-qk1-f180.google.com (mail-qk1-f180.google.com [209.85.222.180])
+Received: from mail-qt1-f169.google.com (mail-qt1-f169.google.com [209.85.160.169])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 490EB3C1D57
-	for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 06:28:51 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.222.180
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 50F813002D1
+	for <virtio-fs@lists.linux.dev>; Tue, 11 Aug 2026 06:28:57 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.169
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1786429732; cv=pass; b=bgCJY49XuSYrLhhLjkSh4aI9O8PJaD2byCQfTm6kwcOMN6KCDv3hrO9CdIydFjSzMyiVqUispWOw/i2t6abviXOXJHsbMNv+7mvsqwRTeR1PzdgTt2UKa+DlPyB2db0v+x+SCSML93N9OEsavBemkpbuvISl0noKbVddVeUgJtM=
+	t=1786429738; cv=pass; b=tpZ6dGERV19NgP/ZIYWb0j7Cq5f1DPjGTvnGpbHRrwHEAYXImmFb4/OH4UgSHmNMXP3VeA2zUPr2+aya2OBld3qDT3pZxsalAQVL0dYdOqdawtQrJRnrio+XdV3ASxYJ1M2sukqIUx7hjL9F7AWgcjHbAC+Znq/0VYPOmXtlJP0=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1786429732; c=relaxed/simple;
-	bh=UkV0HbJ6jZdCfg/HxDWdz234vVFXU4X4eH3eWzp9yM8=;
+	s=arc-20240116; t=1786429738; c=relaxed/simple;
+	bh=hacj+/fZxvJAmK6F60ANwraxhDl20/2cjrnhnnmJf2Y=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=gYVYQv22IuXRpX/ykMhziuQaS/1P4oEcrfoJlvWuLFVZUQw+6MWrMLlNWEv0xs4gqT+aEMhAcfYAfFtaQxjFG8CMT8AlqSBHhBHHXbeeYktp6gJ0YSqPGReZEq1YD33b2glbIzisMyFzS8HYvdlq7vxwSGBrQgaRV2vCHlhIh/E=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=gsBMARb9; arc=pass smtp.client-ip=209.85.222.180
+	 To:Cc:Content-Type; b=UsN34SXXI/vKYC9h2Un19mMryWO7QY6fs+xyXwUplkxR2vSq0f731XkzoT1Cua0oWQuIb/S+SiurWfoqALp0fT4t0WRlYQfLddse/U7WQHZ6t8KiHYhNBR8kK1AJAr8idDsMql6IIXVxBg6RAYiYsEA6Dk137gmeNwIMl10vG28=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=ZlEvaboH; arc=pass smtp.client-ip=209.85.160.169
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="gsBMARb9"
-Received: by mail-qk1-f180.google.com with SMTP id af79cd13be357-930f4e5eed1so19598285a.2
-        for <virtio-fs@lists.linux.dev>; Mon, 10 Aug 2026 23:28:51 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1786429730; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZlEvaboH"
+Received: by mail-qt1-f169.google.com with SMTP id d75a77b69052e-51c5382806fso29486561cf.2
+        for <virtio-fs@lists.linux.dev>; Mon, 10 Aug 2026 23:28:57 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1786429736; cv=none;
         d=google.com; s=arc-20260327;
-        b=VhSBhF2naptWyiHlvGlQpo51gwslaGppmdr5+Z62/F4wWO3Zy1SKMthAlqOZrQULRf
-         SAMbaZNDcmjWDPLBy42znkymdm9ETgw0Onw3LzorgRAjIPi2mjOsq1oJ7iB3CGdDgPG3
-         iTaM38CStzOQPeiBKgIw2wJ51qMrHCi9ciNfXc4mAtTdtwl38FSob/Lkvkcd2KaeNU5k
-         sDddXUTR6lEeMTQsKzN43rdjZTBUaxUxgrbGPTLMZCQRQDBe3wc1oVMHsg7TO8LZsIUX
-         1KFLEwvJ+ohUn2iNWEvDRx4hcEbGIjsBSigIvav4MIRwxFjcFsllX6ot7BnR5urKfoPt
-         L6Iw==
+        b=CR6TM00+iAT0uZjiE/VcUmy+pLWKcpZOxRavYdUM5v0CAXu6Fif+kC20WjB1fE4fQH
+         zl3Ll+WGg1Hu4gETbp0PqQbdpGnUHDEa4/j0y7VendQDu3qo6WhYFhhZKi1AFKiwT7ca
+         gFj5ajWFdSbr8GcgDBgKonJU8RuwXJoaPVRBMMS7qn7Nz5T36HqXonhQOQB4eiVGw0Ua
+         rRCZW+as6hLRcUDTSlrQnLVQ2xBIbrow1s+o/9fBAx+M5Q50jcT8UMKOTlK34DQG9fss
+         AFk8PtlRB5sR/0DzcxHKvzznUHtmV9ae0GNiDv2DSb1aLtoYsOAiJBGnGwn7bsJnH7Kw
+         IcBQ==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=qk+rCaZz7kJBNbLgETOFxIZK9svgbPsa00ch9b+croA=;
-        fh=lZgEF08Magxbmh8K67mOBO4BMKqqJBwQjZlFrScHm5I=;
-        b=fKhjWFgTDfjHdZmRsm+vmyg9n2lzkCmdWXCbt/e80xjYaJ/VJUrp8hAOSEMxzV0REj
-         Z3j4861JRnEcJqiV1rey92NJdtzikQg8t03nAbKTiwu18Nayzeb8Nobqdu5UM1jDlcom
-         RcWK8ZvKWxhe8BYUu61bZeQemkOpUwVPEqoM/uf2tsqZMIsfERHI6HaVA0y5uIxi0Kks
-         a0KelP/QfjrsjUU70M3uRQWilR+aWqe1E36al5RBnZKLEI+X4v/WXxXBnuWOL6BZDlzJ
-         cCV7c3L3hBCso1mY97oQZqbSnKeGN+OBCxA5NKJCkkaKc45S7zBeDnHLC/Dx1z1PODi6
-         BVYw==;
+        bh=q55nAj0wvf6AevCEGFeSNE9kkBxxi2Gq440bDilNO00=;
+        fh=kJWr70pPfQDSkgtgfeClCyeGxNd5qW53nUqUam0eEjQ=;
+        b=H/fFqvoOrQ8WPOfoibyuP/9knx08DTh7pcwNXXG2hA9G4qv2v9T+7/Az/Bxd+vyiJe
+         G08yLsX5anX5eDtJvhGicpMp8eQGtq8UXU23sVReBDlWyUoNAOly2e2BOiCdKaWoU3wS
+         0rhk3IjFuDz8fRJZKP3mw/rl/69JkZJsajlfRkEbZSDUANSOeCtIhLJkYDfSzWHb2xDS
+         SL+hqbLkRc6LDL3oODvz/9gEi42+MYx0RVZYq1atTsMNaHEQM5B0eWuQXqnDd9bawlSF
+         0bDvC+GaMIW4tfKWXcMnoDBf7AUe8cCpy2X7pElokWG6q8Ku++5TAcLzo43jz9RS7WbN
+         GdPg==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1786429730; x=1787034530; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1786429736; x=1787034536; darn=lists.linux.dev;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:from:to:cc:subject
          :date:message-id:reply-to:content-type;
-        bh=qk+rCaZz7kJBNbLgETOFxIZK9svgbPsa00ch9b+croA=;
-        b=gsBMARb96dYgtB0x2Z+tSBHTxjFvv3UUMVtRZsZe9UdhRa/m8tCDnkZGoj/fmv2moR
-         LFOgA5fzgDAR90lLw9FOgWTeuL+/HT1I83G5sTAu9sExcfAHk7aQWk5FL73Pe/y+CVsb
-         H30+eD+Gj9NBD+vkiYvMpaTcMc0MaqwTxKgnJSVLo+HRS+HacL2Y3QV6efojMNU82LSr
-         ohQZbWiv/kjCYUYsaf+G5XNlgsOzLHmFdgms+6z/HY5q5islNWvWjP1PXLXdd8fMTUPW
-         Gs+HJ63uaInUQgY1XydKGOm0TwLdSuggnmI0sgXHQyGfsncxnc7J6VsufIpz4LOaz6zR
-         C9kw==
+        bh=q55nAj0wvf6AevCEGFeSNE9kkBxxi2Gq440bDilNO00=;
+        b=ZlEvaboHYn7zdfEAE/LbxMj0cg1Jq8fAj1jnCOXaxxFV+iJAI7Q/oNNyLG81fdlpC2
+         EOb+mwbLMSPs3aWyhGI0plQwxMWYqAO9ff5On1KSttPo0rytareoEEK635kKrAqOt7z7
+         AQFzJ7SR9pOP+xts5riK2DBLo4AdOxP9BKtDUFRwBv7UJfGXSUlOF6xSlsUCkmdb26XJ
+         oNaWQUjPaeMFZaYddYzGHzEyniPhrQmLAa95kj6tssF/2jJzSVomUm+Q9EQiQC9fqCMM
+         eYd24yivuD775qvpKpL4sOl973XX5kNZ8iSWhf4ycsv3O7rNh5N09u+B7q2BaWoPGY9t
+         7+2g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1786429730; x=1787034530;
+        d=1e100.net; s=20251104; t=1786429736; x=1787034536;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=qk+rCaZz7kJBNbLgETOFxIZK9svgbPsa00ch9b+croA=;
-        b=rhHVasiTF59DxVazLTpA7Fll4Okc3fYwpZ9eXUuAqdaJkYL7RbSP2YQiDWu9HOQLs3
-         OXGbPKkW0PcC3L+LT+FiWTQrBD8veppBb3qBHGIhZn5WF5Fw8ZqktVpuH/D7jkMa3xu3
-         7Fj4um6U8URMAiuMaZM440lauc+LALjFUwkgmESgocs/n6IPP/LBPBA98dwZHuIkrpjK
-         eBGNc1ARzPpU/B4krDCfK89kbYQ5RXT2TyQLSRPLXX9stw6PT5Z26Z1aej7q8zEDjmvb
-         sg0BQb5QVWMEJXtRs3r+h4J4MzdNZ8MaGTq7Vde5je62n9AHe7dhnkmUMY9zKuWuZL+u
-         IEMA==
-X-Forwarded-Encrypted: i=1; AHgh+Rq4ygKF9TwGOGcv6ALQK1yHutkfI1UbMqRbCfBkm3z1YBQwUAKFy09PyAb0AAAxyYlyKYyQvUBF+Nk=@lists.linux.dev
-X-Gm-Message-State: AOJu0YyqDXUmvg8NldXHtIdy7yDZQLpUaecoDpTa22+H2FQPF8OuZbzX
-	XCkwiclNmBu1IWhKakciLPouYXrWs+TUaS0Htxh31NNmpJzI9vwXgafJCVQF/nAElOZPjjSdIrq
-	8kY5GYenC7d/o8VFo6Ii1LsZgx3f3Xb8=
-X-Gm-Gg: AR+sD10BytH1Ggq+xndd8cwgV17XNTraVnOE4MT2wDCBGpQ5WIegqgBpX/eOXeWqmTL
-	rv4l9wGdmRvwOUjAFyM+rmcXewywjYFy0nP2VH3OgfJrnbO6o2ZWU2RFWpIX5e3R0NaiKz5GYN9
-	Vgl0OFnafbbjrCNY/xVFnlUYMGTVxQtZC5S5tECc0jQ3HatEKiDoML8HKYDJCd9vX0DuxNbt2b1
-	Wu1A69fNr4KcqAsBCK5E6t8EJkbXOglngdDux1cjBPCVwE9XiNji0DKM43FBN7OU9Q61wxL4c+b
-	wBvAzMqlSuMeOygzteSGly7/smAgf4rbv4Myotgrd1vX2BYkq9Er3idT5srsjuFM/ZS3Pk6+Qao
-	/0kk=
-X-Received: by 2002:a05:620a:d85:b0:92e:8a84:7041 with SMTP id
- af79cd13be357-936a8e6cae7mr73114885a.8.1786429729981; Mon, 10 Aug 2026
- 23:28:49 -0700 (PDT)
+        bh=q55nAj0wvf6AevCEGFeSNE9kkBxxi2Gq440bDilNO00=;
+        b=VCWVqvu6e80g7V/yQV3r9sgMt0dIhlZp1p+dL8usS3TsSuzjFNpxBM7+Q+0H5KNr1Z
+         BLc+6u5YWBdnNxPbOVO8S09qkTljYF5YR1iAxlQw1PdLPKn6rIGzyuDn6ybfbXNA9tQq
+         xC9CagwnMrfDi2roluoqehosgCM55ic2/e4uMrLgxzSEDqPtagcQdswZqygRXeunV4+E
+         z4Ek23gRCPaNs8k4ouhs0QqIr4ILkwDf27zdt0DnGtiRwOPwyrU24UldXq/OfPvKFhex
+         lBZx7ieB9Nj1cMxkRyNibskic1FTxzhMTF1iiaXpA3gES3eFQ1nORBe1oAJxBGKc/XyD
+         tg2Q==
+X-Forwarded-Encrypted: i=1; AHgh+RqwkOmjrKKtxjwCO46IFimoV3/gHMnpAfUgsW6OlU/8To72C7EwzVyz7uoX4ss3bQ5zp8+0au1ydtI=@lists.linux.dev
+X-Gm-Message-State: AOJu0YwbVjbJ9DWUMnhIr1Mw4UGaBclTKpj9pxXkIGqoR+qY3fEjGPyl
+	DHWD2wMhZcPeEs65PT6A369l1uPSP97IMwCcJ35YXeFuLgGMqIUjt+9lYlf+c/o7uBaeiKvM4Ci
+	PNNMIgFG4PwW2AIoF9w5d5SPCFgEYtps=
+X-Gm-Gg: AR+sD10X2kZhMH7Q/XkKjsEdfJ2SgC5sKtRKLWdU0dhwRyDNueJpHQkq8p+FuVbPxm2
+	zfRDks+TJSecooHMipp89Tv2bTzc847BxSPMeVXFz8mxYoaZVasiQu0zDxGRhObsrGMHfJAODZM
+	Hw5ZI2OsNcmY62jKZv5DfpEdREeDDEFNcYhfbRRJf2hV8ajn7qNOWwOqbg+kg9yD5bV2wqRJurh
+	TSWxJ5D+lBlT0Yh+GPNBzekWPhQ65xKPwPNGorNlcQcUIXCBJ5tGw+fnXbnTDUYSWpYH8K+LhGs
+	YQhnLH0c8bPJ2ZHXlVOVEn3F0xCJuDJm0xp0ZI+ap2fNreSozw4Z3OrCO7y09wa5Sv7AkIgaizr
+	DNeg=
+X-Received: by 2002:ac8:5cc1:0:b0:51c:2068:a9f8 with SMTP id
+ d75a77b69052e-52d5849587emr8908861cf.5.1786429736098; Mon, 10 Aug 2026
+ 23:28:56 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -84,15 +84,15 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-14-6b97c439eb28@gmail.com> <f3ff63d6-6e88-4c82-9455-ca250aa42170@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <f3ff63d6-6e88-4c82-9455-ca250aa42170@rsg.ci.i.u-tokyo.ac.jp>
+ <20260723-vhost-user-isolated-memory-v1-14-6b97c439eb28@gmail.com> <20260728205728.GL371693@fedora>
+In-Reply-To: <20260728205728.GL371693@fedora>
 From: Connor Kite <connorkite@gmail.com>
-Date: Mon, 10 Aug 2026 23:28:37 -0700
-X-Gm-Features: AUfX_mzPDsezATrFYKlhOp6dhdhhkEzRtL-sBWPEdLTmR2c4JyFU57etfo2dkd4
-Message-ID: <CA+spn3qLUh2CWoKMDV=jQrughZmZ9DgBE+gidbn1xmTxCqpNsQ@mail.gmail.com>
+Date: Mon, 10 Aug 2026 23:28:45 -0700
+X-Gm-Features: AUfX_mzDej6OfzJGyINW_W_w6Z7pGsHtQUxPBWQtT9pRtZeJZNjLDViu7ukeDnU
+Message-ID: <CA+spn3qnRrEYLzMS+MRPg0c1UYisp68fFXp-GQzs_chKSr6XeA@mail.gmail.com>
 Subject: Re: [PATCH RFC 14/15] hw/virtio/vhost-user: handle data movement with
  shadow vqs
-To: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
+To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
 	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
 	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
@@ -101,7 +101,7 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
 	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
 	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
+	Milan Zamazal <mzamazal@redhat.com>, Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
 	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
 	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
 	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
@@ -111,63 +111,36 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Jul 24, 2026 at 8:20=E2=80=AFAM Akihiko Odaki
-<odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
+On Tue, Jul 28, 2026 at 1:57=E2=80=AFPM Stefan Hajnoczi <stefanha@redhat.co=
+m> wrote:
 >
->
-> This copies data in the reversed direction.
->
-
-Good catch!  This will be fixed going forward.
-
-...
-
-
-> > +    DMAMap needle;
-> > +    hwaddr *iova_base;
->
-> Please make it void *.
->
-
-Got it!
-
 > > +
 > > +    for (int i =3D 0; i < elem->out_num; i++) {
 > > +        needle.translated_addr =3D elem->out_addr[i];
 > > +        needle.size =3D elem->out_sg[i].iov_len - 1;
 > > +        map =3D vhost_iova_tree_find_gpa(svq->iova_tree, &needle);
 >
-> An error check is missing here. This translation does not seem to
-> support IOMMU.
+> Mapping failure must be handled.
 >
 
-I have added in the error check.
-
-Looking at vhost-vdpa, there is an
-error when IOMMU is enabled at the same time as shadow virtqueues.
-I'll need to dig into what, if any, work is needed to make svqs compatible
-with IOMMU enabled.  For now, I can implement a similar check in
-vhost_user_dev_start to that in vhost-vdpa.
+Got it!  This will be fixed.
 
 > > +        offset =3D needle.translated_addr - map->translated_addr;
 > > +        iova_base =3D (void *)(map->iova + offset);
 > > +
 > > +        elem->out_sg[i].iov_base =3D iova_base;
->
-> elem->out_sg shouldn't be overwritten since virtqueue_unpop() will use
-> it to unmap the element.
->
 > > +        memcpy(iova_base, elem->out_sg[i].iov_base, needle.size + 1);
 >
-> This memcpy() is no-op. elem->out_sg[i].iov_base is already set to
-> iova_base, so it's copying from iova_base to iova_base.
+> iova_base is an iova, not QEMU memory (HVA). Memcpy cannot be used with
+> IOVAs. The address of the mapped shared memory is needed as the
+> destination instead.
 >
 
-Roger!  There were a number of unnecessary adjustments to elem in
-both handlers which should now be fixed.  As the IOVA and hva of the
-isolation region are no longer the same (see Patch 11), there are some
-additional changes required here, but the memcpy issues should also
-be fixed for the next rev.
+This is a relic of how the IOVA space was originally really just the
+hva of the shared
+memory.   However, as you noted, that wasn't great for security.  Now that =
+those
+address spaces are separate, the call is adjusted.
 
 > > +    }
 > > +
@@ -175,94 +148,112 @@ be fixed for the next rev.
 > > +        needle.translated_addr =3D elem->in_addr[i];
 > > +        needle.size =3D elem->in_sg[i].iov_len - 1;
 > > +        map =3D vhost_iova_tree_find_gpa(svq->iova_tree, &needle);
+>
+> Mapping failure must be handled.
+>
+
+Fixed as above!
+
 > > +        offset =3D needle.translated_addr - map->translated_addr;
 > > +        iova_base =3D (void *)(map->iova + offset);
 > > +
 > > +        elem->in_sg[i].iov_base =3D iova_base;
 > > +        memcpy(iova_base, elem->in_sg[i].iov_base, needle.size + 1);
+>
+> No memcpy is necessary before vhost_svq_add() since this is data that
+> will be read from the device upon I/O completion.
+>
+
+Copy! It is removed.
+
 > > +    }
-> > +
-> > +    vhost_svq_add(svq, elem->out_sg, elem->out_num, elem->out_addr,
-> > +                  elem->in_sg, elem->in_num, elem->in_addr, elem);
 >
-> An error is ignored here too.
+> elem->out_sg[] and elem->in_sg[] are modified in this function. Have we
+> lost the original I/O buffer memory address from the guest virtqueue?
+> This is a problem because they will be needed when completing the
+> request.
 >
 
-This is added now.
-
-> > +
-> > +    return 0;
-> > +}
-> > +
-> > +
+I don't believe they were lost.  I had complimentary operations on elem
+in the two handlers.  However, my thought that these needed to be adjusted
+was incorrect, so address fields in elem are no longer modified in either
+handler.
 
 ...
 
+> >
+> > +    if (u->user->memory_isolation) {
+> > +        if (!u->svqs_allocated) {
+> > +            return 0;
+> > +        }
+>
+> Is the idea that this returns silently when called before
+> vhost_user_dev_start()? State make code harder to understand. It would
+> be cleaner to set up the vring addresses without relying on
+> svqs_allocated. What is the reason for deferring the vring address
+> setup to vhost_user_dev_start()?
+>
+
+The current implementation follows a similar order of operations as
+vhost-vdpa, in which vhost_svq_start is called by vhost_dev_start.
+vhost_svq_start is where vrings get assigned their locations, so there
+is no valid address to send before then.
+
+As we discussed offline, this could potentially be fixed by calling
+vhost_svq_start when the mem table is being set, though this
+complexity among others is a good reason to move implementation
+of the isolation mode up to vhost.
+
+...
+
+> >
+> > +static bool vhost_user_svqs_start(struct vhost_dev *dev)
+> > +{
+> > +    struct vhost_user *u =3D dev->opaque;
+> > +    uint64_t vring_base =3D u->iso_memory.vring_base_addr;
+> > +    u->svqs_allocated =3D true;
+>
+> Where is this field cleared to false on reset?
+>
+
+Nowhere originally, but I have added it in vhost_user_svqs_stop.
+
+> > +
 > > +    for (int i =3D 0; i < u->shadow_vqs->len; i++) {
 > > +        VirtQueue *vq =3D virtio_get_queue(dev->vdev, dev->vq_index + =
 i);
 > > +        VhostShadowVirtqueue *svq =3D g_ptr_array_index(u->shadow_vqs,=
  i);
 > > +        svq->base_addr =3D (hwaddr *) vring_base;
+>
+> Does this support multiple virtqueues, it looks like they will all use
+> the same base_addr?
+>
+
+It does!  vring_base is incremented after the assignment is made
+for each svq.  Having said that, I don't think this works with virtio-net
+where the device is implemented as multiple vhost-devs.  Since
+multiple vhost-devs would need to share the iso memory, I will need
+to adjust the vring assignment accordingly.
+
 > > +        vhost_svq_start(svq, dev->vdev, vq, u->iso_iova_tree);
->
-> Calling vhost_svq_start() here overwrites the shadow vring index
-> configured in vhost_virtqueue_start().
->
-
-I might not understand what you are referring to here. If I understand
-correctly,
-vhost_virtqueue_start() does not touch any shadow vring indexes, so I
-don't think
-vhost_svq_start() could overwrite something configured there.
-
-However, I see that the assignment to addr.index followed by
-vhost_user_set_vring_addr
-might create a disconnect between the vq index and that sent to the
-backend.  It's possible
-my ordering is just right as is, but I will confirm by assigning
-virtio_get_queue_index(vq) to
-addr.index
-
 > > +
 > > +        struct vhost_vring_addr addr =3D {
 > > +            .index =3D dev->vq_index + i,
 > > +            .desc_user_addr =3D vring_base,
 > > +            .avail_user_addr =3D vring_base + sizeof(vring_desc_t) *
 > > +                svq->vring.num,
->
-> This assumes the ring is split, but VIRTIO_F_RING_PACKED is not rejected.
->
-
-Currently, shadow virtqueue does not support packed vrings, so I can't here=
-.  It
-is a good idea to add a check and reject VIRTIO_F_RING_PACKED.
-
 > > +            .used_user_addr =3D vring_base + vhost_svq_driver_area_siz=
 e(svq)
 > > +        };
 > > +
 > > +        vhost_user_set_vring_addr(dev, &addr);
 >
+> Also mentioned above in vhost_user_set_vring_addr():
 >
-> The initial ring startup is ordered incorrectly. Generic startup
-> suppresses SET_VRING_ADDR, installs SET_VRING_KICK, and injects a kick;
-> only the later backend-start hook creates the shadow ring and sends its
-> address. SET_VRING_KICK starts the ring, so the backend can process
-> before receiving valid addresses. The late SET_VRING_ADDR result is also
-> ignored.
+> Sending a vhost-user message here is strange since that should already
+> be done by vhost.c:vhost_virtqueue_start() ->
+> vhost_user_set_vring_addr().
+>
 
-I think to avoid this issue, I need to assign svq vring locations when the =
-mem
-table is getting set, rather than on device start, as the svq
-implementation seems to
-expect.
-
-It is likely that the isolation mode implementation will end up moving
-up to vhost rather than
-vhost-user.  If that's the case, some of the complexity around
-tracking order of operations should
-be simplified.
-
-Best,
-Connor
+Same response as above.

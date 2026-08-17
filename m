@@ -1,201 +1,152 @@
-Received: from mail-qt1-f174.google.com (mail-qt1-f174.google.com [209.85.160.174])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+Received: from forwardcorp1a.mail.yandex.net (forwardcorp1a.mail.yandex.net [178.154.239.72])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A908817745
-	for <virtio-fs@lists.linux.dev>; Sat, 15 Aug 2026 23:06:50 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.174
-ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1786835212; cv=pass; b=kanDfsEwIiNE4DF8JoHmQmwmGsOuvJPGE9jv3dGWELINol96SpjmsjXDTDWoZj7+hlrWCh1ILjlBS9073TSEqnYj41fcFztmyi5LWhj4Dj7Q6Sq+pEfYKGTh8K5roC6Rm9uHpDBJ2GvtNtU0k6R+Hp3TeAB7LXpWjPMdcZ0kyJM=
-ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1786835212; c=relaxed/simple;
-	bh=SXHY5XQEJE+f6QflRNKov5QKXTMfGOMMRtdIN9qwj5Y=;
-	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=tZ/2Mmqb2m+14eUAqr5iNnfslCmVIE4gBLjGuj8uQtEgaI3z6SZGiNpqwaCrNYNkPXwytmRNWOukpA52BG9yMQIoBrM/cwSUARKfe3f5fU5JAk2At+sR7E/El9WtEL6RYJ1AyHL1WXekr4wfVJKmXjBW+/EsAmvKEPkhBbLGyoc=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=s7++CAuh; arc=pass smtp.client-ip=209.85.160.174
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A38D13769EA
+	for <virtio-fs@lists.linux.dev>; Mon, 17 Aug 2026 05:29:58 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=178.154.239.72
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1786944603; cv=none; b=EGOiJvc7rsqzRgqWPPLisovbWasZx5zlJyQXs1+9KNy4YJhwQvq06a+zNwFetSCUKZ+8pUtAL1zKOoGAVYdTqhdlOlb0C1c5KHpYgFJHbNpB9gmz8Vb3myHix8QUHsDmCqQ+fhp9WTDId6XpbLdbW+epu/G80AF6l0iLnonGhpU=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1786944603; c=relaxed/simple;
+	bh=kTGYoy4iy2DS46bPosHBVud1vz2PyAgTDrUbUgyE7lk=;
+	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
+	 In-Reply-To:Content-Type; b=V4DtsrnMGWRxIedEMVG1zR8IuZtH+hIf59RFDMvVNtU0T+/HEcbSzBvfY3HZz8krzZXuaFQVAKnPhyEqV9TSBHCmXPWyea718XO7xN25pBFlcqHzLgPT4Nw5vSkAa+1uzhlXybijdBtLveB5bSQYCFFeA7gyYHp4WjPh6k3cJ7M=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=zJCRxF79; arc=none smtp.client-ip=178.154.239.72
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="s7++CAuh"
-Received: by mail-qt1-f174.google.com with SMTP id d75a77b69052e-51c0cea8883so17017191cf.1
-        for <virtio-fs@lists.linux.dev>; Sat, 15 Aug 2026 16:06:50 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1786835209; cv=none;
-        d=google.com; s=arc-20260327;
-        b=Ha9spw0orau/MX2ivK+33A68yRa448cNn/kkhskXdU/Ny6TAVGUNx+HZ5XMV4Agy9u
-         qmjJoQn0an51COSQz23oUX+MZzVlskQ9XpQUTcbQZI9/Yft6t0tcHHYpT4d541606NeR
-         v62TcGoDiq610qHTqsY7zh0IKvATUbo4nldLucP2wFP7RCAIJIPAtwAkoDePdM+QuVgx
-         TCSLzlI3p9+VzRqFJ0Zsyweeof0vF/5yM9NyCWmVFfVwZvUgwlWHkwo3M+2b6kKHvVGM
-         /NII3FX3ZByko1EkPBZIEfg/tFZvKmuuY6qbhjP/bQYC1dLPz8dMAmxpNnW9oInEU966
-         pNUQ==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
-        h=content-transfer-encoding:cc:to:subject:message-id:date:from
-         :in-reply-to:references:mime-version:dkim-signature;
-        bh=ACamN608LlVcQYgc7KvwUxPHxL2uAxs3qXDqYIboXB4=;
-        fh=JFVnEYh+BV92hSk1VPxzShDdQXAUCVXtqB4lDgM3MkM=;
-        b=Ly+8Ps7GM7+J72pOtuDqwZFgKGpIhBzMQ8bW39YNUuUB8+DKHPEnsNc26H5lYWZc2T
-         3qdbEgoNl8uGG8iBUBAHCPsRvpanA4LMaT1DMntIerciqwtHiHJwNHh4JU0eupx7Nepp
-         2065P/Xsldv6SKnFd9soecW4z050ndYKKcwWwBHLQ9kUKXaXxsTqH3u0sOXLPsyFUx7c
-         a6kHRGcG9Tnlh6zR57aftNnBaepZk8WGI5vhweS4IHNxmuNcTkZz8TUNDRQlQ8Mxu7oY
-         EAiy8qN4Y+dIF3sAjDpOFz+K16BZUzK6HpmnjYYBquTJrHW7r/6J8adYPSX3HUezB+9D
-         bAiw==;
-        darn=lists.linux.dev
-ARC-Authentication-Results: i=1; mx.google.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1786835209; x=1787440009; darn=lists.linux.dev;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
-         :date:message-id:reply-to:content-type;
-        bh=ACamN608LlVcQYgc7KvwUxPHxL2uAxs3qXDqYIboXB4=;
-        b=s7++CAuh5ZPdBPIJyrl5U2NXrhGow/E53PScCJU/zecAm7wGxsrxLgobDWiuDHZaKW
-         SctZitZLa6JmW91DsW6qZ83scTJu9ZKhXeOP86kxCe21LTqEY1chdPzwidvzgaXmMn4L
-         FS1jGP3lVmBtQjr2CGhlaOxLvwWterjgviT4qYVkrnAOAh46r1dK7x9/TYHhgfzE5QgC
-         +Iern5BagrQr5AoLFMBSz5oluB2QRBp6mYmwnWkP/gsajt48OPB/D5iRZLct97juy0Pi
-         KQFsmViVFFEY2t7g94Jgp6vJSf4vK/HgB7VPGrWdBHJhm5mc+B1qwIqs6C9LfpQ8CB2I
-         0HyQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1786835209; x=1787440009;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:x-gm-gg
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
-         :content-type;
-        bh=ACamN608LlVcQYgc7KvwUxPHxL2uAxs3qXDqYIboXB4=;
-        b=BINfOsuOZW/woFvrofzCbBG+Kp3o5HcJOtpzH/ZRwBZg+yU0KQwcSI8sfTRuSX/7ZY
-         8XD8X2ZulTDKFcH9/pZpXznP91YQeKflFilmqbSWtQQqoVgEhllDJu89Cgj9aavYkI8m
-         WBDozyzASanQfTcK5KXWv11kfCTMjQcfLYd3Qw08Kkhxuzy2M3h3p7Krr9bXFcUMwN+5
-         FrY4meIY3vTh+FpLlSgTOTL5ElIUCaJVgnr6Rvz5IO0m9bkLRMDXyGGEwsHtcOIIpDwH
-         tty5glcWN9AGCavRmVwpxzYrfOwzdpL32ZXzonOnraLyk9GZmxNML8RG/hsf95AmGVOS
-         FvJQ==
-X-Forwarded-Encrypted: i=1; AHgh+RoUPyvYZ1Bl3sMZ/FGGZvFYHOM2hz+7yalxSBjzwpg3Qtty6Hw1S5bWg3tQP9uDFFK7NFpUzaHGgvE=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yx+d3mYgnovNXihpAfVQVCTMvhmcq4hG/tcglNJ95BzLnT/7tOH
-	oMP/XbBbHk9/tMRkIPD+1Lqgmumga1uOE78AWen3hfaA4uaoTmhmlvj0atJkVLIevjAFcS1G68x
-	ZWw3tOuWzyrqfLi4Qmlsv2dELFv9o5uM=
-X-Gm-Gg: AR+sD114D/Tlf9nrsE1nPQyBQoADBEqTILYtub/WasNQaHEKfCs+H/YlIQ+4Q0NVajX
-	v0PRaPqez3uojSUnwCi0x/SBkUu2GlveHXupnxwIitmustyK2626nafXgqIHJNqcIe5pmrivwYr
-	ngTTjXW6h8JXloJpu9YrYELKGOS/i75R7EaBCOmds2TeFBh6MkUATWFkKu3LRUNdWWGtUuuAWG1
-	9oR5A3npl51eQ0MuEg4ExJm43LZWV4frtcmNRixUs1kDLLOKRM8OBCG0lyGxlpUafZgu4EvWR+y
-	FBRNGWvDBGit1eJOV2NN+1PAqSIojmF5NhfCKiKxydSeGJvSmLgKVVKE56xgbTsF6NjpUKT/7GN
-	pPnc=
-X-Received: by 2002:a05:622a:5c08:b0:528:ce0:e9f8 with SMTP id
- d75a77b69052e-52d74a35420mr251080611cf.3.1786835209204; Sat, 15 Aug 2026
- 16:06:49 -0700 (PDT)
+	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="zJCRxF79"
+Received: from mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net (mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net [IPv6:2a02:6b8:c2d:3530:0:640:eca4:0])
+	by forwardcorp1a.mail.yandex.net (postfix) with ESMTPS id D58E4C04A2;
+	Mon, 17 Aug 2026 08:29:55 +0300 (MSK)
+Received: from [IPV6:2a02:6bf:803e:400:858:d814:19c7:79ca] (unknown [2a02:6bf:803e:400:858:d814:19c7:79ca])
+	by mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net (smtpcorp) with ESMTPSA id nTMCnA8aW8c0-cKeONhQM;
+	Mon, 17 Aug 2026 08:29:55 +0300
+Precedence: bulk
+X-Yandex-Fwd: 1
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+	s=default; t=1786944595;
+	bh=uak8v+oR1lACOzz5qOYMjrD0NnnFEPKnkFKzUNy8KQM=;
+	h=From:In-Reply-To:Cc:Date:References:To:Subject:Message-ID;
+	b=zJCRxF795D+pyOmzrDbOPhzokn04TXBYL+OXG95k1CWXuFDb6J9Zk8n14PLsIbGe0
+	 298Ng9z/FsC0j0d/aFzmtTzuPbMc8xN5QkxeOjzbIwqLCDrP0jDTi0MGAAMT05+9Ao
+	 yRAJ02zLvlRowYDw0/fos184t6a5sBNnr98HrKFI=
+Authentication-Results: mail-nwsmtp-smtp-corp-main-83.vla.yp-c.yandex.net; dkim=pass header.i=@yandex-team.ru
+Message-ID: <c6841f52-4d74-4343-b958-067b110fb532@yandex-team.ru>
+Date: Mon, 17 Aug 2026 10:29:49 +0500
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-References: <20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com>
- <20260723-vhost-user-isolated-memory-v1-13-6b97c439eb28@gmail.com>
- <13594665-16ec-47e5-9075-f7bd5552b0a3@redhat.com> <CA+spn3r7+pEb7e6=8JixTpk7M3rNhWv=JkGZchj2-3FK9ZQGYQ@mail.gmail.com>
- <c549061c-8e9e-48a6-a149-2da743154c10@redhat.com>
-In-Reply-To: <c549061c-8e9e-48a6-a149-2da743154c10@redhat.com>
-From: Connor Kite <connorkite@gmail.com>
-Date: Sat, 15 Aug 2026 16:06:37 -0700
-X-Gm-Features: AUfX_mxgB49cuSbTwPK00Nmro3M7CZjdoHhWzzFGXSUGQymC0ePi45vIit5flQA
-Message-ID: <CA+spn3rcK7c5xoCPP_t+M96UmZUWCaNDpNno-L6q9AoOoddw5w@mail.gmail.com>
-Subject: Re: [PATCH RFC 13/15] hw/virtio/vhost-user: add shadow virtqueues and
- eventfd intercepts
-To: Hanna Czenczek <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
-	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
-	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
-	Mathieu Poirier <mathieu.poirier@linaro.org>, 
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
-	Kevin Wolf <kwolf@redhat.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
-	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
-	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
-	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
-	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
-	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
-	Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
-	Peter Xu <peterx@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, 
-	Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+User-Agent: Mozilla Thunderbird
+Subject: Re: [PATCH v6 0/6] vhost-user-blk: allow toggling inflight-migration
+ at runtime
+To: qemu-devel@nongnu.org
+Cc: Stefano Garzarella <sgarzare@redhat.com>,
+ Stefan Hajnoczi <stefanha@redhat.com>, zhenwei pi <zhenwei.pi@linux.dev>,
+ "Gonglei (Arei)" <arei.gonglei@huawei.com>, Jason Wang
+ <jasowangio@gmail.com>, Kevin Wolf <kwolf@redhat.com>,
+ Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>,
+ Milan Zamazal <mzamazal@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>,
+ qemu-block@nongnu.org, Hanna Reitz <hreitz@redhat.com>,
+ "Michael S. Tsirkin" <mst@redhat.com>, Fam Zheng <fam@euphon.net>,
+ virtio-fs@lists.linux.dev,
+ Pierrick Bouvier <pierrick.bouvier@oss.qualcomm.com>,
+ Jason Wang <jasowang@redhat.com>, =?UTF-8?Q?Alex_Benn=C3=A9e?=
+ <alex.bennee@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>,
+ Pierrick Bouvier <pierrick.bouvier@linaro.org>,
+ "yc-core@yandex-team.ru" <yc-core@yandex-team.ru>
+References: <20260803072853.2920007-1-dtalexundeer@yandex-team.ru>
+Content-Language: en-US
+From: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
+In-Reply-To: <20260803072853.2920007-1-dtalexundeer@yandex-team.ru>
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
 
-On Tue, Aug 11, 2026 at 4:42=E2=80=AFAM Hanna Czenczek <hreitz@redhat.com> =
-wrote:
->
-> On 11.08.26 04:32, Connor Kite wrote:
-> > On Mon, Aug 3, 2026 at 6:52=E2=80=AFAM Hanna Czenczek <hreitz@redhat.co=
-m> wrote:
-> >>> +    struct vhost_user *u =3D dev->opaque;
-> >>> +    int svq_idx =3D file->index - dev->vq_index;
-> >>> +    if (u->user->memory_isolation) {
-> >>> +        VhostShadowVirtqueue *svq =3D g_ptr_array_index(u->shadow_vq=
-s,
-> >>> +                                                      svq_idx);
-> >> Bounds checking via `vhost_user_get_vq_index()` would be nice. (Same b=
-elow.)
-> >>
-> > Adding the bounds checking outside of the memory-isolation only code pa=
-th, since
-> > file->index wasn't being checked previously.
-> >
-> >>> +        if (svq->hdev_kick.initialized =3D=3D false) {
-> >>> +            int r =3D event_notifier_init(&svq->hdev_kick, 0);
-> >>> +            if (r) {
-> >>> +                error_report("Failed to create kick event notifier")=
-;
-> >>> +                return r;
-> >>> +            }
-> >>> +        }
-> >>> +
-> >>> +        file->fd =3D event_notifier_get_fd(&svq->hdev_kick);
-> >> What if `file->fd` was -1, i.e. `VHOST_FILE_UNBIND`? Should we put a
-> >> real FD here then or just continue with -1?
-> >>
-> > Good point!  I think we need to propagate the -1 to the backend device,=
- and
-> > run event_notifier_cleanup on the existing svq->hdev_kick.
-> >
-> > ...
-> >
-> >>> +
-> >>> +        if (svq->hdev_call.initialized =3D=3D false) {
-> >>> +            int r =3D event_notifier_init(&svq->hdev_call, 0);
-> >> Do we need to check if the call event FD is already active?
-> >>
-> > Do you mean, do we need to call event_notifier_test_and_clear to see if=
- it's
-> > been set and potentially run the call handler at this stage?
->
-> Yes, that is what I=E2=80=99m wondering. `vhost_svq_set_svq_kick_fd()` ha=
-s this
-> comment:
->
->  > event_notifier_set_handler already checks for guest's notifications if
->  > they arrive at the new file descriptor in the switch, so there is no
->  > need to explicitly check for them.
->
-> So it sounds like there is some mechanism that will ensure that when the
-> kick FD is set on a shadow virtqueue, it is checked for activity
-> (notification), and if it is active, this is=E2=80=A6 handled? Which I su=
-ppose
-> means the installed handler will be called.
->
-> But it=E2=80=99s entirely possible I misunderstand something because the =
-same
-> code in `vhost_svq_set_svq_kick_fd()` also just calls
-> `event_notifier_set(svq_kick)`, so=E2=80=A6 kinda always emulates a kick,=
- I assume?
->
-> In any case, there seems to be worry about pending checking kicks from
-> the guest in this switch, and so I wonder if the same needs to be done
-> for the call FD.
->
-> Hanna
->
+Greetings! Ping.
 
-I haven't noticed any difference from setting the notifier here, and
-on further thought,
-I think I know why.  I do not believe a call notifier FD is ever sent
-to the back-end without
-getting intercepted in vhost_user_set_vring_call, and once
-svq->hdev_call is initialized,
-it should never change unless the device is reset.  Since
-svq->hdev_call is the only
-notifier shared with the back-end, it should never miss notifications
-from the device.
-
-Connor
+On 8/3/26 12:28, Alexandr Moshkov wrote:
+> v5 -> v6:
+> - block changing inflight-migration property while VM is not running
+> - remove checking runstate in vhost_user_blk_stop() since it's not necessary
+> - updated cover letter: changed subject and description to focus on
+>    runtime toggling of inflight-migration rather than cross-version
+>    migration compatibility
+>
+> v4 -> v5:
+> - introduce protocol feature VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN
+>    to guard the new message, instead of reusing the existing
+>    VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INLIFGHT. Update docs.
+> - improved commit messages.
+>
+> v3 -> v4:
+> - add new protocol message GET_VRING_BASE_SKIP_DRAIN instead of parameter to GET_VRING_BASE message. This new message can be send instead of GET_VRING_BASE, allowing back-end to suspend inflight I/O immediately instead of waiting and completing them.
+> - rebase to newer master
+>
+> v2 -> v3:
+> - fix complile problems
+> - add assert check in do_vhost_virtio_stop
+> - make inflight-migration property mutable
+>
+> v1 -> v2:
+> - reorganize commits: make refactor commits first, then core semantic change
+> - add additional pre_save check for inflight migration possibility
+>
+> ---
+>
+> This is v6 of the series previously sent as:
+> "[PATCH v5 0/6] vhost-user-blk: add compatibility with older qemu versions"
+>
+> This series allows the inflight-migration property of vhost-user-blk to
+> be toggled at runtime via qom-set without restarting the VM or
+> reconnecting to the back-end.
+>
+> Currently, the inflight migration behaviour is controlled by
+> VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT, which is negotiated once
+> at connection time. Once negotiated, the back-end always uses suspend
+> semantics on GET_VRING_BASE -- there is no way for the front-end to
+> request normal drain behaviour on a per-call basis. This makes it
+> impossible to disable inflight-migration at runtime.
+>
+> To solve this, the series introduces a new protocol message
+> VHOST_USER_GET_VRING_BASE_SKIP_DRAIN (id=45) guarded by a new protocol
+> feature VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN. The message
+> instructs the back-end to suspend in-flight I/O immediately rather than
+> draining it. This gives the front-end explicit per-call control:
+> GET_VRING_BASE for normal drain, GET_VRING_BASE_SKIP_DRAIN when
+> inflight-migration is enabled.
+>
+> In vhost-user-blk, GET_VRING_BASE_SKIP_DRAIN is sent whenever
+> inflight-migration is on. The inflight-migration
+> property can only be changed while the VM is running, so its value at
+> stop time reliably reflects the user's intent.
+>
+> Alexandr Moshkov (6):
+>    vhost-user: add skip_drain param to do_vhost_virtqueue_stop
+>    vhost-user: add GET_VRING_BASE_SKIP_DRAIN message
+>    vhost-user: use skip_drain with GET_VRING_BASE_SKIP_DRAIN message
+>    vhost-user-blk: make inflight-migration prop mutable on running vm
+>    vhost-user-blk: move inflight_needed higher
+>    vhost-user-blk: use GET_VRING_BASE_SKIP_DRAIN when inflight-migration
+>      is on
+>
+>   backends/cryptodev-vhost.c        |  2 +-
+>   backends/vhost-user.c             |  2 +-
+>   docs/interop/vhost-user.rst       | 88 +++++++++++++++++++------------
+>   hw/block/vhost-user-blk.c         | 60 ++++++++++++++++++---
+>   hw/net/vhost_net.c                |  9 ++--
+>   hw/scsi/vhost-scsi-common.c       |  2 +-
+>   hw/virtio/vdpa-dev.c              |  2 +-
+>   hw/virtio/vhost-user-base.c       |  2 +-
+>   hw/virtio/vhost-user-fs.c         |  2 +-
+>   hw/virtio/vhost-user-scmi.c       |  2 +-
+>   hw/virtio/vhost-user.c            | 47 ++++++++++++++---
+>   hw/virtio/vhost-vsock-common.c    |  2 +-
+>   hw/virtio/vhost.c                 | 34 ++++++++----
+>   include/hw/virtio/vhost-backend.h |  1 +
+>   include/hw/virtio/vhost-user.h    |  2 +-
+>   include/hw/virtio/vhost.h         |  7 ++-
+>   16 files changed, 189 insertions(+), 75 deletions(-)
+>

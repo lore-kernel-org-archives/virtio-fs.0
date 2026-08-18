@@ -1,67 +1,67 @@
-Received: from mail-pf1-f174.google.com (mail-pf1-f174.google.com [209.85.210.174])
+Received: from mail-pf1-f175.google.com (mail-pf1-f175.google.com [209.85.210.175])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 8E1B03C456F
-	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 05:12:25 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.210.174
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 28D913BCD1E
+	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 05:12:28 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.210.175
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787029946; cv=none; b=qniqtIeNH3+ba41OTy4TKrVtS2n881nI76WVG+EHZ6Za1C22+OT3aVPPjxxiLBHuOwXNHYhDHgJCPWofy+YljYhXgf/wG0m+xiyZ1oOKjQTubMBAcwaaizsGilTJIfkVgFx5Bf7Cs+KPeeN2cV5oM5/viW2UQvlNdft6S04LFlo=
+	t=1787029949; cv=none; b=A5oz/eNnYCxNLdtH3a3VeWlktfNzi6ldCnHcl3CZzAx7afxkexkeeIQUAtkI8JwevTrNaIKAqOQAB2lay2GptjMfWExMj2SifvyKRoe+FPZVARH4Tz1COr5ecWWpa+y5W5mmbJ35kjK9o4oE0EwBTmLJ+8qtf/4VizNAuVZpN9g=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787029946; c=relaxed/simple;
-	bh=o7eLAZfdtjRRWSqHEojyG/bzxtWRaxaRR5MzJJtbNk8=;
+	s=arc-20240116; t=1787029949; c=relaxed/simple;
+	bh=vwbYBaMbgDk4wePAOZ4o3ZHnYy3c61j7iZi/xAaHWVE=;
 	h=From:Date:Subject:MIME-Version:Content-Type:Message-Id:References:
-	 In-Reply-To:To:Cc; b=tkbj01DYLlugTAM2f6Nni8KaLKiHoOBRoJPDqq977MgpRqgqvP6m+2m3s9Cwr6LK66EDNvrI/YaYPCBkzzwQvofKrUyt+li0FNiLew9KlhcToFhP6t/6ZC8lN9HMQ+iuJf7obtqRTR9xNSwdc93FIBpmhogUtm8hxZSP+vp1cZ0=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=q0qgBWXa; arc=none smtp.client-ip=209.85.210.174
+	 In-Reply-To:To:Cc; b=FafwTuhI7Uy0vmVg4hBSpJQWGZreyqf4PA+1flNyF7C2MM/cFqxpnwfXachNx9avIToRzku8dVS8NL+igfnq8b7JM1GdiV+iqhtbD9r5YMw+2I8JBM/rHsEi+Kk2Jh2vmxijBPvYq1hfVCz26yt525W5PLkN1xZ5+BT/kiQBaCs=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=aETuo+fV; arc=none smtp.client-ip=209.85.210.175
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="q0qgBWXa"
-Received: by mail-pf1-f174.google.com with SMTP id d2e1a72fcca58-84fa3b14ee1so3080128b3a.0
-        for <virtio-fs@lists.linux.dev>; Mon, 17 Aug 2026 22:12:25 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aETuo+fV"
+Received: by mail-pf1-f175.google.com with SMTP id d2e1a72fcca58-84e507b079dso2752825b3a.0
+        for <virtio-fs@lists.linux.dev>; Mon, 17 Aug 2026 22:12:28 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1787029945; x=1787634745; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1787029948; x=1787634748; darn=lists.linux.dev;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:from:to:cc:subject:date
          :message-id:reply-to:content-type;
-        bh=GF0FtzLMWaPpijge2pYmINjU8s3/LYKiLpVZpt8RABo=;
-        b=q0qgBWXamNsH+pkx5IrvBMNqjLyzQ4Rdi9ueTrrxVJntz4Wn0LQWXpAmnuqe+cihTf
-         GFq0GRZWTa4CK9C1XUp+UftuL/EihFcziAyE7qB+chKdc1BitEQX5XrOfqPgQnxpU61/
-         Ynv/Lm9MdfV3seZ1+yGzFdqfn5rM4N3dTV0UK+TeYl7eSY7p5+Pv6RcX/T30oHzV6ml2
-         tstcvSxYR29ju/XlLUE6NNn1D3lE4ccIdJD8A1BVK8IfGPSVm7Hwi6DzyyeHg0jz7Rg4
-         nuuSPzgW4CeW/3dVg9Q8GPqbJ7zjYoOGiOZt2DtihtBD4wRNQiSOOX41YTStyss5y4Nw
-         eFOg==
+        bh=9dnSpwb0dn+bdk24pKhPvPsrY1aMYcRsQf+7mWHImvs=;
+        b=aETuo+fVLihJkr1+YRAYAEQB3XAy0YpBEhEPCmqWA5zImjrSPqvbHQoGsP62PhnIcf
+         h+05GTT+3FIbbp8Ld3wdFdAwDalVXbbYskxgG7dev1VnpK6mASBELgEoUSSq36Blzn6N
+         u2zm/ic2qyy95unkYlPglPcERv7tlonovna/LNBvEO39yZWYCL79dMrebOQyS7rH5T7C
+         xXdfRUnE8bDYN/ATeV/mZPqga3F66XM4kQ/52AHCWWJW7H2rYGoegvuNB2JvYgD3M2ws
+         7Ruw7pgxyllvsDGrJAjj72LyZLK8Gng6aR29XPemFK4UBguCY3VGjS2ItykIIQg6eZLw
+         +cyA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1787029945; x=1787634745;
+        d=1e100.net; s=20251104; t=1787029948; x=1787634748;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=GF0FtzLMWaPpijge2pYmINjU8s3/LYKiLpVZpt8RABo=;
-        b=qDi9OqVnP25P8ikrZ7AdhxyxOWg6jS/A2tkUAkqSnyF0NZGdKj2SQUJWYC1nZDw3wn
-         JERszjjv/l9PZBmTG9yJ32BBTwygv4dbn7CfBxEQmOpn0maZ662R6a9/VHP9q3j7FeF0
-         Rov4/TP/u1BuKQpr+JHzwQfeDecQg+0qUivS9MdVItbz22BlxsXMk8g0Grzt/PaMF80M
-         ilkVx+tJPxpmGFLasS5JxzpLMmqesc87ELy6pWAtmJZdOGX1JXhcsRbr4+JeDEP28Rn5
-         +TynykpGpafFPtSe530JlpZ2KPUPf6SrwDOUok6iKvdbldl3D+HRT7aYe2+nFUcPWLhJ
-         IO0w==
-X-Forwarded-Encrypted: i=1; AHgh+RozrKlDxSEMWemuqfSJPO3YZdfW6kNVh9Y357IODmTyY42AAoF7SYSr3RB9+0z4CJDHVD2xFbPolng=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yz3UtV2HJ6P9jfjh82FMuBSU7Be5Sif8lousKw6ABR3Q/4eluI8
-	ggNPtJ78/vOhPliWF/gy/kOuajtrVq4p1HRYayclcb/bf3DYeJQekR0X
-X-Gm-Gg: AR+sD13U2eAoQH+vwiFDRfAaAzy/SDhUOPgGqvE7HaXvPOmZs0cMplALx1Ej7x4BZsS
-	53sa8/dQXpUePM4ihI8QvY6xLFYMwzBe5BKgQCuGN2uXY9u/wiOF6CVU35+w/4uzqhzcmKZJ+pA
-	538dKYeXe5Y8dGn3U/4E2I+v0uE8ZmHW1VfRE3tZhOirLnqEt010xQCkPer97MnyRyQ9ZaZMGEz
-	TcZF08UvakJVsLbyjLMMVY6QmWLj5c/jILjBPV9FvItUcsIeA27OLYHXxvc3NDoe26mxymspD4Q
-	veaG4CrKRTlzsPnRI0kzN17B/AAfLsIhQzLh236vbEuAjM+FL1TtIKNKgWxTdvQWAZ/4O26LvcD
-	i/4eW2MxHizGrZst+8puQx4+H2cAHnNCozgiM18+KC/LuTprnM6EO550xhPB6UfZQ+eCQGPYq2t
-	UKRlFlyDG6bEvFOnkA24Exe6CdJGdxhflrjnxoYBYDC7QrK1Wz5LPkzXEb9rcMtC7vDQ==
-X-Received: by 2002:a05:6a00:3763:b0:851:ba04:ca02 with SMTP id d2e1a72fcca58-851ba04da9amr4656750b3a.16.1787029944848;
-        Mon, 17 Aug 2026 22:12:24 -0700 (PDT)
+        bh=9dnSpwb0dn+bdk24pKhPvPsrY1aMYcRsQf+7mWHImvs=;
+        b=NJfSTAWH02q1a6qcLynUeZnwwn2OW7UIipNMBWU9eyPGDdRYnACbWAdDlVsC/NMvnT
+         lnevqMYExFSGokjUIdpJBEqK2Aa8rNdtzv1hcbsYdvrLjQeUq3sEtWBs2xkvT72S8KhO
+         7xwTBkKCF0qlzKF+ftUevdSjwgBUxFRWs3BsT7L1LNp/nsrFVUHtmQLIWsTtdd+nm6pO
+         B15ms+BEPoPT5OSW+fOix8ZcVJ38H0kZb29jPz7uhXQFpjsaQ8LybwEOFjGA9q2LquhZ
+         T5syiMtjeeexKLQ//Uv1TJAUr0bVj1Vy+H33lLIGSfUbJgxuA7F2STcB/8jkn2VZ8xhe
+         pnuw==
+X-Forwarded-Encrypted: i=1; AHgh+Rru0Ty0Q5Cw0835kDQMiOdKtFoSpF0EEr8HLRpkQ6TNLtC8g39tZui4w0UyucZezKUClbfIGoCTNYM=@lists.linux.dev
+X-Gm-Message-State: AOJu0YyQTZAh2dWtBRwqFnl4taoYFBGWv8r4e2+qfkDpS9ui2J0uvDsY
+	tiZ/3lFrkPBMFHNg0Ex99eh8lsYpsIMcQ8yc7Dz7j8wh2Z7Et9MB1xyK
+X-Gm-Gg: AR+sD104XBtgLz3Tud71ZoiOt9GZiKx8wXqSRsoT20LyS7MJrpv1sXD/DNbxTSDq9Yq
+	He2SmUMyGP0lSMhJjtMknrtwXDkik5XUG/fMgNQUT0GqTE+8COBxEnlTppEhaQ9zLPvCS0g/8Qx
+	iPayLz5xXDdxfpB9ZFnKkw8TKXNTv01Bp6YIBDSBQg3mUQHBJrz6a5Su4CzjBYTxyO7OORNMGaD
+	HMU4i6LugmvF7aiezjsmpSg3glzy1eIYYApCFgq6uEs1eEDtEcb6KCa3N0PBAtEFxlc7gE+mY4P
+	K0cIbNiFdb/cAk81U3IwTd/KaC6gjj8ak5oeSXcgdlQmw7p+y6FskH+ggqYKBGu0gIYVKkmdZc1
+	Ka3XkFEqm9oaGazARBRxORJinRbQXhdAgNAC6ad4lU+lSV0B1RtLZ0wJSMsAVU8dJF45WnUxzSO
+	M8/heJ73mpiks2kp4VpDkwZqZvZED2Uac6eUQ2ncK3J38hl2zO2T2Huun4XYuF9o91/w==
+X-Received: by 2002:a05:6a00:808d:b0:847:e2c7:59b6 with SMTP id d2e1a72fcca58-84fde1ce5d1mr31913848b3a.11.1787029947566;
+        Mon, 17 Aug 2026 22:12:27 -0700 (PDT)
 Received: from [127.0.1.1] ([2600:1700:e140:14d0:d043:a40d:25c1:432c])
-        by smtp.gmail.com with ESMTPSA id d2e1a72fcca58-851b6fc0e84sm1031160b3a.43.2026.08.17.22.12.22
+        by smtp.gmail.com with ESMTPSA id d2e1a72fcca58-851b6fc0e84sm1031160b3a.43.2026.08.17.22.12.25
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Mon, 17 Aug 2026 22:12:24 -0700 (PDT)
+        Mon, 17 Aug 2026 22:12:27 -0700 (PDT)
 From: Connor Kite <connorkite@gmail.com>
-Date: Mon, 17 Aug 2026 22:12:17 -0700
-Subject: [PATCH RFC v2 02/13] util/iova-tree: g_tree_foreach wrapper
+Date: Mon, 17 Aug 2026 22:12:18 -0700
+Subject: [PATCH RFC v2 03/13] hw/virtio: iova_tree_foreach wrapper
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -70,7 +70,7 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
-Message-Id: <20260817-vhost-user-isolated-memory-v2-2-948aae960abb@gmail.com>
+Message-Id: <20260817-vhost-user-isolated-memory-v2-3-948aae960abb@gmail.com>
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
 In-Reply-To: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
 To: qemu-devel@nongnu.org
@@ -97,67 +97,59 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  Connor Kite <connorkite@gmail.com>, 
  20260817233147.2867623-1-connorkite@gmail.com
 X-Mailer: b4 0.13.0
-X-Developer-Signature: v=1; a=ed25519-sha256; t=1787029936; l=1906;
+X-Developer-Signature: v=1; a=ed25519-sha256; t=1787029936; l=1780;
  i=connorkite@gmail.com; s=20260723; h=from:subject:message-id;
- bh=o7eLAZfdtjRRWSqHEojyG/bzxtWRaxaRR5MzJJtbNk8=;
- b=Z3tFhfEr1Omnp83Zy3bXpXXEiQIMkob68NNERZBNgm5EjVu9Ykqidco7cjuQ4gnEqs7pgUwhM
- ELFXw7D56GGCzrXpmI7r68dyx5q3Ot2OBTpnrqhYAOCg7lgJmRrB5TA
+ bh=vwbYBaMbgDk4wePAOZ4o3ZHnYy3c61j7iZi/xAaHWVE=;
+ b=wt3JAdEQQY0WOd6NAZCMl2xoPft+pWYzPIfGFmmMVVjmM5AQRpS7XXXxcs7BsebWgzN8hEnWj
+ rBA2T+mhFQfAhf0I2K0qofH4RWgVMouKexIY0LXa5EKULkDz7ZcLkhp
 X-Developer-Key: i=connorkite@gmail.com; a=ed25519;
  pk=xg/3N8AntFCYogaIgN5NC/KkT7UlZB6ktPIRliJ3hv4=
 
-Add a wrapper to iova-tree to call g_tree_foreach.  Provides a means
-to execute some function on each node of the iova-tree.
+Add a wrapper to vhost-iova-tree that calls iova_tree_foreach on the
+underlying iova_map.  This provides a means to execute some function on
+each node of the tree.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 Signed-off-by: Connor Kite <connorkite@gmail.com>
 ---
- include/qemu/iova-tree.h | 21 +++++++++++++++++++++
- util/iova-tree.c         |  5 +++++
- 2 files changed, 26 insertions(+)
+ hw/virtio/vhost-iova-tree.c | 15 +++++++++++++++
+ hw/virtio/vhost-iova-tree.h |  2 ++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/include/qemu/iova-tree.h b/include/qemu/iova-tree.h
-index 14e82a22d5..a1938e36a1 100644
---- a/include/qemu/iova-tree.h
-+++ b/include/qemu/iova-tree.h
-@@ -161,4 +161,25 @@ int iova_tree_alloc_map(IOVATree *tree, DMAMap *map, hwaddr iova_begin,
-  */
- void iova_tree_destroy(IOVATree *tree);
- 
-+/**
-+ * iova_tree_foreach:
-+ *
-+ * @tree: the iova tree to traverse
-+ * @func: the function called at every node. A true return value ends traversal.
-+ *        Arguments:
-+ *            gpointer key:   key of current node
-+ *            gpointer value: value of current node
-+ *            gpointer data:  data passed in at g_tree_foreach call
-+ *        Return: gboolean
-+ * @data: an argument passed to func
-+ *
-+ * Wrapper to call g_tree_foreach on the underlying g_tree. g_tree_foreach will
-+ * traverse through every node of the tree, barring an early return. At each
-+ * node, g_tree_foreach calls func with pointers to the node key, node value,
-+ * and a pointer to data passed in by the caller.
-+ *
-+ * Return: None
-+ */
-+void iova_tree_foreach(IOVATree *tree, GTraverseFunc func, gpointer data);
-+
- #endif
-diff --git a/util/iova-tree.c b/util/iova-tree.c
-index 5b0c95ff15..2239bb6ae1 100644
---- a/util/iova-tree.c
-+++ b/util/iova-tree.c
-@@ -303,3 +303,8 @@ int gpa_tree_insert(IOVATree *tree, const DMAMap *map)
- 
-     return IOVA_OK;
+diff --git a/hw/virtio/vhost-iova-tree.c b/hw/virtio/vhost-iova-tree.c
+index fa4147b773..0a9b38b6f3 100644
+--- a/hw/virtio/vhost-iova-tree.c
++++ b/hw/virtio/vhost-iova-tree.c
+@@ -189,3 +189,18 @@ void vhost_iova_tree_remove_gpa(VhostIOVATree *iova_tree, DMAMap map)
+     iova_tree_remove(iova_tree->gpa_iova_map, map);
+     iova_tree_remove(iova_tree->iova_map, map);
  }
 +
-+void iova_tree_foreach(IOVATree *tree, GTraverseFunc func, gpointer data)
++
++/**
++ * Traverse through the iova tree in sorted order
++ *
++ * @tree: The VhostIOVATree
++ * @func: Function called at every node.  A true return value ends traversal
++ * @data: An argument passed to func
++ */
++void vhost_iova_tree_foreach(VhostIOVATree *tree,
++                             GTraverseFunc func,
++                             gpointer data)
 +{
-+    g_tree_foreach(tree->tree, func, data);
++    iova_tree_foreach(tree->iova_map, func, data);
 +}
+diff --git a/hw/virtio/vhost-iova-tree.h b/hw/virtio/vhost-iova-tree.h
+index 08f63b61cd..c84fd652bd 100644
+--- a/hw/virtio/vhost-iova-tree.h
++++ b/hw/virtio/vhost-iova-tree.h
+@@ -29,5 +29,7 @@ const DMAMap *vhost_iova_tree_find_gpa(const VhostIOVATree *iova_tree,
+ int vhost_iova_tree_map_alloc_gpa(VhostIOVATree *iova_tree, DMAMap *map,
+                                   hwaddr taddr);
+ void vhost_iova_tree_remove_gpa(VhostIOVATree *iova_tree, DMAMap map);
++void vhost_iova_tree_foreach(VhostIOVATree *tree, GTraverseFunc func,
++                               gpointer data);
+ 
+ #endif
 
 -- 
 2.43.0

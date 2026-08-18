@@ -1,66 +1,68 @@
-Received: from mail-pf1-f179.google.com (mail-pf1-f179.google.com [209.85.210.179])
+Received: from mail-pf1-f175.google.com (mail-pf1-f175.google.com [209.85.210.175])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 59B8F3C871E
-	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 05:12:20 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.210.179
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 1E13D3C456F
+	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 05:12:22 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.210.175
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787029942; cv=none; b=UlnEhv7JSuJdcE/WbmpBShskfpUKnctBnLJK/GHQOmL7s0VSfWXOi2LpzESHKt3E3rZ/KLkF3YB7DlWmDnNy4SEny7XNY14iUcPhIsYgrrenTvopHstZuKdFn2900E0lxJPkvYYyrXh4z8+BGNUgnM3MBuBbNNWFnKO1z1yxOUE=
+	t=1787029944; cv=none; b=VERxiNbAmyI6/9GBrejzyPfIUi7Db5V77UuNI4u7REMA9Fz7RA+8QOIjvEo4NMGL4Ip2zlZAGW4bcuwyyAy3AYvjlkrb3IqVjyJW43nYGRlP/uyF+rKFa3psmWBYQPWYNmRXSBaVco2yW8sPd/i5m2AUEDvlznDYVDugfl1b/uo=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787029942; c=relaxed/simple;
-	bh=mw/NOsJAc5c3oTLsgT3HVoifVskWtAB9BaIpmPIXu1M=;
-	h=From:Subject:Date:Message-Id:MIME-Version:Content-Type:To:Cc; b=TVsFvC43Avh9ptrdEu1HqRqxb0zHd7vs1qoKt52sd7I0veBS76oGD1bGgvBSS9EaPFS7KhER5poQH03mQLt7UTz25dLK5j3PPdf/jHYZ7MVH+Kh5JX3sCyAkFCqiroTsBSOhlXsyz78bTsgeyCsE2lhPyk0rx/Im2CmFiD/0XaU=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=QsZ9eTZf; arc=none smtp.client-ip=209.85.210.179
+	s=arc-20240116; t=1787029944; c=relaxed/simple;
+	bh=y46aEYYWs6g66G1yduLOZWbS9jprmJN0wGotjR+n/g4=;
+	h=From:Date:Subject:MIME-Version:Content-Type:Message-Id:References:
+	 In-Reply-To:To:Cc; b=WIxCdsW2bMXYChq0kIj5AdRWGIGM+kUUU35DPI72Dcgz6HkdkjcYrlMX4DNmofRJ4oQdSMcN0BRye+YMK8Xdp5LB+31havM8cjTzOZg+9puSsb8Qirq2F3DTjI9XCsDF56pgUM07XH7Y47g19uO3W3rHGgJjnnjRMOOoKm6Nwbc=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=Vs6baM4h; arc=none smtp.client-ip=209.85.210.175
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="QsZ9eTZf"
-Received: by mail-pf1-f179.google.com with SMTP id d2e1a72fcca58-84faf87d19dso4480523b3a.3
-        for <virtio-fs@lists.linux.dev>; Mon, 17 Aug 2026 22:12:20 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Vs6baM4h"
+Received: by mail-pf1-f175.google.com with SMTP id d2e1a72fcca58-84867f07d63so4367294b3a.2
+        for <virtio-fs@lists.linux.dev>; Mon, 17 Aug 2026 22:12:22 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1787029939; x=1787634739; darn=lists.linux.dev;
-        h=cc:to:content-transfer-encoding:content-type:mime-version
-         :message-id:date:subject:from:from:to:cc:subject:date:message-id
-         :reply-to:content-type;
-        bh=eYeq9bPe6CWbjsZmFOByTII3fv+JYv7PgXnda9ah0pM=;
-        b=QsZ9eTZfV46zK7OtlnVnXh6hUS3QOueKGPp2RS5ORkBdvANZsGJoJTSgpiGce3UD2j
-         tb8aDVBtSot/lJ1l8CuGWHizeXl+AsX3MV8FIjWokyGywIopJaBBQCVqf+yPTsk8W5Vr
-         jtXFUsqSTRFLdHUIY9SaIhLBWGY5Tdvz8uVe7vD/v2c6yjc9d4f+AmERKB7zkpMKFY/U
-         zQKJWJGM/QJtVbZUXzk3k8l9sBXRe20Yewm+YIJda5DiG6cUrXnsaugmzrxFU4NvU/4j
-         FEakeM7uzzONVaBDPXZso8VE1dLXkcvQmcqbvduGA489sTITYe7SXVIfXtlB6dHBTO5t
-         8Zkg==
+        d=gmail.com; s=20251104; t=1787029942; x=1787634742; darn=lists.linux.dev;
+        h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
+         :content-type:mime-version:subject:date:from:from:to:cc:subject:date
+         :message-id:reply-to:content-type;
+        bh=AkZeRoc3E17YBp5XADn9w+7xUKDSvBeBFuBZM8xExpk=;
+        b=Vs6baM4hCSMxtwrGSyLG86oRT2qVfMVYscWpBsmz2OxppzLbCVaS/v+8oE/SjnFsb3
+         xGFm7lRHwkZyTOaO2e+ckWG/B9E+UvhoBCIFZwurjrCuvMe+8XiPS6FviFUnm1A71Q7G
+         3x8DYE4cx+grj74rrcLsCJ91wBVTOuIoBUt/HM4ecuhop3D/CYCBcSnT/3Ihixq/uJyG
+         lCPal4OSdytDzyhDqLD2VUcxjuTrJ5hznQYi4ik/p7gHW5wgWCkgfN6Z8nMaxGo8szOx
+         yEvHp4HPlXtUkQHEOG4isT0EzMTWZAeZ/TODNlBg2X4KpBX7WF1heQlbxbb4svCTqxNV
+         E//g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1787029939; x=1787634739;
-        h=cc:to:content-transfer-encoding:content-type:mime-version
-         :message-id:date:subject:from:x-gm-gg:x-gm-message-state:from:to:cc
-         :subject:date:message-id:reply-to:content-type;
-        bh=eYeq9bPe6CWbjsZmFOByTII3fv+JYv7PgXnda9ah0pM=;
-        b=Gdy8LClA6hm5ugju98+jf70XaMqpiE3Osrd7GSBzFmM8+4m7ohTcGu/eaBuObZqzv9
-         LdS1iw3tk9c4PkUG21zWSDjFaBbM8Oao0eb89xaoPyEcTJ57cN1ljxlsZD2h4Am+CMhp
-         CrMV49f2sYwVZvg4f+d/vUEUkgi0HDaK8HQ87WrnnDIYDLeMhraPRgvh2HUStouGLJTj
-         0Exvcoo8KTfteAUzLOj8eodExHw8Nladw3z73aErYJgobQA2eRSZdDt3io7Nztv0kzWx
-         QvM2JnmHg+cwNE+mFkvZAzjJ1rD6Jj+lV+lFU3i4EPOqpQq0gviTisYKVgbaeXFMDVKT
-         zxEQ==
-X-Forwarded-Encrypted: i=1; AHgh+RpDor3U6HX/TyiFTw2z3PZKTxL/gYdg45fZDAEVP7WZ44dAHquPajYraolPZxCr/xDUtQiUxukvXf8=@lists.linux.dev
-X-Gm-Message-State: AOJu0YzaNYJEkgyAUviLpsUHl70Xellj2SSUYEZCuMUjVoHN4C8XKo9F
-	qFT0zXjrUElbjVRFfkikup9LIEFVaEBA/JDma/yb7OMKKahIgkle9umt
-X-Gm-Gg: AR+sD13QyzmxNl1bY9gNRXzRrdAFgaT+zXgC4fG02xUmiKdCM6Ju38Y1Z6Kl5nKKPQw
-	iDKh+9Max90oGTvq85POEAxge/KCfs9NLhiST6ycgnz1e4oGpvFj4vHHQCsRVbEA9/nLSdhlzBa
-	3YNvh4Dho7Aexjf6Kg9uOTVk9t/DPZyu8QY26pOWbZa6h0wV1Yt5K8286ZUIVqFbsU1F9pM+NfK
-	Kvf+35Qd0XyYSSQgd3lC+UBwby1NvNZpZdEPD+Kh9GXC3AHFDITDK1VMjDCXR7hBQJ7Ieu8KNcl
-	4he1Y7zSrf5ks6JNLkuMsoclnXoSyhPoIv7jo0arkcnJptgwFknVNZrF1HcPPkbvoN9H3D5JRFp
-	IdKrOsNaFRGezC5GJ6dBRzp/EcuqFB/e2H35D4nvw0zG2NQAo9WRLnDM7eHjjWCAahUbsKIjLpl
-	LGlx+eilxc5MU0JHf2JdSRq4ekXPT3NHFXaCGBALeGC0XIse/wkeHbGXoIHvPWGnivww==
-X-Received: by 2002:a05:6a00:4f91:b0:84f:37c1:f887 with SMTP id d2e1a72fcca58-84fddfdf5b0mr29235781b3a.12.1787029939441;
-        Mon, 17 Aug 2026 22:12:19 -0700 (PDT)
+        d=1e100.net; s=20251104; t=1787029942; x=1787634742;
+        h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
+         :content-type:mime-version:subject:date:from:x-gm-gg
+         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=AkZeRoc3E17YBp5XADn9w+7xUKDSvBeBFuBZM8xExpk=;
+        b=A91uBWpw7+VJ2GMjEcfV35/tJN59x2C/njbSDYKAbS93e2+S+yw6wu2tPpdw6Nvg8o
+         Aqoa+HUeTdKgxuCP3EGs+3FhL+lB+jkFxa2Q2Bu5i19F5p9p/97xVjs9LvmFiy23MS6o
+         qrG/KikSZq5x3uHqSMrNU1vjGc12WEwqkz067Lu9WjiZDdYSBM7VBUZz9sUPBAINRgff
+         lRyYhbYmKmq+nsH/35CHHvITDrmb/B8TS+tx5LmBLX1IMihL7veeQevRNzwg1YwccxyS
+         X3pCu3YC94Tpirl4I8FZ7DYY+2sQdBFFkYRaZtNfDyOWG37S0QK8I+1eQviG52dErwXm
+         rNJA==
+X-Forwarded-Encrypted: i=1; AHgh+RrODUrS+crUdA8HQ5kUZJ1ckhTMliKQlysp4o5n372ZkVj+yKbgD2qOQ5VzyZPAz9e61kWjxHq7uQ0=@lists.linux.dev
+X-Gm-Message-State: AOJu0Yypep9vZ5204ENBUiN0jO/ipXAG6zDvWudUTajG/fvCE1aIhxmc
+	fAQXuenaVN87dxG93m7Xe2v3Wwcrr8pWOl2EobQzjkOutDh+7puNDHOB
+X-Gm-Gg: AR+sD12JHDpkN+avrDh9Mmv7rBp5lMl0OpD2HFn4aONZguq7CFiuwLiMNP0Ym8WCa/e
+	kFaBKmPTSn9wjEI+h16tbjYX0WIcpYXm3Rgo3qA8y4GsTlkHHSN87GMas+J51edwgwu5fJIW2KG
+	AJQklSBbNYYzFkABZx4iHGuPJN0C1KA4m7TNRoIP6IowOBqwQm5xbV1SY6sSp4JDIRdx2zlsKfl
+	I8KN7TCrQrkUFOdWK8LNaE/naeKunSgCzrZZbFzKy5QI8qUPgYW/50Q7yblH644gIze48yXIetG
+	+r2ooydW8qWdNbelPZqq+yfRIzP/hKYHscxVoaX2cXqwbGIc0fVuRHJu+CKY+Sj+V8Oj4AGwoO5
+	62BDpGAbaHShkw7A0nU/owyTIrE25M3/GKoLJ+RZXSD7bAXzAqW+QD4mXB9Eaq0j+FaEpImRpYP
+	XRl0rLR4iS7lWJFnxi4kIIpzit5EqS9KfzdwDJlUygToWU8g1UVLwrr0alyM9k6DpDj9pKt54=
+X-Received: by 2002:a05:6a00:3d96:b0:851:8012:c38b with SMTP id d2e1a72fcca58-8518012c611mr22777756b3a.10.1787029942322;
+        Mon, 17 Aug 2026 22:12:22 -0700 (PDT)
 Received: from [127.0.1.1] ([2600:1700:e140:14d0:d043:a40d:25c1:432c])
-        by smtp.gmail.com with ESMTPSA id d2e1a72fcca58-851b6fc0e84sm1031160b3a.43.2026.08.17.22.12.16
+        by smtp.gmail.com with ESMTPSA id d2e1a72fcca58-851b6fc0e84sm1031160b3a.43.2026.08.17.22.12.19
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Mon, 17 Aug 2026 22:12:18 -0700 (PDT)
+        Mon, 17 Aug 2026 22:12:21 -0700 (PDT)
 From: Connor Kite <connorkite@gmail.com>
-Subject: [PATCH RFC v2 00/13] vhost-user: isolated memory
-Date: Mon, 17 Aug 2026 22:12:15 -0700
-Message-Id: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
+Date: Mon, 17 Aug 2026 22:12:16 -0700
+Subject: [PATCH RFC v2 01/13] vhost-user: Consolidate chardev property
+ definitions
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -68,11 +70,10 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-X-B4-Tracking: v=1; b=H4sIAK/pg2oC/32NSwqDMBCGryKz7pSYiNGuhEIP0G1x4WOqA8aUx
- IYW8e4NOUCX/+v7d/DkmDxcsh0cBfZs1yjkKYNh7taJkMeoQQpZilIUGGbrN3zHGbK3S7fRiIa
- MdV8UWtBYVEoRaYiAl6MnfxL8AffbFdpozuy3WE6HIU9RYmup/rFDjgLLvtZDoWrqZdVMpuPlP
- FgD7XEcP7xLo0DJAAAA
+Content-Transfer-Encoding: 7bit
+Message-Id: <20260817-vhost-user-isolated-memory-v2-1-948aae960abb@gmail.com>
+References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
+In-Reply-To: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
 To: qemu-devel@nongnu.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>, 
  Stefano Garzarella <sgarzare@redhat.com>, 
@@ -97,231 +98,223 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  Connor Kite <connorkite@gmail.com>, 
  20260817233147.2867623-1-connorkite@gmail.com
 X-Mailer: b4 0.13.0
-X-Developer-Signature: v=1; a=ed25519-sha256; t=1787029936; l=9629;
+X-Developer-Signature: v=1; a=ed25519-sha256; t=1787029936; l=8233;
  i=connorkite@gmail.com; s=20260723; h=from:subject:message-id;
- bh=mw/NOsJAc5c3oTLsgT3HVoifVskWtAB9BaIpmPIXu1M=;
- b=6dagyY53uaZiuyJbepRPFr0QSnVBXkRD7WRmxIoBDFSgXL13glQEHSPvbZdCwiKqm1ySTY3a8
- LsvNRUiocxmAIhYpC3IP7HwrC3pwQrCIgsbBTxqCaxSLDec/1a/1+WR
+ bh=y46aEYYWs6g66G1yduLOZWbS9jprmJN0wGotjR+n/g4=;
+ b=/WflkskraN4ES9D2WSPAizCPRVsCc0v4+MbDwiiAO/iCI3qYDfgVUf8zepKSO8EByiytIW9ZK
+ odU/jff+RptAg8X1jFangGqsKMl7gc1tv/1bMwgVFCGIgm/Z36CQucb
 X-Developer-Key: i=connorkite@gmail.com; a=ed25519;
  pk=xg/3N8AntFCYogaIgN5NC/KkT7UlZB6ktPIRliJ3hv4=
 
-This patch series implements a memory isolation mode in vhost-user. The
-purpose of this mode is to provide the option of additional security by
-eliminating direct access of guest memory by vhost-user devices.
-At a high level this works by:
+Move chardev qdev property definitions from children into
+VHostUserBase. This reduces code duplication and allows children
+to simply inherit the property during initialization.
 
-1. Adding qdev and qapi properties required to enable isolation mode for
-   various devices.
-2. Allocating an isolation memory region in an anonymous file and mapping it
-   to host memory.  This isolation region will hold the bounce buffers and
-   vrings necessary to move data.
-3. Using a vhost-iova-tree to allocate and track the mapping between
-   guest regions and their corresponding bounce buffers in the isolation
-   memory.
-4. Creating shadow virtqueues to intercept request notifications.  As
-   kick and call events are received by an svq, it copies buffer
-   contents and descriptors between isolation and guest memory before
-   notifying the backend or guest.   
-
-Note: This project is currently in a partially functional state.
-While the overall method will stay the same, the implementation
-is planned to move up into vhost to simplify some elements of
-initializing and using the shadow virtqueues.
-However, the desire is to make this work public at this stage
-for comment on the overall approach.
-
-To: qemu-devel@nongnu.org
-Cc: Michael S. Tsirkin <mst@redhat.com>
-Cc: Stefano Garzarella <sgarzare@redhat.com>
-Cc: Alex Bennée <alex.bennee@linaro.org>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Gerd Hoffmann <kraxel@redhat.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Manos Pitsidianakis <manos.pitsidianakis@linaro.org>
-Cc: Raphael Norwitz <rnorwitz@nvidia.com>
-Cc: Kevin Wolf <kwolf@redhat.com>
-Cc: Hanna Reitz <hreitz@redhat.com>
-Cc: Marc-André Lureau <marcandre.lureau@redhat.com>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: Fam Zheng <fam@euphon.net>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Milan Zamazal <mzamazal@redhat.com>
-Cc: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-Cc: Dmitry Osipenko <dmitry.osipenko@collabora.com>
-Cc: qemu-block@nongnu.org
-Cc: virtio-fs@lists.linux.dev
-Cc: Gonglei (Arei) <arei.gonglei@huawei.com>
-Cc: zhenwei pi <zhenwei.pi@linux.dev>
-Cc: Daniel P. Berrangé <berrange@redhat.com>
-Cc: Eric Blake <eblake@redhat.com>
-Cc: Markus Armbruster <armbru@redhat.com>
-Cc: Jason Wang <jasowangio@gmail.com>
-Cc: Peter Xu <peterx@redhat.com>
-Cc: Eugenio Pérez <eperezma@redhat.com>
-Cc: Alyssa Ross <hi@alyssa.is>
-Cc: Demi Marie Obenour <demiobenour@gmail.com>
 Signed-off-by: Connor Kite <connorkite@gmail.com>
-
-Based-on: 20260817233147.2867623-1-connorkite@gmail.com
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
-Changelog:
-V2:
-Series:
-- Updates to svq address translation moved to a different patch series.
-  Link: https://lore.kernel.org/qemu-devel/20260817233147.2867623-1-connorkite@gmail.com 
-- The "shadow vq cleanup" has been merged into the earlier patch
-  handling svq setup.
-- Link to v1: https://lore.kernel.org/qemu-devel/20260723-vhost-user-isolated-memory-v1-0-6b97c439eb28@gmail.com
+ hw/virtio/vhost-user-base.c        | 9 +++++++++
+ hw/virtio/vhost-user-gpio.c        | 4 ----
+ hw/virtio/vhost-user-i2c.c         | 5 -----
+ hw/virtio/vhost-user-input.c       | 5 -----
+ hw/virtio/vhost-user-rng.c         | 5 -----
+ hw/virtio/vhost-user-rtc.c         | 4 ----
+ hw/virtio/vhost-user-snd.c         | 1 -
+ hw/virtio/vhost-user-spi.c         | 5 -----
+ hw/virtio/vhost-user-test-device.c | 1 -
+ 9 files changed, 9 insertions(+), 30 deletions(-)
 
-Individual Patches:
-vhost-user: Consolidate chardev property definitions
-- Patch author updated from ConKite to Connor Kite
+diff --git a/hw/virtio/vhost-user-base.c b/hw/virtio/vhost-user-base.c
+index 478ec68f09..90bd2903db 100644
+--- a/hw/virtio/vhost-user-base.c
++++ b/hw/virtio/vhost-user-base.c
+@@ -407,9 +407,16 @@ static void vub_device_unrealize(DeviceState *dev)
+     do_vhost_user_cleanup(vdev, vub);
+ }
+ 
++/*Define common qdev properties.  Inherited by all children*/
++static const Property vub_properties[] = {
++    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev)
++};
++
++
+ static void vub_class_init(ObjectClass *klass, const void *data)
+ {
+     VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
++    DeviceClass *dc = DEVICE_CLASS(klass);
+ 
+     vdc->realize = vub_device_realize;
+     vdc->unrealize = vub_device_unrealize;
+@@ -417,6 +424,8 @@ static void vub_class_init(ObjectClass *klass, const void *data)
+     vdc->get_config = vub_get_config;
+     vdc->set_config = vub_set_config;
+     vdc->set_status = vub_set_status;
++
++    device_class_set_props(dc, vub_properties);
+ }
+ 
+ static const TypeInfo vub_types[] = {
+diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
+index d473f87077..33b8752282 100644
+--- a/hw/virtio/vhost-user-gpio.c
++++ b/hw/virtio/vhost-user-gpio.c
+@@ -14,9 +14,6 @@
+ #include "standard-headers/linux/virtio_ids.h"
+ #include "standard-headers/linux/virtio_gpio.h"
+ 
+-static const Property vgpio_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+-};
+ 
+ static void vgpio_realize(DeviceState *dev, Error **errp)
+ {
+@@ -42,7 +39,6 @@ static void vu_gpio_class_init(ObjectClass *klass, const void *data)
+     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
+ 
+     dc->vmsd = &vu_gpio_vmstate;
+-    device_class_set_props(dc, vgpio_properties);
+     device_class_set_parent_realize(dc, vgpio_realize,
+                                     &vubc->parent_realize);
+     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
+diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+index 152b1f6740..3f5427b5b2 100644
+--- a/hw/virtio/vhost-user-i2c.c
++++ b/hw/virtio/vhost-user-i2c.c
+@@ -14,10 +14,6 @@
+ #include "qemu/error-report.h"
+ #include "standard-headers/linux/virtio_ids.h"
+ 
+-static const Property vi2c_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+-};
+-
+ static void vi2c_realize(DeviceState *dev, Error **errp)
+ {
+     VHostUserBase *vub = VHOST_USER_BASE(dev);
+@@ -42,7 +38,6 @@ static void vu_i2c_class_init(ObjectClass *klass, const void *data)
+     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
+ 
+     dc->vmsd = &vu_i2c_vmstate;
+-    device_class_set_props(dc, vi2c_properties);
+     device_class_set_parent_realize(dc, vi2c_realize,
+                                     &vubc->parent_realize);
+     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
+diff --git a/hw/virtio/vhost-user-input.c b/hw/virtio/vhost-user-input.c
+index 5cfc5bbb56..8fe6349ffc 100644
+--- a/hw/virtio/vhost-user-input.c
++++ b/hw/virtio/vhost-user-input.c
+@@ -7,10 +7,6 @@
+ #include "qemu/osdep.h"
+ #include "hw/virtio/virtio-input.h"
+ 
+-static const Property vinput_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+-};
+-
+ static void vinput_realize(DeviceState *dev, Error **errp)
+ {
+     VHostUserBase *vub = VHOST_USER_BASE(dev);
+@@ -36,7 +32,6 @@ static void vhost_input_class_init(ObjectClass *klass, const void *data)
+     DeviceClass *dc = DEVICE_CLASS(klass);
+ 
+     dc->vmsd = &vmstate_vhost_input;
+-    device_class_set_props(dc, vinput_properties);
+     device_class_set_parent_realize(dc, vinput_realize,
+                                     &vubc->parent_realize);
+     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
+diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
+index 106c8f211a..664aee403d 100644
+--- a/hw/virtio/vhost-user-rng.c
++++ b/hw/virtio/vhost-user-rng.c
+@@ -20,10 +20,6 @@ static const VMStateDescription vu_rng_vmstate = {
+     .unmigratable = 1,
+ };
+ 
+-static const Property vrng_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+-};
+-
+ static void vu_rng_base_realize(DeviceState *dev, Error **errp)
+ {
+     VHostUserBase *vub = VHOST_USER_BASE(dev);
+@@ -43,7 +39,6 @@ static void vu_rng_class_init(ObjectClass *klass, const void *data)
+     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
+ 
+     dc->vmsd = &vu_rng_vmstate;
+-    device_class_set_props(dc, vrng_properties);
+     device_class_set_parent_realize(dc, vu_rng_base_realize,
+                                     &vubc->parent_realize);
+ 
+diff --git a/hw/virtio/vhost-user-rtc.c b/hw/virtio/vhost-user-rtc.c
+index 88b0c70b90..6d80cb6263 100644
+--- a/hw/virtio/vhost-user-rtc.c
++++ b/hw/virtio/vhost-user-rtc.c
+@@ -19,9 +19,6 @@ static const VMStateDescription vu_rtc_vmstate = {
+     .unmigratable = 1,
+ };
+ 
+-static const Property vrtc_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+-};
+ 
+ static void vu_rtc_base_realize(DeviceState *dev, Error **errp)
+ {
+@@ -42,7 +39,6 @@ static void vu_rtc_class_init(ObjectClass *klass, const void *data)
+     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
+ 
+     dc->vmsd = &vu_rtc_vmstate;
+-    device_class_set_props(dc, vrtc_properties);
+     device_class_set_parent_realize(dc, vu_rtc_base_realize,
+                                     &vubc->parent_realize);
+ 
+diff --git a/hw/virtio/vhost-user-snd.c b/hw/virtio/vhost-user-snd.c
+index 7129b77d9c..3663450aed 100644
+--- a/hw/virtio/vhost-user-snd.c
++++ b/hw/virtio/vhost-user-snd.c
+@@ -34,7 +34,6 @@ static const VMStateDescription vu_snd_vmstate = {
+ };
+ 
+ static const Property vsnd_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+     DEFINE_PROP_BIT64("controls", VHostUserBase,
+                       parent_obj.host_features, VIRTIO_SND_F_CTLS, false),
+ };
+diff --git a/hw/virtio/vhost-user-spi.c b/hw/virtio/vhost-user-spi.c
+index 707f96c250..fb6168d391 100644
+--- a/hw/virtio/vhost-user-spi.c
++++ b/hw/virtio/vhost-user-spi.c
+@@ -15,10 +15,6 @@
+ #include "standard-headers/linux/virtio_ids.h"
+ #include "standard-headers/linux/virtio_spi.h"
+ 
+-static const Property vspi_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+-};
+-
+ static void vspi_realize(DeviceState *dev, Error **errp)
+ {
+     VHostUserBase *vub = VHOST_USER_BASE(dev);
+@@ -44,7 +40,6 @@ static void vu_spi_class_init(ObjectClass *klass, const void *data)
+     VHostUserBaseClass *vubc = VHOST_USER_BASE_CLASS(klass);
+ 
+     dc->vmsd = &vu_spi_vmstate;
+-    device_class_set_props(dc, vspi_properties);
+     device_class_set_parent_realize(dc, vspi_realize,
+                                     &vubc->parent_realize);
+     set_bit(DEVICE_CATEGORY_INPUT, dc->categories);
+diff --git a/hw/virtio/vhost-user-test-device.c b/hw/virtio/vhost-user-test-device.c
+index a2f963fdf6..91e23bf07a 100644
+--- a/hw/virtio/vhost-user-test-device.c
++++ b/hw/virtio/vhost-user-test-device.c
+@@ -30,7 +30,6 @@ static const VMStateDescription vud_vmstate = {
+ };
+ 
+ static const Property vud_properties[] = {
+-    DEFINE_PROP_CHR("chardev", VHostUserBase, chardev),
+     DEFINE_PROP_UINT16("virtio-id", VHostUserBase, virtio_id, 0),
+     DEFINE_PROP_UINT32("vq_size", VHostUserBase, vq_size, 64),
+     DEFINE_PROP_UINT32("num_vqs", VHostUserBase, num_vqs, 1),
 
-util/iova-tree: g_tree_foreach wrapper
-- Added clarification comments about the function passed to
-  iova_tree_foreach
-
-hw/virtio: iova_tree_foreach wrapper
-- Corrected comment about GTraverseFUnc end condition
-
-hw/virtio/vhost-shadow-virtqueue: used callback
-- Changed name of "used_handler" to "used_callback"
-- Added handling if callback returns with error value
-- Comments added clarifying callback return values
-
-hw/virtio/vhost-shadow-virtqueue: specified vring placement
-- Formatting improvements
-- Change hwaddr to void * for pointers to host memory
-- Bounds checking added when allocating vrings
-
-vhost-user: add memory_isolation to VhostUserState
-- Updated net_passt_vhost_user_init signature that is active when
-  !defined(CONFIG_VHOST_USER)
-- Comment updates for clarity
-
-hw/virtio/vhost-user: create isolation region
-- Formatting fixes
-- Many comments added
-- Read-after-zeroing bug fixed in cleanup_isolation_regions
-- User-after-free bug in init_isolation_regions fixed by removing
-  duplicate calls, and consolidating those steps in
-  cleanup_isolation_regions
-- Data unique to isolation mode consolidated in IsolationModeCtx struct
-- Vring memory size calculations now only done via an API exposed by
-  vhost-shadow-virtqueue
-- Isolation region memfd file given a unique name
-- Iova-tree IOVA space now starts at 0 + page_size to avoid exposing
-  qemu addresses
-- buffer_regions array moved changed from GArray to dynamically
-  allocated array of predetermined size.  Avoids GArray formatting
-  ugliness
-
-  Note: Devicies implemented with multiple vhost threads, like
-  virtio-net, are not currently supported.  Work is still required to
-  update the vring allocation code to run only for vq_index=0 and
-  propagate to the other vhost-user instances.
-
-hw/virtio/vhost-user: send isolation regions to device
-- Formatting improvements
-- Vring region combined with contiguous buffer region in IOVA space to
-  avoid wasting one of the available region slots that can be sent to
-  the back-end
-- Traversal callback for filling out msg regions renamed to
-  vhost_user_fill_msg_reg_from_tree and simplified
-- Check added if postcopy is in use as it is not currently supported
-
-hw/virtio/vhost-user: add shadow virtqueues and eventfd intercepts
-- Vring mapping now occurs during the vhost_user_set_mem_tables call,
-  which means that vring addresses can be sent to the backend when
-  expected by vhost
-- The svq's device-facing event notifiers are now cleaned up in case of
-  error or reset
-- Bounds checking on vq index added in various locations
-- SVQ cleanup code added
-
-hw/virtio/vhost-user: handle data movement with shadow vqs
-- Removed unecessary changes to elements during handling
-- Fixed incorrect memcpy of used buffers in reverse direction
-- Formatting improvements
-- Bounds and error checking to handle mapping failures or buffers with
-  invalid ranges
-- Add error if isolation mode is used while IOMMU is active
-- Add error if isolation mode is used with packed vrings
-
-vhost-user: Add memory-isolation qdev property to vhost-user devices
-- Patch moved to end of patch series
-- Fixed overlong lines
-
-backends/cryptodev-vhost-user: add memory isolation bool
-- Fixed style in qapi and added "since" field
-- Clarification added to comments
-- The memory_isolation bool can no longer be set in vhost-cryptodev once
-  initialization finishes
-
-net/vhost-user: add memory isolation
-- Moved to the back of the patch series
-- Dead code removed by hard-coding memory_isolation args to vhost_user_init
-
----
-Connor Kite (13):
-      vhost-user: Consolidate chardev property definitions
-      util/iova-tree: g_tree_foreach wrapper
-      hw/virtio: iova_tree_foreach wrapper
-      hw/virtio/vhost-shadow-virtqueue: used callback
-      hw/virtio/vhost-shadow-virtqueue: specified vring placement
-      vhost-user: add memory_isolation to VhostUserState
-      hw/virtio/vhost-user: create isolation region
-      hw/virtio/vhost-user: send isolation regions to device
-      hw/virtio/vhost-user: add shadow virtqueues and eventfd intercepts
-      hw/virtio/vhost-user: handle data movement with shadow vqs
-      vhost-user: Add memory-isolation qdev property to vhost-user devices
-      backends/cryptodev-vhost-user: add memory isolation bool
-      net/vhost-user: add memory isolation
-
- backends/cryptodev-vhost-user.c      |  28 +-
- backends/vhost-user.c                |   4 +-
- hw/block/vhost-user-blk.c            |   4 +-
- hw/display/vhost-user-gpu.c          |   4 +-
- hw/scsi/vhost-user-scsi.c            |   5 +-
- hw/virtio/vhost-iova-tree.c          |  15 +
- hw/virtio/vhost-iova-tree.h          |   2 +
- hw/virtio/vhost-shadow-virtqueue.c   |  80 ++++-
- hw/virtio/vhost-shadow-virtqueue.h   |  25 +-
- hw/virtio/vhost-stub.c               |   3 +-
- hw/virtio/vhost-user-base.c          |  14 +-
- hw/virtio/vhost-user-fs.c            |   5 +-
- hw/virtio/vhost-user-gpio.c          |   4 -
- hw/virtio/vhost-user-i2c.c           |   5 -
- hw/virtio/vhost-user-input.c         |   5 -
- hw/virtio/vhost-user-rng.c           |   5 -
- hw/virtio/vhost-user-rtc.c           |   4 -
- hw/virtio/vhost-user-scmi.c          |   5 +-
- hw/virtio/vhost-user-snd.c           |   1 -
- hw/virtio/vhost-user-spi.c           |   5 -
- hw/virtio/vhost-user-test-device.c   |   1 -
- hw/virtio/vhost-user-vsock.c         |   5 +-
- hw/virtio/vhost-user.c               | 657 ++++++++++++++++++++++++++++++++++-
- include/hw/virtio/vhost-user-base.h  |   1 +
- include/hw/virtio/vhost-user-blk.h   |   1 +
- include/hw/virtio/vhost-user-fs.h    |   1 +
- include/hw/virtio/vhost-user-scmi.h  |   1 +
- include/hw/virtio/vhost-user-vsock.h |   1 +
- include/hw/virtio/vhost-user.h       |   6 +-
- include/hw/virtio/virtio-gpu.h       |   1 +
- include/hw/virtio/virtio-scsi.h      |   1 +
- include/qemu/iova-tree.h             |  21 ++
- include/system/vhost-user-backend.h  |   3 +-
- net/passt.c                          |  19 +-
- net/vhost-user.c                     |  11 +-
- qapi/net.json                        |  16 +-
- qapi/qom.json                        |   8 +-
- util/iova-tree.c                     |   5 +
- 38 files changed, 903 insertions(+), 79 deletions(-)
----
-base-commit: 88aac004fb1bef50277d8484f4aeacf2e8cb9e38
-change-id: 20260604-vhost-user-isolated-memory-070ed4833ee7
-
-Best regards,
 -- 
-Connor Kite <connorkite@gmail.com>
+2.43.0
 

@@ -1,39 +1,39 @@
 Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 1E1393BE17B
-	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 11:32:23 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 93009221546
+	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 12:35:53 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787052746; cv=none; b=Rk6rlf+y4aSw9q9GCJ4MTrF+0/wvu0/qottFc6hpAmwaPnSHWY7AbSUbBmW5NLPtKFRYT2it6CMFvqysK5jpWAk5B5BptSgypMN2RIUovzwkRfORylyCaoj/3MrQ9o7ZJQtb6VPBvMwMgiGmmZEamRapwP9NEuV2CMQnRPBjG7U=
+	t=1787056556; cv=none; b=eKAJCmxoQtpBiCgqz+hzM9wgHIesh+gKV4NYmHu1imEhxPmd91ilK67wYF2DKxDEdref9plvRWVvgMFN8FHtbWsU7FeSzp8zdYglfNh+jXjniQHu/brqbSFejpBVQrwZIdp/MzFccZtbk4tdZYLHy7JsDWcfL0ey18zETczZhQM=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787052746; c=relaxed/simple;
-	bh=KIBca07THktsafOq0v9J1zKBprQTaBtclA0QW9b8Kws=;
+	s=arc-20240116; t=1787056556; c=relaxed/simple;
+	bh=H86VwNk9z2BZmnoZ+lgAjzlZTCaeatgJ+VHhGwVRDqY=;
 	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=DHK+Lk5rS2xSLGENuvQRlxAwW0+9N+VL7hys+aodg+Z7PDC3UDIGezdAjY6Jtj0ofxrv9eXYQXFMVySobS7SMYDq7aW88uuVx8VdfNmHQ3NAApnQlEgsDZAW3oEzJOJVpUL4hLc1FjhET+XAS1jpoVyWncE/ujOy5jSKFsKJToY=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=GF1KW2ZA; arc=none smtp.client-ip=49.212.243.89
+	 In-Reply-To:Content-Type; b=inU7u57H18ntiaz8WBdlnBBlD1VnHkhM6qf0xuOVS5YDGulu2lGuMsKPBMu2MKkVXFXiUqD100oPyuTrN5NfMFKks7pBFTXMm6LvgA0vnjSjP0FjmDssiR/dXzZWpHTO9LLDHt3SmzBne8CW8rU91w49X1/Rpiwci3Ry22J8ZhQ=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=r3WyYSTk; arc=none smtp.client-ip=49.212.243.89
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="GF1KW2ZA"
+	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="r3WyYSTk"
 Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
 	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67IBVjKM069137
+	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67ICYwMb092544
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Tue, 18 Aug 2026 20:31:45 +0900 (JST)
+	Tue, 18 Aug 2026 21:34:58 +0900 (JST)
 	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=HGztCwXSzmO+tRApV6D6qoPijGlMR+1m3KpNzRiLiyg=;
+DKIM-Signature: a=rsa-sha256; bh=LUeb38oMvvESBEacWa+JwwNRjf77ZX6fuQUxFwXE74w=;
         c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
         h=From:Message-ID:To:Subject:Date;
-        s=rs20250326; t=1787052706; v=1;
-        b=GF1KW2ZAiNcjeYMqOfdLwnas2aCKru8PiNTPhri/o/0c/u9dCSs6q9h9o4HOLdOV
-         YosHhUxd1BO10huDkzOKgBuSvBFXFrS1dHWGdBNddUtAQ+++/S2ldfO3mv6/5oud
-         1xYLZ+Os+tlSkxVLr07NSLTqJUZslvKhUnFOZ6kFlvabqg2ixXroptCQGA6Fadx3
-         0SwGXpkn7o2YmpnsrJ7jQ5vln1fpjAphhBEbI+BaUZxkzEdosHS1xGdQzUc6WZaj
-         fjVB90U6LLdduvWfmy8DoBucOz+5vl7IOZdcQ1WMr9KGJmbXiqJVIUSl73gcv3qE
-         zdCjN4uB2RoM36ICPtn4+A==
-Message-ID: <7838ab96-38a7-48ea-8a4c-3f7784559e1d@rsg.ci.i.u-tokyo.ac.jp>
-Date: Tue, 18 Aug 2026 20:31:45 +0900
+        s=rs20250326; t=1787056498; v=1;
+        b=r3WyYSTkKKLZVNJZ9ziyNTDdeJ6W7AkVZk4NmAcdQvdNoGs0v1Ww3wrFvq1g+OXw
+         lp9I0M+K/L22+958hR5B4b1PenmoJH0XlMt9ErdiGqWWVF18TA+e0y1xeQG8Rf5i
+         mpERmlG6IhdSVuuOk7EThxUzCK/WNqxZkYADmAFuFh21q69bTIpIPLMsf0ZXvjmG
+         RfsQWxce8YqXjbiN4ir3p4mpeE+PFC24sZbsSgF0DD3kPpxNsOZwS1BHcuK9/yp1
+         Zg8en8zfNpbxippYicCFDglQ6N8MXcshEP9e0lBkwcsv0tGi/9Xo4JGZo26bup1u
+         za3nLjpDg5DFJHlCK7RqSg==
+Message-ID: <7b4d2e3d-4593-492c-887a-db560d590ac6@rsg.ci.i.u-tokyo.ac.jp>
+Date: Tue, 18 Aug 2026 21:34:58 +0900
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -41,8 +41,8 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC v2 08/13] hw/virtio/vhost-user: send isolation regions
- to device
+Subject: Re: [PATCH RFC v2 09/13] hw/virtio/vhost-user: add shadow virtqueues
+ and eventfd intercepts
 To: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Stefano Garzarella <sgarzare@redhat.com>,
@@ -69,204 +69,303 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>,
         20260817233147.2867623-1-connorkite@gmail.com
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-8-948aae960abb@gmail.com>
+ <20260817-vhost-user-isolated-memory-v2-9-948aae960abb@gmail.com>
 Content-Language: en-US
 From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20260817-vhost-user-isolated-memory-v2-8-948aae960abb@gmail.com>
+In-Reply-To: <20260817-vhost-user-isolated-memory-v2-9-948aae960abb@gmail.com>
 Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 7bit
 
 On 2026/08/18 14:12, Connor Kite wrote:
-> Adds features to fill a vhost_user_set_mem_table message with the
-> addresses of isolation memory regions corresponding to bounce buffers
-> and vrings.
+> Adds shadow virtqueues that will eventually be used to transfer data
+> between device and host via bounce buffers when isolation mode is
+> active.  The svqs are initalized, and eventfd assignments are
+> intercepted so that notifications come to svqs first before
+> the guest or backend receive them.
 > 
 > Signed-off-by: Connor Kite <connorkite@gmail.com>
 > ---
->   hw/virtio/vhost-user.c | 118 ++++++++++++++++++++++++++++++++++++++++++++++++-
->   1 file changed, 117 insertions(+), 1 deletion(-)
+>   hw/virtio/vhost-user.c | 136 ++++++++++++++++++++++++++++++++++++++++++-------
+>   1 file changed, 119 insertions(+), 17 deletions(-)
 > 
 > diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-> index 7e9233e174..e1e5cba53d 100644
+> index e1e5cba53d..ace328f5eb 100644
 > --- a/hw/virtio/vhost-user.c
 > +++ b/hw/virtio/vhost-user.c
-> @@ -1140,7 +1140,77 @@ static void cleanup_isolation_regions(struct vhost_dev *dev)
->       }
->   }
+> @@ -18,6 +18,7 @@
+>   #include "hw/virtio/vhost-backend.h"
+>   #include "hw/virtio/virtio.h"
+>   #include "hw/virtio/virtio-net.h"
+> +#include "hw/virtio/vhost-shadow-virtqueue.h"
+>   #include "hw/virtio/vhost-iova-tree.h"
+>   #include "chardev/char-fe.h"
+>   #include "io/channel-socket.h"
+> @@ -331,6 +332,7 @@ typedef struct {
+>       size_t size; /* size of the mapped shared memory */
+>       int fd; /* descriptor of anonymous file backing shared iso region */
+>       Int128 iso_iova_offset; /* translation from IOVA to hva of iso region */
+> +    GPtrArray *shadow_vqs; /* shadow vqs with vrings in iso region*/
+
+A whitespace problem remains here.
+
+>   } IsolationModeCtx;
 >   
-> -__attribute__((unused))
-> +typedef struct {
-> +    VhostUserMsg *msg;
-> +    struct vhost_user *u;
-> +    int *fds;
-> +    size_t fds_size;
-> +    uint64_t vring_iova;
-> +    size_t vring_size;
-> +    bool vring_node_visited;
-> +    size_t *idx;
-> +} IOVATreeTraversalArgs;
-> +
-> +static gboolean vhost_user_fill_msg_reg_from_tree(gpointer key,
-> +                                                  gpointer value,
-> +                                                  gpointer data)
-> +{
-> +    IOVATreeTraversalArgs *args = data;
-> +    struct vhost_user *u;
-> +    VhostUserMsg *msg = args->msg;
-> +    DMAMap *map = key;
-> +    uint64_t offset;
-> +
-> +    assert(args && key && value);
-> +    if (!args->vring_node_visited) {
-> +        args->vring_node_visited = true;
-> +        return false;
-> +    }
-> +
-> +    u = args->u;
-> +    assert(*args->idx < args->fds_size);
-> +
-> +    args->fds[*args->idx] = args->u->iso_mem_ctx.fd;
-> +
-> +    /*
-> +     * If the number of regions is fixed, it would be wasteful to use one for
-> +     * only the vrings. The first vhost_iova_tree element is always
-> +     * reserved for the vrings, so we can simply combine the first and second
-> +     * elements, which are contiguous in IOVA space, when sending regions to
-> +     * the backend.
-> +     */
-> +    if (*args->idx == 0) {
-> +        offset = u->iso_mem_ctx.vring_hva_addr - u->iso_mem_ctx.shared_mem_addr;
-> +        msg->payload.memory.regions[*args->idx].userspace_addr =
-> +            args->vring_iova;
-> +        /*
-> +         * The size from the iova tree is inclusive, so 1 is added to it.
-> +         * args->vring_size is exclusive, so no addition is required.
-> +         */
-> +        msg->payload.memory.regions[*args->idx].memory_size =
-> +            args->vring_size + map->size + 1;
-> +        msg->payload.memory.regions[*args->idx].guest_phys_addr =
-> +            args->vring_iova;
-> +        msg->payload.memory.regions[*args->idx].mmap_offset = offset;
-> +    } else {
-> +        /* Use 128 bit operation in unlikely case of negative iso_iova_offset */
-> +        offset = int128_get64(int128_add(int128_make64(map->iova),
-> +                                        u->iso_mem_ctx.iso_iova_offset)) -
-> +                (uint64_t)u->iso_mem_ctx.shared_mem_addr;
-> +
-> +        msg->payload.memory.regions[*args->idx].userspace_addr = map->iova;
-> +        msg->payload.memory.regions[*args->idx].memory_size = map->size + 1;
-> +        msg->payload.memory.regions[*args->idx].guest_phys_addr = map->iova;
-> +        msg->payload.memory.regions[*args->idx].mmap_offset = offset;
-> +    }
-> +
-> +    assert(offset + msg->payload.memory.regions[*args->idx].memory_size <=
-> +        u->iso_mem_ctx.size);
-> +    (*args->idx)++;
-> +
-> +    return false;
-> +}
-> +
->   static int init_isolation_regions(struct vhost_dev *dev,
->                                     VhostUserMsg *msg,
->                                     int *fds, size_t *fd_num)
-> @@ -1159,6 +1229,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
->       DMAMap *map;
->       DMAMap vring_map;
->       int r;
-> +    IOVATreeTraversalArgs trav_args;
->   
->       msg->hdr.request = VHOST_USER_SET_MEM_TABLE;
->   
-> @@ -1244,6 +1315,27 @@ static int init_isolation_regions(struct vhost_dev *dev,
->           }
->       }
->   
-> +    *fd_num = 0;
-> +    trav_args.idx = fd_num;
-> +    trav_args.fds = fds;
-> +    trav_args.msg = msg;
-> +    trav_args.u = u;
-> +    trav_args.vring_iova = vring_map.iova;
-> +    trav_args.vring_size = total_vring_size;
-> +    trav_args.fds_size = nregions;
-> +    trav_args.vring_node_visited = false;
-> +
-> +    vhost_iova_tree_foreach(u->iso_mem_ctx.tree,
-> +                            vhost_user_fill_msg_reg_from_tree, &trav_args);
-> +
-> +    msg->payload.memory.nregions = *fd_num;
-> +
-> +    assert(*fd_num == nregions);
-> +
-> +    msg->hdr.size = sizeof(msg->payload.memory.nregions);
-> +    msg->hdr.size += sizeof(msg->payload.memory.padding);
-> +    msg->hdr.size += *fd_num * sizeof(VhostUserMemoryRegion);
-> +
+>   struct vhost_user {
+> @@ -1128,15 +1130,38 @@ static int vhost_user_set_mem_table_postcopy(struct vhost_dev *dev,
 >       return 0;
 >   }
 >   
-> @@ -1251,6 +1343,7 @@ static int vhost_user_set_mem_table(struct vhost_dev *dev,
->                                       struct vhost_memory *mem)
->   {
->       struct vhost_user *u = dev->opaque;
-> +    bool memory_isolation = u->user->memory_isolation;
->       int fds[VHOST_MEMORY_BASELINE_NREGIONS];
->       size_t fd_num = 0;
->       bool do_postcopy = u->postcopy_listen && u->postcopy_fd.handler;
-> @@ -1262,6 +1355,11 @@ static int vhost_user_set_mem_table(struct vhost_dev *dev,
->       int ret;
->   
->       if (do_postcopy) {
-> +        /* Postcopy is not supported with memory isolation yet */
-> +        if (memory_isolation) {
-> +            return -1;
-> +        }
-> +
->           /*
->            * Postcopy has enough differences that it's best done in it's own
->            * version
-> @@ -1278,6 +1376,24 @@ static int vhost_user_set_mem_table(struct vhost_dev *dev,
->           msg.hdr.flags |= VHOST_USER_NEED_REPLY_MASK;
->       }
->   
-> +    if (memory_isolation) {
-> +        ret = init_isolation_regions(dev, &msg, fds, &fd_num);
-> +        if (ret < 0) {
-> +            return ret;
-> +        }
-> +
-> +        ret = vhost_user_write(dev, &msg, fds, fd_num);
-> +        if (ret < 0) {
-> +            return ret;
-> +        }
-> +
-> +        if (reply_supported) {
-> +            return process_message_reply(dev, &msg);
-> +        }
-> +
-> +        return 0;
+> -static void cleanup_isolation_regions(struct vhost_dev *dev)
+> +static void vhost_user_svq_cleanup(struct vhost_user *u, bool reset)
+> +{
+> +    VhostShadowVirtqueue *svq;
+> +    for (int i = 0; i < u->iso_mem_ctx.shadow_vqs->len; i++) {
+> +        svq = g_ptr_array_index(u->iso_mem_ctx.shadow_vqs, i);
+> +        vhost_svq_stop(svq);
+> +        event_notifier_cleanup(&svq->hdev_call);
+> +        event_notifier_cleanup(&svq->hdev_kick);
 > +    }
 > +
+> +    if (!reset) {
+> +        g_ptr_array_free(u->iso_mem_ctx.shadow_vqs, true);
+> +    }
+> +}
+> +
+> +static void cleanup_isolation_regions(struct vhost_dev *dev, bool reset)
+>   {
+>       struct vhost_user *u = dev->opaque;
+>       if (u->iso_mem_ctx.shared_mem_addr) {
 
-This bypasses vhost_user_fill_set_mem_table_msg() below and suppresses 
-the error saying: "Failed initializing vhost-user memory map, consider 
-using -object memory-backend-file share=on"
+If vhost_dev_init() fails after vhost_user_init_svq(), shadow_vqs is 
+present but shared_mem_addr is not because init_isolation_regions() is 
+not called yet. shadow_vqs will be leaked then.
 
-However, vhost-user doesn't work even with memory isolation in such a 
-case because vhost_user_no_private_memslots() always returns true and 
-that makes vhost_section() filter private memory out. This restriction 
-is unnecessary with memory isolation and can be removed instead of 
-restoring the error.
+> +        vhost_user_svq_cleanup(u, reset);
+>           vhost_iova_tree_delete(u->iso_mem_ctx.tree);
+>           qemu_memfd_free(u->iso_mem_ctx.shared_mem_addr,
+>                           u->iso_mem_ctx.size,
+>                           u->iso_mem_ctx.fd);
+> +
+> +        GPtrArray *temp = u->iso_mem_ctx.shadow_vqs;
 
-This also lacks handling of VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS, 
-and will overflow fds and VhostUserMemory::regions when 
-VHOST_USER_GET_MAX_MEM_SLOTS is larger than VHOST_MEMORY_BASELINE_NREGIONS.
+This is a mixed declaration prohibited in docs/devel/style.rst
+
+>           memset(&u->iso_mem_ctx, 0, sizeof(IsolationModeCtx));
+> +
+> +        if (!reset) {
+
+This condition is inverted. When reset is true, vhost_user_svq_cleanup() 
+retains the array so the pointer to it should be kept.
+
+> +            u->iso_mem_ctx.shadow_vqs = temp;
+> +        }> +
+>       }
+>   }
+>   
+> @@ -1234,7 +1259,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
+>       msg->hdr.request = VHOST_USER_SET_MEM_TABLE;
+>   
+>       /* In case of reset, clear old regions */
+> -    cleanup_isolation_regions(dev);
+> +    cleanup_isolation_regions(dev, true);
+>   
+>       /* Gather information for bounce buffers to be mapped */
+>       for (u_int32_t i = 0; i < nregions; i++) {
+> @@ -1267,7 +1292,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
+>   
+>       if (err) {
+>           error_report_err(err);
+> -        cleanup_isolation_regions(dev);
+> +        cleanup_isolation_regions(dev, false);
+>           return -1;
+>       }
+>   
+> @@ -1295,7 +1320,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
+>                                     (hwaddr)u->iso_mem_ctx.shared_mem_addr);
+>   
+>       if (r != IOVA_OK) {
+> -        cleanup_isolation_regions(dev);
+> +        cleanup_isolation_regions(dev, false);
+>           return r;
+>       }
+>   
+> @@ -1310,7 +1335,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
+>                                             dev->mem->regions[i].guest_phys_addr);
+>   
+>           if (r != IOVA_OK) {
+> -            cleanup_isolation_regions(dev);
+> +            cleanup_isolation_regions(dev, false);
+>               return r;
+>           }
+>       }
+> @@ -1738,11 +1763,49 @@ static int vhost_set_vring_file(struct vhost_dev *dev,
+>       return 0;
+>   }
+>   
+> +static int vhost_user_get_vq_index(struct vhost_dev *dev, int idx)
+> +{
+> +    assert(idx >= dev->vq_index && idx < dev->vq_index + dev->nvqs);
+> +
+> +    return idx;
+> +}
+> +
+>   static int vhost_user_set_vring_kick(struct vhost_dev *dev,
+>                                        struct vhost_vring_file *file)
+>   {
+> -    int ret = vhost_set_vring_file(dev, VHOST_USER_SET_VRING_KICK, file);
+> +    struct vhost_user *u = dev->opaque;
+> +    int svq_idx = file->index - dev->vq_index;
+> +    VhostShadowVirtqueue *svq = NULL;
+> +    struct vhost_vring_file vr_file = *file;
+> +    int ret;
+> +
+> +    vhost_user_get_vq_index(dev, file->index); /* bounds checking */
+> +
+> +    if (u->user->memory_isolation) {
+> +        svq = g_ptr_array_index(u->iso_mem_ctx.shadow_vqs, svq_idx);
+> +        vhost_svq_set_svq_kick_fd(svq, file->fd);
+
+The svq->svq_kick EventNotifier is left set in the error paths.
 
 Regards,
 Akihiko Odaki
 
->       if (config_mem_slots) {
->           ret = vhost_user_add_remove_regions(dev, &msg, reply_supported, false);
->           if (ret < 0) {
+> +
+> +        if (file->fd != -1) {
+> +            if (!svq->hdev_kick.initialized) {
+> +                ret = event_notifier_init(&svq->hdev_kick, 0);
+> +                if (ret < 0) {
+> +                    event_notifier_cleanup(&svq->hdev_kick);
+> +                    error_report("Failed to create kick event notifier");
+> +                    return ret;
+> +                }
+> +            }
+> +
+> +            vr_file.fd = event_notifier_get_fd(&svq->hdev_kick);
+> +        } else {
+> +            event_notifier_cleanup(&svq->hdev_kick);
+> +        }
+> +    }
+> +
+> +    ret = vhost_set_vring_file(dev, VHOST_USER_SET_VRING_KICK, &vr_file);
+>       if (ret < 0) {
+> +        if (svq != NULL) {
+> +            event_notifier_cleanup(&svq->hdev_kick);
+> +        }
+>           return ret;
+>       }
+>   
+> @@ -1750,15 +1813,18 @@ static int vhost_user_set_vring_kick(struct vhost_dev *dev,
+>        * Inject a kick in case the back-end only starts vring processing upon
+>        * receiving a kick. The spec suggests this to improve compatibility.
+>        */
+> -    if (file->fd != -1) {
+> +    if (vr_file.fd != -1) {
+>           uint64_t val = 1;
+>           ssize_t nwritten;
+>   
+>           do {
+> -            nwritten = write(file->fd, &val, sizeof(val));
+> +            nwritten = write(vr_file.fd, &val, sizeof(val));
+>           } while (nwritten < 0 && errno == EINTR);
+>   
+>           if (nwritten < 0 && errno != EAGAIN /* back-end can already read */) {
+> +            if (svq != NULL) {
+> +                event_notifier_cleanup(&svq->hdev_kick);
+> +            }
+>               return -errno;
+>           }
+>       }
+> @@ -1769,7 +1835,35 @@ static int vhost_user_set_vring_kick(struct vhost_dev *dev,
+>   static int vhost_user_set_vring_call(struct vhost_dev *dev,
+>                                        struct vhost_vring_file *file)
+>   {
+> -    return vhost_set_vring_file(dev, VHOST_USER_SET_VRING_CALL, file);
+> +    struct vhost_user *u = dev->opaque;
+> +    int svq_idx = file->index - dev->vq_index;
+> +    VhostShadowVirtqueue *svq = NULL;
+> +    struct vhost_vring_file vr_file = *file;
+> +    int ret;
+> +
+> +    vhost_user_get_vq_index(dev, file->index); /* bounds checking */
+> +
+> +    if (u->user->memory_isolation) {
+> +        svq = g_ptr_array_index(u->iso_mem_ctx.shadow_vqs, svq_idx);
+> +        vhost_svq_set_svq_call_fd(svq, file->fd);
+> +
+> +        if (file->fd != -1) {
+> +            if (!svq->hdev_call.initialized) {
+> +                ret = event_notifier_init(&svq->hdev_call, 0);
+> +                if (ret < 0) {
+> +                    event_notifier_cleanup(&svq->hdev_call);
+> +                    error_report("Failed to create call event notifier");
+> +                    return ret;
+> +                }
+> +            }
+> +
+> +            vr_file.fd = event_notifier_get_fd(&svq->hdev_call);
+> +        } else {
+> +            event_notifier_cleanup(&svq->hdev_call);
+> +        }
+> +    }
+> +
+> +    return vhost_set_vring_file(dev, VHOST_USER_SET_VRING_CALL, &vr_file);
+
+Clean up svq->hdev_call when this fails.
+
+>   }
+>   
+>   static int vhost_user_set_vring_err(struct vhost_dev *dev,
+> @@ -2763,6 +2857,17 @@ static int vhost_user_postcopy_notifier(NotifierWithReturn *notifier,
+>       return 0;
+>   }
+>   
+> +static void vhost_user_init_svq(struct vhost_dev *dev, struct vhost_user *u)
+> +{
+> +    /*Modified from vhost-vdpa*/
+> +    u->iso_mem_ctx.shadow_vqs = g_ptr_array_new_full(dev->nvqs, vhost_svq_free);
+> +    for (int i = 0; i < dev->nvqs; i++) {
+> +        VhostShadowVirtqueue *svq;
+> +        svq = vhost_svq_new(NULL, NULL);
+> +        g_ptr_array_add(u->iso_mem_ctx.shadow_vqs, svq);
+> +    }
+> +}
+> +
+>   static int vhost_user_backend_init(struct vhost_dev *dev, void *opaque,
+>                                      Error **errp)
+>   {
+> @@ -2907,6 +3012,10 @@ static int vhost_user_backend_init(struct vhost_dev *dev, void *opaque,
+>       u->postcopy_notifier.notify = vhost_user_postcopy_notifier;
+>       postcopy_add_notifier(&u->postcopy_notifier);
+>   
+> +    if (vus->memory_isolation) {
+> +        vhost_user_init_svq(dev, u);
+> +    }
+> +
+>       return 0;
+>   }
+>   
+> @@ -2935,20 +3044,13 @@ static int vhost_user_backend_cleanup(struct vhost_dev *dev)
+>       g_free(u->region_rb_offset);
+>       u->region_rb_offset = NULL;
+>       u->region_rb_len = 0;
+> -    cleanup_isolation_regions(dev);
+> +    cleanup_isolation_regions(dev, false);
+>       g_free(u);
+>       dev->opaque = 0;
+>   
+>       return 0;
+>   }
+>   
+> -static int vhost_user_get_vq_index(struct vhost_dev *dev, int idx)
+> -{
+> -    assert(idx >= dev->vq_index && idx < dev->vq_index + dev->nvqs);
+> -
+> -    return idx;
+> -}
+> -
+>   static int vhost_user_memslots_limit(struct vhost_dev *dev)
+>   {
+>       struct vhost_user *u = dev->opaque;
 > 
 

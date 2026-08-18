@@ -1,69 +1,67 @@
-Received: from mail-pf1-f181.google.com (mail-pf1-f181.google.com [209.85.210.181])
+Received: from mail-pg1-f173.google.com (mail-pg1-f173.google.com [209.85.215.173])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id C5E113D16FC
-	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 05:12:52 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.210.181
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A85513D5C2A
+	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 05:12:55 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.215.173
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787029974; cv=none; b=iGN/HpkHdlh99KcIQHak1j27N7pLSBPHXH7Dxyo4tbH8k4BiHCV6ED31fYrbT62XnlCRCXK42qU21mHFCjEdn8/c1S/opJ5rt6ew0M9ADGEQiNO8ZAZ+S9zoPqUdcek1vWuYZOBgrJgH6C8YVSmnNXaLK5U7xjm0dD062XTtO8Q=
+	t=1787029977; cv=none; b=I1i++o9fW4QTELz1sjFYHDSvYYRINoofBrtps+Fu08CcxOSQfey1j4BFZU2lMJcFZsror5/XLKJtu9S6YNexbj973zxul6+vsPdmHfllUyBjturBDvoPPOwgR2jVp7dNFx9bhC0bc00i4bU7yYaIqeFQEJgwQcOzRVeKrVDmOLY=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787029974; c=relaxed/simple;
-	bh=eS7iavmbL0ampAG6cVubHx6sNBExzuvb7v9JapDYYmM=;
+	s=arc-20240116; t=1787029977; c=relaxed/simple;
+	bh=c1m9/46t7T/yFXDXSgz1vdQxYZX3+5KvcmxIw/DGGZM=;
 	h=From:Date:Subject:MIME-Version:Content-Type:Message-Id:References:
-	 In-Reply-To:To:Cc; b=E5RpVlSfj9E0E51GeiabaOAeyHZCVUks1qtAaxWWqQtEJn+DY1YUuEZTaV2mIjG4PmAWg9nCOx3QLaI2HkN7pfJLMrOaGYM8ogMunMzPQ+Hfar3O9cYVz0Z4o8+/J6LGlBuUQWLvfL2OBZJe6d34zA1ZHz3l3srrhEgQkD3OEEA=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=Ds46zT29; arc=none smtp.client-ip=209.85.210.181
+	 In-Reply-To:To:Cc; b=aRYFF9m0YYaYz01W6Ez/czOdQHRDA910cVLY9unx06F93irpZfogztsoz8GCuhCY+pKnscdxFp0gKb0n8Y00/qJeB9GozefNXIKgweb23AvlLS5zCtgx7mvR4rwb2cG1MakNS0ApMu4jHzzvjiATTkQpjwHrZ+YTFrvwIUBg6+g=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=cAt+XiOe; arc=none smtp.client-ip=209.85.215.173
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Ds46zT29"
-Received: by mail-pf1-f181.google.com with SMTP id d2e1a72fcca58-84874b52eabso5627713b3a.0
-        for <virtio-fs@lists.linux.dev>; Mon, 17 Aug 2026 22:12:52 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cAt+XiOe"
+Received: by mail-pg1-f173.google.com with SMTP id 41be03b00d2f7-ca00f126b7eso2756824a12.2
+        for <virtio-fs@lists.linux.dev>; Mon, 17 Aug 2026 22:12:55 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1787029972; x=1787634772; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1787029975; x=1787634775; darn=lists.linux.dev;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:from:to:cc:subject:date
          :message-id:reply-to:content-type;
-        bh=YLd2wdLWmGn/myw/YqHvhA2qKd6cbpArYdUl+1k3wFU=;
-        b=Ds46zT29pw+lyK+iIMutaT3re5nxhm8WIUyxvmpdrRxTp3FX5H+WStIphXG97Psm1u
-         YjKUr1XiR7A3x3Io2XMnODrJP1fMXJYtpdb/Kd9I9c7kVO2v6sNTvvrUzX2SKV4/HC7m
-         KK2pX8N+0T/eHqfVdvUn51aWsCP7A6h+m92CW6dSENocME9V1Z4hKXbgBB6chMHBHnzo
-         A92M4bSoQShv7d7jjuMnuYrU4GVjCDzcX7IwPnYEhZkET6afNR+Ce5mMhCSoApq/XDjb
-         6JDzd+2r+mywvBVVYZOryT4Qaj4InzICiQdKoacrBiFQ4xEIotuRBoN/TraGw4fbNpp+
-         GN9Q==
+        bh=6J8o1AExw8TA5IVqQ+lEqAQiF7xrSW0tFYRCpllyDsY=;
+        b=cAt+XiOedAJoU7nfA5v2SRMaqsd7pITF8yAwkfVZaGY3gAXfqUKUczQ1gbR3HIInDm
+         6cIas103zISkhuhFKodtQk0R61rYoSkhbEU5uQ4ed/13GNg4BATgMw0a7N4cnd8e8zfG
+         TKOQTRB4Vl5aCFiVAXmH3jGqAXqnw9Pr7hmE1mBbY9ecWpytqHezIH5CnhTxxbDvjx5C
+         4Pb/Alq03JzAqT4KzzkfrWNLLoy2HeU+wa3/zQUjuF2VoE6S1dPefZxoQkBYRFLyKY22
+         8fSom5hdVhc6vnzbYtWVc/HQ6EvPkDvFgMwFEFzCRzyVB581N2+OGGCsJRKRIUXARLEP
+         +BUQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1787029972; x=1787634772;
+        d=1e100.net; s=20251104; t=1787029975; x=1787634775;
         h=cc:to:in-reply-to:references:message-id:content-transfer-encoding
          :content-type:mime-version:subject:date:from:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=YLd2wdLWmGn/myw/YqHvhA2qKd6cbpArYdUl+1k3wFU=;
-        b=JxHez/JfeUZDUIGVIElMdIZH5w54/XtYbmdf+1LI7cRlGOFSOsbRttU+xrCGziku93
-         E9tRwSomuqPOQNVi6PyrFdiW0ucZ8BgElGjj0o25uNG99meM1IdZdYi44cgdAq9U4uor
-         QR/kjA/ZjEPkkqzkWK43PfCLDOMlcPKSWvbZlu8pK5DV0e4UlUPNFwFGEj+cwqNgbX0I
-         FtPRgJpV/t4jfldiKt5uNPgP7dnBDn4CWVflL3koHqpXqXkhDsUZtSC3AStbpUuBzbUo
-         bxPzmxYGYF4SoJGaA1ySFSp7Jv5w5BFl96/v2Jhpz6CskxCQB33Og613SbwuiLpkOocp
-         feIg==
-X-Forwarded-Encrypted: i=1; AHgh+Rrx+KOZKrqpMMhj468VQVRONHv9mMFIyi/XOxaiC2ytHM1maWPhENG6ehS5gpxkVgc/8epAYvMf4qg=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yx1D7F5KPox3RTzNIuAUUwikmRNPrCQah1q282t43NAWY5wa90L
-	wP0V74Aq0YJTnw1OwOfexXCy0Ys0UQH5Xfbq4PYEon33FEC37Csm2oAc
-X-Gm-Gg: AR+sD13TzjP354xn6ySpKslUzLp0vgzQEhD6mr7r9NiOKMib3JWF7gSyfoASvIse1qX
-	CxFJBIzaKlW9DyWLigF26BmFdtzYXvtbU65HWPvDGijk5RUFl3Ljgn5PYyN+5/KouPGbNKdWtRv
-	lsBvnPV8SsKwcISrq5mcrwKXP84rqa9pWgzRrMbJaixG2DrRnz0CAmq/WVvXy3uG+BnnSJf5Vmo
-	Yz+oRCyRC0yXKBI7z9qe8bT2EUiKtlluACtukXh2EKJVrT8JTa0Ynxe1hm5vepbVr0YsJlcxmF6
-	3YApyFUgV7AogXK5cJgUosGv/FE14x3+p7UOKerBn8Go+PXXdVoLW140wRB1UCV3VJs/mYFzfY1
-	DiliPPb7q71qHEXNFp58BCRkaSZ0dyXuJAWYvT6P/RKmdaoLU4ssPL//a0GaySeW0mjWJeyMQgE
-	OpdnugumNkTnejEm+vKrfV+KYPiQfKsNd0+2vJIVdNLaS5RqtDsqxABQgSXQ5Nb4v/Mb1XWqNAZ
-	vQm
-X-Received: by 2002:a05:6a00:2e99:b0:84e:7ec:aa42 with SMTP id d2e1a72fcca58-84fddfce17amr29977836b3a.10.1787029972164;
-        Mon, 17 Aug 2026 22:12:52 -0700 (PDT)
+        bh=6J8o1AExw8TA5IVqQ+lEqAQiF7xrSW0tFYRCpllyDsY=;
+        b=fuTIS47uAfEJE82H+Vu0GDf5ntN1/WgWpJ/XdKAjEIaw6+28+gATfJF6S0muXL48gJ
+         4jNhhBlGFfuGB1BLbmuU4Hupd26+zpq4/pCixIfPjBa+nXQhaMVZsniS+xipLfBkgisq
+         6jvDxlGwqmlbzRfOOtg1uqBHbvP5hqWkNOiEOh+/LrVKhI6QDQzyW7HOijj/HTlRfIJO
+         YU2yxs3ByjjNO25tJ5SkpBcam8UY5cqP6x1KYOo04YSNy8H4aCyf5kt0ub7FgGfVGtv9
+         eJA6qZ5B93caNHQP9mPTeB19UqvBqCR9R/2lVcjq/id3+KbcWzJqS3/vE88uERdcA1+/
+         Kumg==
+X-Forwarded-Encrypted: i=1; AHgh+RoDEe2ngPXJAmg8N9of40xiitZdecRNgysjWQPK6QhlQsiZjUGWeuj/Ur4ZJuPSeIYOW6aQc/NiUEA=@lists.linux.dev
+X-Gm-Message-State: AOJu0Yy4QICWvlL1j4JT/y3YXEAYJMa30ZywiSlqIBzW4+EDUl5UNtuS
+	BHnswALOee/NxeQLC2Ffr3Xvj73rjXD60GEjQuTqGBM3radfCLoEFaob
+X-Gm-Gg: AR+sD12m91PEmhitIYrC3iY3VBK57/Q2tWSJkLdPN1DxJoGsz3KOCXT04dzgJ9oMCbV
+	k132FsO+aKd/I2A81kG8AHJJMaQwAtk5E2bz5Ta0FTQcBQRHf+dCR+oKMY70UUqVNk5YhcRUwsa
+	90SlcXkJcvUs+LzSuOpvmCfHur0WVftMiWSCusORbJvg7OkSpPlDQGnGsmu6yX+l5ephExJllWf
+	NELbNUUmH/WTvfIIzK+rJNBjUQBDNpWTTIU7M2j6SaxEIBBJo14Sw/YX2Py1LZfXcT3vk5D3HZ/
+	/TvsBmptC6NcvTqqJqcd9lK7JIX0mmV9HEzqFsMAc/LyOho/qyiQR0Z9L3MrS0sWaSYzzURTlRO
+	VNDxaypArRh/F1dttwXkAuFDDHPvf1QdkvcYZ+8YRXfE5MlKnblZomyw2IPdeShwyLV8s71Tq6n
+	0vSBlyEyPS/d54okkt/fewhvWqIoLgYsdk92ZXj4eIIrs5iScDTGtZCq5aiN8jQJcbBgs=
+X-Received: by 2002:a05:6a00:950f:b0:84c:4b58:2cec with SMTP id d2e1a72fcca58-84fde3dcf0amr31788880b3a.15.1787029974889;
+        Mon, 17 Aug 2026 22:12:54 -0700 (PDT)
 Received: from [127.0.1.1] ([2600:1700:e140:14d0:d043:a40d:25c1:432c])
-        by smtp.gmail.com with ESMTPSA id d2e1a72fcca58-851b6fc0e84sm1031160b3a.43.2026.08.17.22.12.49
+        by smtp.gmail.com with ESMTPSA id d2e1a72fcca58-851b6fc0e84sm1031160b3a.43.2026.08.17.22.12.52
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Mon, 17 Aug 2026 22:12:51 -0700 (PDT)
+        Mon, 17 Aug 2026 22:12:54 -0700 (PDT)
 From: Connor Kite <connorkite@gmail.com>
-Date: Mon, 17 Aug 2026 22:12:27 -0700
-Subject: [PATCH RFC v2 12/13] backends/cryptodev-vhost-user: add memory
- isolation bool
+Date: Mon, 17 Aug 2026 22:12:28 -0700
+Subject: [PATCH RFC v2 13/13] net/vhost-user: add memory isolation
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -72,7 +70,7 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
-Message-Id: <20260817-vhost-user-isolated-memory-v2-12-948aae960abb@gmail.com>
+Message-Id: <20260817-vhost-user-isolated-memory-v2-13-948aae960abb@gmail.com>
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
 In-Reply-To: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
 To: qemu-devel@nongnu.org
@@ -99,111 +97,101 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
  Connor Kite <connorkite@gmail.com>, 
  20260817233147.2867623-1-connorkite@gmail.com
 X-Mailer: b4 0.13.0
-X-Developer-Signature: v=1; a=ed25519-sha256; t=1787029936; l=3359;
+X-Developer-Signature: v=1; a=ed25519-sha256; t=1787029936; l=2866;
  i=connorkite@gmail.com; s=20260723; h=from:subject:message-id;
- bh=eS7iavmbL0ampAG6cVubHx6sNBExzuvb7v9JapDYYmM=;
- b=QQC2OuLiUfEcGY5CpgdYwdIVlG/TPTJH7ZlmxUHZmp1sA4tGb7tfTiqnQlBPGifcZORQ+JMwD
- 6K2JrArn0J5Ct+0HPw1nnvuKpOOZIgruSX4qtfleJJy8I0Q4U1EiBIx
+ bh=c1m9/46t7T/yFXDXSgz1vdQxYZX3+5KvcmxIw/DGGZM=;
+ b=0OBe+eR1e1pPM+zCBkIkB6miAajDaB38ytMDFbdnB9eJvtfYmOO9BXrKbFt1bsCkL8dbpqiAh
+ mlqwoGnl/VzARSTOyl20AImpQij7EOtVhDZS+xLZvgRjJACXJyRYvKI
 X-Developer-Key: i=connorkite@gmail.com; a=ed25519;
  pk=xg/3N8AntFCYogaIgN5NC/KkT7UlZB6ktPIRliJ3hv4=
 
-Add a memory_isolation property to CryptoDevBackendVhostUser and
-add add it as an optional member of CryptodevVhostUserProperties
-in qapi.
-
-This is needed to be able to specify memory isolation for
-cryptodev-vhost-user objects, and the bool will eventually be
-passed to vhost_user_init() in a future patch.
+Add a memory-isolation property to NetdevPassOptions and
+NetDevVhostUserOptions in net.json.  This property will
+be used for vhost-user devices to disable access to guest
+memory from vhost-user backends.
 
 Signed-off-by: Connor Kite <connorkite@gmail.com>
 ---
- backends/cryptodev-vhost-user.c | 28 +++++++++++++++++++++++++++-
- qapi/qom.json                   |  8 +++++++-
- 2 files changed, 34 insertions(+), 2 deletions(-)
+ net/passt.c      |  5 +++++
+ net/vhost-user.c |  3 +++
+ qapi/net.json    | 16 ++++++++++++----
+ 3 files changed, 20 insertions(+), 4 deletions(-)
 
-diff --git a/backends/cryptodev-vhost-user.c b/backends/cryptodev-vhost-user.c
-index fa1f9b76d3..be8631446b 100644
---- a/backends/cryptodev-vhost-user.c
-+++ b/backends/cryptodev-vhost-user.c
-@@ -49,6 +49,7 @@ struct CryptoDevBackendVhostUser {
-     CharFrontend chr;
-     char *chr_name;
-     bool opened;
-+    bool memory_isolation;
-     CryptoDevBackendVhost *vhost_crypto[MAX_CRYPTO_QUEUE_NUM];
- };
+diff --git a/net/passt.c b/net/passt.c
+index 35ec6ad6de..7bcd47ad32 100644
+--- a/net/passt.c
++++ b/net/passt.c
+@@ -741,6 +741,11 @@ int net_init_passt(const Netdev *netdev, const char *name,
+     if (netdev->u.passt.has_vhost_user && netdev->u.passt.vhost_user) {
+         bool memory_isolation = false;
  
-@@ -213,7 +214,7 @@ static void cryptodev_vhost_user_init(
-         }
++        if (netdev->u.passt.has_memory_isolation &&
++            netdev->u.passt.memory_isolation) {
++            memory_isolation = true;
++        }
++
+         if (net_passt_vhost_user_init(s, memory_isolation, errp) == -1) {
+             qemu_del_net_client(nc);
+             return -1;
+diff --git a/net/vhost-user.c b/net/vhost-user.c
+index b6ee9ed297..bd33decadf 100644
+--- a/net/vhost-user.c
++++ b/net/vhost-user.c
+@@ -477,6 +477,9 @@ int net_init_vhost_user(const Netdev *netdev, const char *name,
+         return -1;
      }
  
--    if (!vhost_user_init(&s->vhost_user, &s->chr, false, errp)) {
-+    if (!vhost_user_init(&s->vhost_user, &s->chr, s->memory_isolation, errp)) {
-         return;
-     }
- 
-@@ -392,6 +393,27 @@ static void cryptodev_vhost_user_finalize(Object *obj)
-     g_free(s->chr_name);
++    memory_isolation = vhost_user_opts->has_memory_isolation ?
++                       vhost_user_opts->memory_isolation : false;
++
+     return net_vhost_user_init(peer, "vhost_user", name, chr, queues,
+                                memory_isolation);
  }
- 
-+static void cryptodev_vhost_user_set_mem_isolation(Object *obj, bool value,
-+                                                   Error **errp)
-+{
-+    CryptoDevBackendVhostUser *s =
-+                      CRYPTODEV_BACKEND_VHOST_USER(obj);
-+
-+    if (s->opened) {
-+        error_setg(errp, "Property 'memory-isolation' can no longer be set");
-+    } else{
-+        s->memory_isolation = value;
-+    }
-+}
-+
-+static bool cryptodev_vhost_user_get_mem_isolation(Object *obj, Error **errp)
-+{
-+    CryptoDevBackendVhostUser *s =
-+                      CRYPTODEV_BACKEND_VHOST_USER(obj);
-+
-+    return s->memory_isolation;
-+}
-+
- static void
- cryptodev_vhost_user_class_init(ObjectClass *oc, const void *data)
- {
-@@ -407,6 +429,10 @@ cryptodev_vhost_user_class_init(ObjectClass *oc, const void *data)
-                                   cryptodev_vhost_user_get_chardev,
-                                   cryptodev_vhost_user_set_chardev);
- 
-+    object_class_property_add_bool(oc, "memory-isolation",
-+                                   cryptodev_vhost_user_get_mem_isolation,
-+                                   cryptodev_vhost_user_set_mem_isolation);
-+
- }
- 
- static const TypeInfo cryptodev_vhost_user_info = {
-diff --git a/qapi/qom.json b/qapi/qom.json
-index c55776af7d..1024027195 100644
---- a/qapi/qom.json
-+++ b/qapi/qom.json
-@@ -350,11 +350,17 @@
- # @chardev: the name of a Unix domain socket character device that
- #     connects to the vhost-user server
+diff --git a/qapi/net.json b/qapi/net.json
+index 1a6382825c..add7cb5408 100644
+--- a/qapi/net.json
++++ b/qapi/net.json
+@@ -213,6 +213,9 @@
  #
-+# @memory-isolation: disable direct access from vhost-user back-end
-+#     to guest memory.  The back-end will instead access data via
-+#     bounce buffers residing in the QEMU virtual address space.
+ # @param: parameter to pass to passt command
+ #
++# @memory-isolation: isolate guest memory from vhost-user back-end
 +#     (default: false) (Since 11.2)
 +#
- # Since: 2.12
+ # Since: 10.1
  ##
- { 'struct': 'CryptodevVhostUserProperties',
-   'base': 'CryptodevBackendProperties',
--  'data': { 'chardev': 'str' },
-+  'data': { 'chardev': 'str',
-+            '*memory-isolation': 'bool' },
-   'if': 'CONFIG_VHOST_CRYPTO' }
+ { 'struct': 'NetdevPasstOptions',
+@@ -250,7 +253,8 @@
+     '*ipv6':               'bool',
+     '*tcp-ports':          ['PasstPortForward'],
+     '*udp-ports':          ['PasstPortForward'],
+-    '*param':              ['PasstParameter'] },
++    '*param':              ['PasstParameter'],
++    '*memory-isolation':   'bool'},
+     'if': 'CONFIG_PASST' }
  
  ##
+@@ -685,13 +689,17 @@
+ # @queues: number of queues to be created for multiqueue vhost-user
+ #     (default: 1) (Since 2.5)
+ #
++# @memory-isolation: isolate guest memory from vhost-user back-end
++#     (default: false) (Since 11.2)
++#
+ # Since: 2.1
+ ##
+ { 'struct': 'NetdevVhostUserOptions',
+   'data': {
+-    'chardev':        'str',
+-    '*vhostforce':    'bool',
+-    '*queues':        'int' } }
++    'chardev':              'str',
++    '*vhostforce':          'bool',
++    '*queues':              'int',
++    '*memory-isolation':    'bool' } }
+ 
+ ##
+ # @NetdevVhostVDPAOptions:
 
 -- 
 2.43.0

@@ -1,39 +1,39 @@
 Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 93009221546
-	for <virtio-fs@lists.linux.dev>; Tue, 18 Aug 2026 12:35:53 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id C5DAF26A1AC
+	for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 06:24:19 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787056556; cv=none; b=eKAJCmxoQtpBiCgqz+hzM9wgHIesh+gKV4NYmHu1imEhxPmd91ilK67wYF2DKxDEdref9plvRWVvgMFN8FHtbWsU7FeSzp8zdYglfNh+jXjniQHu/brqbSFejpBVQrwZIdp/MzFccZtbk4tdZYLHy7JsDWcfL0ey18zETczZhQM=
+	t=1787120663; cv=none; b=NXXb9uQQlb+uJFDv1uPNHWqjSYRjeVRCr+K7mqrcV03rj66qRPe+g6v+v7BlUTqclWRiuaWxKPIKJALS7/oU65XdoNxzJVo4P+Uqx0ln50McApMNlY3uRMA3GKt4eLDNCU06LOr/XbtXHH5Fgpu7N3s9MhcDOIoBv8aCtv7GN7E=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787056556; c=relaxed/simple;
-	bh=H86VwNk9z2BZmnoZ+lgAjzlZTCaeatgJ+VHhGwVRDqY=;
+	s=arc-20240116; t=1787120663; c=relaxed/simple;
+	bh=cBs5tcjJMEId9ht+3FMMtCGVkH9P2QW6aPM/dtsQe1s=;
 	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=inU7u57H18ntiaz8WBdlnBBlD1VnHkhM6qf0xuOVS5YDGulu2lGuMsKPBMu2MKkVXFXiUqD100oPyuTrN5NfMFKks7pBFTXMm6LvgA0vnjSjP0FjmDssiR/dXzZWpHTO9LLDHt3SmzBne8CW8rU91w49X1/Rpiwci3Ry22J8ZhQ=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=r3WyYSTk; arc=none smtp.client-ip=49.212.243.89
+	 In-Reply-To:Content-Type; b=P1lGnuXP/vHqODBxJNkyTmU3VO0ArRxYUwNbH4clTYdRgsfZ+VJvEwQ32M0+G5Qa96AM3iMDG1vu8S38ViWEPt647qnDYRpNSgnwr+m3Se8tk2NQZKN7KnLZNX0a72ddKM2xhfT3gr8ySm30O1GFQPX2bJYF03x/MTjnulbRP/0=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=pV+sgUGc; arc=none smtp.client-ip=49.212.243.89
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="r3WyYSTk"
+	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="pV+sgUGc"
 Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
 	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67ICYwMb092544
+	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67J6NbTN005720
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Tue, 18 Aug 2026 21:34:58 +0900 (JST)
+	Wed, 19 Aug 2026 15:23:37 +0900 (JST)
 	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=LUeb38oMvvESBEacWa+JwwNRjf77ZX6fuQUxFwXE74w=;
+DKIM-Signature: a=rsa-sha256; bh=T3tEXd0syhzyFAfdE1g8TCL6cqnp3afNMsnHjclz8LI=;
         c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
         h=From:Message-ID:To:Subject:Date;
-        s=rs20250326; t=1787056498; v=1;
-        b=r3WyYSTkKKLZVNJZ9ziyNTDdeJ6W7AkVZk4NmAcdQvdNoGs0v1Ww3wrFvq1g+OXw
-         lp9I0M+K/L22+958hR5B4b1PenmoJH0XlMt9ErdiGqWWVF18TA+e0y1xeQG8Rf5i
-         mpERmlG6IhdSVuuOk7EThxUzCK/WNqxZkYADmAFuFh21q69bTIpIPLMsf0ZXvjmG
-         RfsQWxce8YqXjbiN4ir3p4mpeE+PFC24sZbsSgF0DD3kPpxNsOZwS1BHcuK9/yp1
-         Zg8en8zfNpbxippYicCFDglQ6N8MXcshEP9e0lBkwcsv0tGi/9Xo4JGZo26bup1u
-         za3nLjpDg5DFJHlCK7RqSg==
-Message-ID: <7b4d2e3d-4593-492c-887a-db560d590ac6@rsg.ci.i.u-tokyo.ac.jp>
-Date: Tue, 18 Aug 2026 21:34:58 +0900
+        s=rs20250326; t=1787120618; v=1;
+        b=pV+sgUGc0ff9swG+SbMY62GQm5+qCGgN14aryaVuB0LxUdjd9ykRrX1f5T5m8pW7
+         nCB3oBJ7A47QYwy2b9+UfAAqdalpK3XpDYfXKXYXIbRa/piXYGtPU+D03XOwKBa3
+         LvIpxsjFVsR9bIrzWaVsBnmeCfeKUu7pxS0qkKTaGz3bwAyz26GPndUDHnkikbrl
+         by4qdxISULmwztMSxeNBhC+CqBXUe/ASeeMKn2P1neLY8ACBd7A4PL2wOKK8J8o9
+         DOuZ8NCcMvgTmnSc4iW6ks+VkFuLVHL7gQ7BlnZwVLbaWzATcuKLehpqzdpBRQM2
+         eOmi+sZ6I2/QvQ9PwDuOGg==
+Message-ID: <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
+Date: Wed, 19 Aug 2026 15:23:37 +0900
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -41,8 +41,8 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC v2 09/13] hw/virtio/vhost-user: add shadow virtqueues
- and eventfd intercepts
+Subject: Re: [PATCH RFC v2 04/13] hw/virtio/vhost-shadow-virtqueue: used
+ callback
 To: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Stefano Garzarella <sgarzare@redhat.com>,
@@ -69,303 +69,82 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>,
         20260817233147.2867623-1-connorkite@gmail.com
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-9-948aae960abb@gmail.com>
+ <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com>
 Content-Language: en-US
 From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20260817-vhost-user-isolated-memory-v2-9-948aae960abb@gmail.com>
+In-Reply-To: <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com>
 Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 7bit
 
 On 2026/08/18 14:12, Connor Kite wrote:
-> Adds shadow virtqueues that will eventually be used to transfer data
-> between device and host via bounce buffers when isolation mode is
-> active.  The svqs are initalized, and eventfd assignments are
-> intercepted so that notifications come to svqs first before
-> the guest or backend receive them.
+> Adds a callback to shadow virtqueues in order to enable
+> non-default processing of used vring elements from the device.
 > 
 > Signed-off-by: Connor Kite <connorkite@gmail.com>
 > ---
->   hw/virtio/vhost-user.c | 136 ++++++++++++++++++++++++++++++++++++++++++-------
->   1 file changed, 119 insertions(+), 17 deletions(-)
+>   hw/virtio/vhost-shadow-virtqueue.c |  9 +++++++++
+>   hw/virtio/vhost-shadow-virtqueue.h | 16 ++++++++++++++++
+>   2 files changed, 25 insertions(+)
 > 
-> diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-> index e1e5cba53d..ace328f5eb 100644
-> --- a/hw/virtio/vhost-user.c
-> +++ b/hw/virtio/vhost-user.c
-> @@ -18,6 +18,7 @@
->   #include "hw/virtio/vhost-backend.h"
->   #include "hw/virtio/virtio.h"
->   #include "hw/virtio/virtio-net.h"
-> +#include "hw/virtio/vhost-shadow-virtqueue.h"
->   #include "hw/virtio/vhost-iova-tree.h"
->   #include "chardev/char-fe.h"
->   #include "io/channel-socket.h"
-> @@ -331,6 +332,7 @@ typedef struct {
->       size_t size; /* size of the mapped shared memory */
->       int fd; /* descriptor of anonymous file backing shared iso region */
->       Int128 iso_iova_offset; /* translation from IOVA to hva of iso region */
-> +    GPtrArray *shadow_vqs; /* shadow vqs with vrings in iso region*/
-
-A whitespace problem remains here.
-
->   } IsolationModeCtx;
+> diff --git a/hw/virtio/vhost-shadow-virtqueue.c b/hw/virtio/vhost-shadow-virtqueue.c
+> index c8831d52be..496e7e58a3 100644
+> --- a/hw/virtio/vhost-shadow-virtqueue.c
+> +++ b/hw/virtio/vhost-shadow-virtqueue.c
+> @@ -675,6 +675,15 @@ static void vhost_svq_flush(VhostShadowVirtqueue *svq,
+>                   break;
+>               }
 >   
->   struct vhost_user {
-> @@ -1128,15 +1130,38 @@ static int vhost_user_set_mem_table_postcopy(struct vhost_dev *dev,
->       return 0;
->   }
->   
-> -static void cleanup_isolation_regions(struct vhost_dev *dev)
-> +static void vhost_user_svq_cleanup(struct vhost_user *u, bool reset)
-> +{
-> +    VhostShadowVirtqueue *svq;
-> +    for (int i = 0; i < u->iso_mem_ctx.shadow_vqs->len; i++) {
-> +        svq = g_ptr_array_index(u->iso_mem_ctx.shadow_vqs, i);
-> +        vhost_svq_stop(svq);
-> +        event_notifier_cleanup(&svq->hdev_call);
-> +        event_notifier_cleanup(&svq->hdev_kick);
-> +    }
+> +            if (svq->ops && svq->ops->used_callback) {
+> +                int r = svq->ops->used_callback(svq, elem, svq->ops_opaque);
 > +
-> +    if (!reset) {
-> +        g_ptr_array_free(u->iso_mem_ctx.shadow_vqs, true);
-> +    }
-> +}
-> +
-> +static void cleanup_isolation_regions(struct vhost_dev *dev, bool reset)
->   {
->       struct vhost_user *u = dev->opaque;
->       if (u->iso_mem_ctx.shared_mem_addr) {
+> +                if (r < 0) {
+> +                    /* VQ or handler is broken. Do not set guest notifier */
 
-If vhost_dev_init() fails after vhost_user_init_svq(), shadow_vqs is 
-present but shared_mem_addr is not because init_isolation_regions() is 
-not called yet. shadow_vqs will be leaked then.
+This comment is extraneous. It is obvious that event_notifier_set() 
+below is not called, and it is same with the existing error path below.
 
-> +        vhost_user_svq_cleanup(u, reset);
->           vhost_iova_tree_delete(u->iso_mem_ctx.tree);
->           qemu_memfd_free(u->iso_mem_ctx.shared_mem_addr,
->                           u->iso_mem_ctx.size,
->                           u->iso_mem_ctx.fd);
-> +
-> +        GPtrArray *temp = u->iso_mem_ctx.shadow_vqs;
-
-This is a mixed declaration prohibited in docs/devel/style.rst
-
->           memset(&u->iso_mem_ctx, 0, sizeof(IsolationModeCtx));
-> +
-> +        if (!reset) {
-
-This condition is inverted. When reset is true, vhost_user_svq_cleanup() 
-retains the array so the pointer to it should be kept.
-
-> +            u->iso_mem_ctx.shadow_vqs = temp;
-> +        }> +
->       }
->   }
->   
-> @@ -1234,7 +1259,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
->       msg->hdr.request = VHOST_USER_SET_MEM_TABLE;
->   
->       /* In case of reset, clear old regions */
-> -    cleanup_isolation_regions(dev);
-> +    cleanup_isolation_regions(dev, true);
->   
->       /* Gather information for bounce buffers to be mapped */
->       for (u_int32_t i = 0; i < nregions; i++) {
-> @@ -1267,7 +1292,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
->   
->       if (err) {
->           error_report_err(err);
-> -        cleanup_isolation_regions(dev);
-> +        cleanup_isolation_regions(dev, false);
->           return -1;
->       }
->   
-> @@ -1295,7 +1320,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
->                                     (hwaddr)u->iso_mem_ctx.shared_mem_addr);
->   
->       if (r != IOVA_OK) {
-> -        cleanup_isolation_regions(dev);
-> +        cleanup_isolation_regions(dev, false);
->           return r;
->       }
->   
-> @@ -1310,7 +1335,7 @@ static int init_isolation_regions(struct vhost_dev *dev,
->                                             dev->mem->regions[i].guest_phys_addr);
->   
->           if (r != IOVA_OK) {
-> -            cleanup_isolation_regions(dev);
-> +            cleanup_isolation_regions(dev, false);
->               return r;
->           }
->       }
-> @@ -1738,11 +1763,49 @@ static int vhost_set_vring_file(struct vhost_dev *dev,
->       return 0;
->   }
->   
-> +static int vhost_user_get_vq_index(struct vhost_dev *dev, int idx)
-> +{
-> +    assert(idx >= dev->vq_index && idx < dev->vq_index + dev->nvqs);
-> +
-> +    return idx;
-> +}
-> +
->   static int vhost_user_set_vring_kick(struct vhost_dev *dev,
->                                        struct vhost_vring_file *file)
->   {
-> -    int ret = vhost_set_vring_file(dev, VHOST_USER_SET_VRING_KICK, file);
-> +    struct vhost_user *u = dev->opaque;
-> +    int svq_idx = file->index - dev->vq_index;
-> +    VhostShadowVirtqueue *svq = NULL;
-> +    struct vhost_vring_file vr_file = *file;
-> +    int ret;
-> +
-> +    vhost_user_get_vq_index(dev, file->index); /* bounds checking */
-> +
-> +    if (u->user->memory_isolation) {
-> +        svq = g_ptr_array_index(u->iso_mem_ctx.shadow_vqs, svq_idx);
-> +        vhost_svq_set_svq_kick_fd(svq, file->fd);
-
-The svq->svq_kick EventNotifier is left set in the error paths.
+What matters here is the difference with the existing error path. Why 
+doesn't it call virtqueue_fill() nor virtqueue_flush()? They need to be 
+addressed here.
 
 Regards,
 Akihiko Odaki
 
-> +
-> +        if (file->fd != -1) {
-> +            if (!svq->hdev_kick.initialized) {
-> +                ret = event_notifier_init(&svq->hdev_kick, 0);
-> +                if (ret < 0) {
-> +                    event_notifier_cleanup(&svq->hdev_kick);
-> +                    error_report("Failed to create kick event notifier");
-> +                    return ret;
+> +                    return;
 > +                }
 > +            }
 > +
-> +            vr_file.fd = event_notifier_get_fd(&svq->hdev_kick);
-> +        } else {
-> +            event_notifier_cleanup(&svq->hdev_kick);
-> +        }
-> +    }
+>               if (unlikely(i >= svq->vring.num)) {
+>                   qemu_log_mask(LOG_GUEST_ERROR,
+>                            "More than %u used buffers obtained in a %u size SVQ",
+> diff --git a/hw/virtio/vhost-shadow-virtqueue.h b/hw/virtio/vhost-shadow-virtqueue.h
+> index ec16a1e838..fd68319fb7 100644
+> --- a/hw/virtio/vhost-shadow-virtqueue.h
+> +++ b/hw/virtio/vhost-shadow-virtqueue.h
+> @@ -56,8 +56,24 @@ typedef int (*VirtQueueAvailCallback)(VhostShadowVirtqueue *svq,
+>                                         VirtQueueElement *elem,
+>                                         void *vq_callback_opaque);
+>   
+> +/**
+> + * Callback to handle a used buffer
+> + *
+> + * @svq: Shadow virtqueue
+> + * @elem: Element placed in the queue by the device
+> + * @vq_callback_opaque: Used to pass arguments to callback
+> + *
+> + * Returns 0 if the vq is running as expected. Returns a negative errno on
+> + * failure.  The callback should not add used elements to the vq shadowed
+> + * by the svq as that is done separately after the callback returns.
+> + */
+> +typedef int (*VirtQueueUsedCallback)(VhostShadowVirtqueue *svq,
+> +                                      VirtQueueElement *elem,
+> +                                      void *vq_callback_opaque);
 > +
-> +    ret = vhost_set_vring_file(dev, VHOST_USER_SET_VRING_KICK, &vr_file);
->       if (ret < 0) {
-> +        if (svq != NULL) {
-> +            event_notifier_cleanup(&svq->hdev_kick);
-> +        }
->           return ret;
->       }
+>   typedef struct VhostShadowVirtqueueOps {
+>       VirtQueueAvailCallback avail_handler;
+> +    VirtQueueUsedCallback used_callback;
+>   } VhostShadowVirtqueueOps;
 >   
-> @@ -1750,15 +1813,18 @@ static int vhost_user_set_vring_kick(struct vhost_dev *dev,
->        * Inject a kick in case the back-end only starts vring processing upon
->        * receiving a kick. The spec suggests this to improve compatibility.
->        */
-> -    if (file->fd != -1) {
-> +    if (vr_file.fd != -1) {
->           uint64_t val = 1;
->           ssize_t nwritten;
->   
->           do {
-> -            nwritten = write(file->fd, &val, sizeof(val));
-> +            nwritten = write(vr_file.fd, &val, sizeof(val));
->           } while (nwritten < 0 && errno == EINTR);
->   
->           if (nwritten < 0 && errno != EAGAIN /* back-end can already read */) {
-> +            if (svq != NULL) {
-> +                event_notifier_cleanup(&svq->hdev_kick);
-> +            }
->               return -errno;
->           }
->       }
-> @@ -1769,7 +1835,35 @@ static int vhost_user_set_vring_kick(struct vhost_dev *dev,
->   static int vhost_user_set_vring_call(struct vhost_dev *dev,
->                                        struct vhost_vring_file *file)
->   {
-> -    return vhost_set_vring_file(dev, VHOST_USER_SET_VRING_CALL, file);
-> +    struct vhost_user *u = dev->opaque;
-> +    int svq_idx = file->index - dev->vq_index;
-> +    VhostShadowVirtqueue *svq = NULL;
-> +    struct vhost_vring_file vr_file = *file;
-> +    int ret;
-> +
-> +    vhost_user_get_vq_index(dev, file->index); /* bounds checking */
-> +
-> +    if (u->user->memory_isolation) {
-> +        svq = g_ptr_array_index(u->iso_mem_ctx.shadow_vqs, svq_idx);
-> +        vhost_svq_set_svq_call_fd(svq, file->fd);
-> +
-> +        if (file->fd != -1) {
-> +            if (!svq->hdev_call.initialized) {
-> +                ret = event_notifier_init(&svq->hdev_call, 0);
-> +                if (ret < 0) {
-> +                    event_notifier_cleanup(&svq->hdev_call);
-> +                    error_report("Failed to create call event notifier");
-> +                    return ret;
-> +                }
-> +            }
-> +
-> +            vr_file.fd = event_notifier_get_fd(&svq->hdev_call);
-> +        } else {
-> +            event_notifier_cleanup(&svq->hdev_call);
-> +        }
-> +    }
-> +
-> +    return vhost_set_vring_file(dev, VHOST_USER_SET_VRING_CALL, &vr_file);
-
-Clean up svq->hdev_call when this fails.
-
->   }
->   
->   static int vhost_user_set_vring_err(struct vhost_dev *dev,
-> @@ -2763,6 +2857,17 @@ static int vhost_user_postcopy_notifier(NotifierWithReturn *notifier,
->       return 0;
->   }
->   
-> +static void vhost_user_init_svq(struct vhost_dev *dev, struct vhost_user *u)
-> +{
-> +    /*Modified from vhost-vdpa*/
-> +    u->iso_mem_ctx.shadow_vqs = g_ptr_array_new_full(dev->nvqs, vhost_svq_free);
-> +    for (int i = 0; i < dev->nvqs; i++) {
-> +        VhostShadowVirtqueue *svq;
-> +        svq = vhost_svq_new(NULL, NULL);
-> +        g_ptr_array_add(u->iso_mem_ctx.shadow_vqs, svq);
-> +    }
-> +}
-> +
->   static int vhost_user_backend_init(struct vhost_dev *dev, void *opaque,
->                                      Error **errp)
->   {
-> @@ -2907,6 +3012,10 @@ static int vhost_user_backend_init(struct vhost_dev *dev, void *opaque,
->       u->postcopy_notifier.notify = vhost_user_postcopy_notifier;
->       postcopy_add_notifier(&u->postcopy_notifier);
->   
-> +    if (vus->memory_isolation) {
-> +        vhost_user_init_svq(dev, u);
-> +    }
-> +
->       return 0;
->   }
->   
-> @@ -2935,20 +3044,13 @@ static int vhost_user_backend_cleanup(struct vhost_dev *dev)
->       g_free(u->region_rb_offset);
->       u->region_rb_offset = NULL;
->       u->region_rb_len = 0;
-> -    cleanup_isolation_regions(dev);
-> +    cleanup_isolation_regions(dev, false);
->       g_free(u);
->       dev->opaque = 0;
->   
->       return 0;
->   }
->   
-> -static int vhost_user_get_vq_index(struct vhost_dev *dev, int idx)
-> -{
-> -    assert(idx >= dev->vq_index && idx < dev->vq_index + dev->nvqs);
-> -
-> -    return idx;
-> -}
-> -
->   static int vhost_user_memslots_limit(struct vhost_dev *dev)
->   {
->       struct vhost_user *u = dev->opaque;
+>   /* Shadow virtqueue to relay notifications */
 > 
 

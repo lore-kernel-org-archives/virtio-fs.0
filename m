@@ -1,39 +1,39 @@
 Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id C5DAF26A1AC
-	for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 06:24:19 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 3EDAB3E009B
+	for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 07:37:53 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787120663; cv=none; b=NXXb9uQQlb+uJFDv1uPNHWqjSYRjeVRCr+K7mqrcV03rj66qRPe+g6v+v7BlUTqclWRiuaWxKPIKJALS7/oU65XdoNxzJVo4P+Uqx0ln50McApMNlY3uRMA3GKt4eLDNCU06LOr/XbtXHH5Fgpu7N3s9MhcDOIoBv8aCtv7GN7E=
+	t=1787125079; cv=none; b=MX28YJYMPYxE7o+M8V+u8OOr/SILl7bVY0srmG7CjqAaJLK6Yv/zym2Czrm9fkGwyXhgMIrGJz3f+teSMUq2SuB9xXFydwBHv99iJkfRkDiKKpkC2QnhHEtHYMvz4kPLXq8MuPlB5SMsC9C8v4RaC28t+LNrXq+U2whTA/hEOy0=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787120663; c=relaxed/simple;
-	bh=cBs5tcjJMEId9ht+3FMMtCGVkH9P2QW6aPM/dtsQe1s=;
+	s=arc-20240116; t=1787125079; c=relaxed/simple;
+	bh=IRzIswu57hbTHiVqbujfkkVs2zZfmKTR13LrOjdBhDY=;
 	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=P1lGnuXP/vHqODBxJNkyTmU3VO0ArRxYUwNbH4clTYdRgsfZ+VJvEwQ32M0+G5Qa96AM3iMDG1vu8S38ViWEPt647qnDYRpNSgnwr+m3Se8tk2NQZKN7KnLZNX0a72ddKM2xhfT3gr8ySm30O1GFQPX2bJYF03x/MTjnulbRP/0=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=pV+sgUGc; arc=none smtp.client-ip=49.212.243.89
+	 In-Reply-To:Content-Type; b=DQGfcPeBlJiwsbpY+T7iYFwWG+fY75/tkch+BRDIz5SCoSDpFJT9FiXLuS7CUyTYPUgjiHHR7amONs4YPquIzSWYiNRO/d1iUaUaXA+3QMEEsuQxGAi2YEEtdI2VRdBiHZWcgZGaBlmZh7Rysm5o30VAMUiuHmAL854LX5EFO6s=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=T3B5R5Zq; arc=none smtp.client-ip=49.212.243.89
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="pV+sgUGc"
+	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="T3B5R5Zq"
 Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
 	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67J6NbTN005720
+	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67J7bQaT038534
 	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Wed, 19 Aug 2026 15:23:37 +0900 (JST)
+	Wed, 19 Aug 2026 16:37:26 +0900 (JST)
 	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=T3tEXd0syhzyFAfdE1g8TCL6cqnp3afNMsnHjclz8LI=;
+DKIM-Signature: a=rsa-sha256; bh=40/SmnpS+414qCoeOzC/7o/OH5OFlR/RHKU1VqwYRf4=;
         c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
         h=From:Message-ID:To:Subject:Date;
-        s=rs20250326; t=1787120618; v=1;
-        b=pV+sgUGc0ff9swG+SbMY62GQm5+qCGgN14aryaVuB0LxUdjd9ykRrX1f5T5m8pW7
-         nCB3oBJ7A47QYwy2b9+UfAAqdalpK3XpDYfXKXYXIbRa/piXYGtPU+D03XOwKBa3
-         LvIpxsjFVsR9bIrzWaVsBnmeCfeKUu7pxS0qkKTaGz3bwAyz26GPndUDHnkikbrl
-         by4qdxISULmwztMSxeNBhC+CqBXUe/ASeeMKn2P1neLY8ACBd7A4PL2wOKK8J8o9
-         DOuZ8NCcMvgTmnSc4iW6ks+VkFuLVHL7gQ7BlnZwVLbaWzATcuKLehpqzdpBRQM2
-         eOmi+sZ6I2/QvQ9PwDuOGg==
-Message-ID: <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
-Date: Wed, 19 Aug 2026 15:23:37 +0900
+        s=rs20250326; t=1787125047; v=1;
+        b=T3B5R5ZqQUJ1TEvEA0ze3E+13+8Ad5xvt9C6mORoWPsFow36N/DBLDT44kfNuqjv
+         bsSWDJMYhBUrEiPsr4iTEOPmvNtdx07VhxwrZBehtk0GwbMi9mb/HNFnSFvZQLV5
+         3XCmu+rAD1kD320MdIjSDa8Q6NI1WC2WwesFlaxmZ7w8mcQ9CxMWuArDdQOh0rbv
+         qwq4pY3A9p5KIzO2bs+dnymwH7zuCnhM53XTEjGp3dg0tTNqpkFcSEUwkdBuIa9F
+         DcbHKTXHhQYS5kZ6InbdmsnYC/wQ3+zRKN9cQQ94Xhdu/EFnvr3cTMMGfKZihO6s
+         9yy1gtNKKSq4F6YDl8ckvQ==
+Message-ID: <15427c56-a585-48ff-b024-e48a2fdea697@rsg.ci.i.u-tokyo.ac.jp>
+Date: Wed, 19 Aug 2026 16:37:26 +0900
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -41,8 +41,7 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC v2 04/13] hw/virtio/vhost-shadow-virtqueue: used
- callback
+Subject: Re: [PATCH RFC v2 13/13] net/vhost-user: add memory isolation
 To: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Stefano Garzarella <sgarzare@redhat.com>,
@@ -69,82 +68,107 @@ Cc: "Michael S. Tsirkin" <mst@redhat.com>,
         Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>,
         20260817233147.2867623-1-connorkite@gmail.com
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com>
+ <20260817-vhost-user-isolated-memory-v2-13-948aae960abb@gmail.com>
 Content-Language: en-US
 From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com>
+In-Reply-To: <20260817-vhost-user-isolated-memory-v2-13-948aae960abb@gmail.com>
 Content-Type: text/plain; charset=UTF-8; format=flowed
 Content-Transfer-Encoding: 7bit
 
 On 2026/08/18 14:12, Connor Kite wrote:
-> Adds a callback to shadow virtqueues in order to enable
-> non-default processing of used vring elements from the device.
-> 
-> Signed-off-by: Connor Kite <connorkite@gmail.com>
-> ---
->   hw/virtio/vhost-shadow-virtqueue.c |  9 +++++++++
->   hw/virtio/vhost-shadow-virtqueue.h | 16 ++++++++++++++++
->   2 files changed, 25 insertions(+)
-> 
-> diff --git a/hw/virtio/vhost-shadow-virtqueue.c b/hw/virtio/vhost-shadow-virtqueue.c
-> index c8831d52be..496e7e58a3 100644
-> --- a/hw/virtio/vhost-shadow-virtqueue.c
-> +++ b/hw/virtio/vhost-shadow-virtqueue.c
-> @@ -675,6 +675,15 @@ static void vhost_svq_flush(VhostShadowVirtqueue *svq,
->                   break;
->               }
->   
-> +            if (svq->ops && svq->ops->used_callback) {
-> +                int r = svq->ops->used_callback(svq, elem, svq->ops_opaque);
-> +
-> +                if (r < 0) {
-> +                    /* VQ or handler is broken. Do not set guest notifier */
+> Add a memory-isolation property to NetdevPassOptions and
+> NetDevVhostUserOptions in net.json.  This property will
+> be used for vhost-user devices to disable access to guest
+> memory from vhost-user backends.
 
-This comment is extraneous. It is obvious that event_notifier_set() 
-below is not called, and it is same with the existing error path below.
-
-What matters here is the difference with the existing error path. Why 
-doesn't it call virtqueue_fill() nor virtqueue_flush()? They need to be 
-addressed here.
+The cover letter says multiqueue is not supported but the code just 
+continues with multiqueue and breaks.
 
 Regards,
 Akihiko Odaki
 
-> +                    return;
-> +                }
-> +            }
-> +
->               if (unlikely(i >= svq->vring.num)) {
->                   qemu_log_mask(LOG_GUEST_ERROR,
->                            "More than %u used buffers obtained in a %u size SVQ",
-> diff --git a/hw/virtio/vhost-shadow-virtqueue.h b/hw/virtio/vhost-shadow-virtqueue.h
-> index ec16a1e838..fd68319fb7 100644
-> --- a/hw/virtio/vhost-shadow-virtqueue.h
-> +++ b/hw/virtio/vhost-shadow-virtqueue.h
-> @@ -56,8 +56,24 @@ typedef int (*VirtQueueAvailCallback)(VhostShadowVirtqueue *svq,
->                                         VirtQueueElement *elem,
->                                         void *vq_callback_opaque);
+> 
+> Signed-off-by: Connor Kite <connorkite@gmail.com>
+> ---
+>   net/passt.c      |  5 +++++
+>   net/vhost-user.c |  3 +++
+>   qapi/net.json    | 16 ++++++++++++----
+>   3 files changed, 20 insertions(+), 4 deletions(-)
+> 
+> diff --git a/net/passt.c b/net/passt.c
+> index 35ec6ad6de..7bcd47ad32 100644
+> --- a/net/passt.c
+> +++ b/net/passt.c
+> @@ -741,6 +741,11 @@ int net_init_passt(const Netdev *netdev, const char *name,
+>       if (netdev->u.passt.has_vhost_user && netdev->u.passt.vhost_user) {
+>           bool memory_isolation = false;
 >   
-> +/**
-> + * Callback to handle a used buffer
-> + *
-> + * @svq: Shadow virtqueue
-> + * @elem: Element placed in the queue by the device
-> + * @vq_callback_opaque: Used to pass arguments to callback
-> + *
-> + * Returns 0 if the vq is running as expected. Returns a negative errno on
-> + * failure.  The callback should not add used elements to the vq shadowed
-> + * by the svq as that is done separately after the callback returns.
-> + */
-> +typedef int (*VirtQueueUsedCallback)(VhostShadowVirtqueue *svq,
-> +                                      VirtQueueElement *elem,
-> +                                      void *vq_callback_opaque);
+> +        if (netdev->u.passt.has_memory_isolation &&
+> +            netdev->u.passt.memory_isolation) {
+> +            memory_isolation = true;
+> +        }
 > +
->   typedef struct VhostShadowVirtqueueOps {
->       VirtQueueAvailCallback avail_handler;
-> +    VirtQueueUsedCallback used_callback;
->   } VhostShadowVirtqueueOps;
+>           if (net_passt_vhost_user_init(s, memory_isolation, errp) == -1) {
+>               qemu_del_net_client(nc);
+>               return -1;
+> diff --git a/net/vhost-user.c b/net/vhost-user.c
+> index b6ee9ed297..bd33decadf 100644
+> --- a/net/vhost-user.c
+> +++ b/net/vhost-user.c
+> @@ -477,6 +477,9 @@ int net_init_vhost_user(const Netdev *netdev, const char *name,
+>           return -1;
+>       }
 >   
->   /* Shadow virtqueue to relay notifications */
+> +    memory_isolation = vhost_user_opts->has_memory_isolation ?
+> +                       vhost_user_opts->memory_isolation : false;
+> +
+>       return net_vhost_user_init(peer, "vhost_user", name, chr, queues,
+>                                  memory_isolation);
+>   }
+> diff --git a/qapi/net.json b/qapi/net.json
+> index 1a6382825c..add7cb5408 100644
+> --- a/qapi/net.json
+> +++ b/qapi/net.json
+> @@ -213,6 +213,9 @@
+>   #
+>   # @param: parameter to pass to passt command
+>   #
+> +# @memory-isolation: isolate guest memory from vhost-user back-end
+> +#     (default: false) (Since 11.2)
+> +#
+>   # Since: 10.1
+>   ##
+>   { 'struct': 'NetdevPasstOptions',
+> @@ -250,7 +253,8 @@
+>       '*ipv6':               'bool',
+>       '*tcp-ports':          ['PasstPortForward'],
+>       '*udp-ports':          ['PasstPortForward'],
+> -    '*param':              ['PasstParameter'] },
+> +    '*param':              ['PasstParameter'],
+> +    '*memory-isolation':   'bool'},
+>       'if': 'CONFIG_PASST' }
+>   
+>   ##
+> @@ -685,13 +689,17 @@
+>   # @queues: number of queues to be created for multiqueue vhost-user
+>   #     (default: 1) (Since 2.5)
+>   #
+> +# @memory-isolation: isolate guest memory from vhost-user back-end
+> +#     (default: false) (Since 11.2)
+> +#
+>   # Since: 2.1
+>   ##
+>   { 'struct': 'NetdevVhostUserOptions',
+>     'data': {
+> -    'chardev':        'str',
+> -    '*vhostforce':    'bool',
+> -    '*queues':        'int' } }
+> +    'chardev':              'str',
+> +    '*vhostforce':          'bool',
+> +    '*queues':              'int',
+> +    '*memory-isolation':    'bool' } }
+>   
+>   ##
+>   # @NetdevVhostVDPAOptions:
 > 
 

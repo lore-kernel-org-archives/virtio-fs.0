@@ -1,135 +1,125 @@
-Received: from mail-qk1-f176.google.com (mail-qk1-f176.google.com [209.85.222.176])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4978A13D886
-	for <virtio-fs@lists.linux.dev>; Thu, 20 Aug 2026 01:23:02 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.222.176
-ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787188983; cv=pass; b=IhSf+pBG0frNpuPwaHpxXX8kobW+cvUNppwyUbtjNbKrg0VddEgXzgwheTJnR/ZNK3klmlHljJUQJIDshznOL3PXxHoDUFrZcoduHcE57dhH9BiIp/b+E5gRyeZIM55dCf0qEKHH3mpykqtyM5q/fXExDd1P+naeNW/omMSK7m8=
-ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787188983; c=relaxed/simple;
-	bh=IzD5WkVaqb9IoNA5w11jZZ80BB1le8+DrEpLAAUIvvY=;
-	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=p06scWfCNS066XnohF8gMsu0PqclIUKwyfY/UMEFLDr3MkXeXSopuEmDoOB8hsYY8DB8wvhW/sZ7NA7D5dYhKElvy+hrIyQxlRr+Ldu0aZ9xYUDIapsirFZg2o7Q9eAw2cy9Ewf93BAcWcx8KyRI8mi3+eTnqvetoT5KKPAAs+U=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=W9q+QtEn; arc=pass smtp.client-ip=209.85.222.176
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id E40D8481B1
+	for <virtio-fs@lists.linux.dev>; Thu, 20 Aug 2026 05:16:22 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1787202986; cv=none; b=WCsQt3lqYxWNETXtr7zRHcxfvegUVVGg+W7Ti8NxEBtnvP209wnydUvo7x7CzgEkzWtjrX7lfqTYKETouLtX7pn3q2Iv3WeFR2gixyMAPXAD5FsTmMaQ92E88QDikmE/oZVyK0PciwYoEV8ucittcIDi/Qj9zfug6atUh67fgQQ=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1787202986; c=relaxed/simple;
+	bh=v1F06riwhHCx781eU0q6/4ueT5lROpsIxl3/fWzzoSU=;
+	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
+	 In-Reply-To:Content-Type; b=sNwAd+BANi+W0HHyLOjNuNVbvFwwPdFzgSp+Rvg8N7dgS8/UVmYLySqkUlctrN+HG5fP/8FVIP0tYouMAF029Bi37VTgeeHlq/fi1G3EFGTAotZC6lYvi5j5GToDFr0JSNhxt26vOURYmhGodvzqCRIopAAy9IlGBYPiuA8ISNA=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=Noupx53v; arc=none smtp.client-ip=49.212.243.89
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="W9q+QtEn"
-Received: by mail-qk1-f176.google.com with SMTP id af79cd13be357-92f0b5ed131so148502285a.3
-        for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 18:23:02 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1787188981; cv=none;
-        d=google.com; s=arc-20260327;
-        b=bR/qaFQ0j9x4MCYDrq4x4LaJPoHpSnYQhXNcVQyANizgFMZfkPEyQTorzhYFuIcn2q
-         9lN/ssEimjl44z6+XpO6K2MJYo5vjxMVPsUsregtoEzPu24B+G5v6FLL7ibsDwz7UvAe
-         +yBaEdv4eVjPwIyUx+Mlu8vLxxbDcm1Ua4Bl93YzZOkwNcDkvrpVY2EZMYYbQ5kS8Zl9
-         Qwin+x+V7YCc0BW7kO/L7ds0UMQsECvUhsdovy8Or3gIyQpScx1hy3Du+aDwveTzdqN+
-         Q41cUa2YXCGK1ZpFdnHvEmbUdcO1F4m+v/TVr1Bsd5lxjBqj8XkJKKaFkSjCnyEUR27v
-         uz8w==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
-        h=content-transfer-encoding:cc:to:subject:message-id:date:from
-         :in-reply-to:references:mime-version:dkim-signature;
-        bh=fEPJshVvRAljzQG147X6Ty6PBl0uhRhyX5+dH7xacrU=;
-        fh=VLrgB28A4OVoFR2Ra3kTdYm/Nw5cmxuikkxsIJOh98s=;
-        b=KXguKdXZTfhZRU6J4fpprtAK7LFTy0n2EqzkeDeMC85KDfQNPn/8Sh6aqNAeuHKAjC
-         JkaRSYdw5J8sXgQOmvWUc+HtSuETJaKaEN8o9Cvo5Rj3HrbDqbLyAxOdV/y4zr74hedo
-         Z2BwYDLXZEc+1UBUzkQG04HJ/VINnblvsUkng2pbF35RGqOIiObZ4ny3zPZipeplTKRH
-         rP/oXzjbl28GLglx9VEpdlq+voy8FEVide7jNedlgAT2kkj0+POYfpf8pEL9BbECq1GO
-         FslzwmPKEQfq/dXUQDC9kJDaF+g36+ji0tJyo1r/SZK/KC5IoQ0mQqFkxZC6r8fkC7O9
-         c1SA==;
-        darn=lists.linux.dev
-ARC-Authentication-Results: i=1; mx.google.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1787188981; x=1787793781; darn=lists.linux.dev;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
-         :date:message-id:reply-to:content-type;
-        bh=fEPJshVvRAljzQG147X6Ty6PBl0uhRhyX5+dH7xacrU=;
-        b=W9q+QtEnMBsLuuUIBdFkyZ4UO+23F62lu37F3mqLAqdNPBnK3dRSz6FvdCy8NfQhAv
-         3Yc18Jsfa2Qa39OKtlFKdf9pSSb0ydn0y7Q+JmrPui75fJR6ev3sEQ9xCpvxnSjD94IV
-         tNXhithQF/xhz+06yoSLA91WbqlEImMbQWdKmb44aUfNMLtu71K4IuBbTX3ZB+B0L94U
-         dpdfd8tC8e72sHdRyX7jMrD9CjOoEwNT3o7YePuv7/Ye2tkOs7hyWdjt79naeyNrO3uZ
-         JbWuuPF1Gloa0afeUiiK6JG18KPBQ5c+23YoEcm5z1l1ex+hA+rU+issVi8cew/fgbWf
-         T1Mg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1787188981; x=1787793781;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:x-gm-gg
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
-         :content-type;
-        bh=fEPJshVvRAljzQG147X6Ty6PBl0uhRhyX5+dH7xacrU=;
-        b=NZBcDK5nTRvwIfHbPPQtRo+yNgHleqtwalkUU+8H8xMfSZc9gzV5+tbBz7hEEYh+Rk
-         UsZMNbQGT+r0KCn5SgKBORbFknn+XMqdCiu9CoJecJ5i9xHNnDEt1do7DPYL9FijiiGr
-         JFfdoZEdQttDoJotE16tTa6/zbA7o+XeOabtAS8bxZq1hxQuz2Km8Gpr2tivQNE0ncvJ
-         YzQdO9awANHSyXCW9PfDT5T7hqv8WjC8Js8TIXJHdyCCUTP7KPaip4QsYLYfX00S5LRT
-         u+suTnTXPDpbYppyJsitXXROrYJFdcULWhQzWEqvHhjA8+gNOpjeqGMctvNplyaPHQci
-         0JTw==
-X-Forwarded-Encrypted: i=1; AHgh+RoSqj/bwK/hJ7zdtmU2t+Brvl2lsU3rMcHDIk/8pJNfXbAon4zdi1kBwhjXZsrlF3IUSKDjpWF1L8w=@lists.linux.dev
-X-Gm-Message-State: AOJu0Yz+SL2jfxSuRaBXdjO5BjS9QmK/HmRnekzkGWivqNivFXe6W9Ai
-	f1I45z7dDggf+SJxh/GcdWK0nvBijp6De1pjSuRcF2bYclO8CCOvOOD7EMf5opQcUCOoSXADpNh
-	0lNQIDHwyf3XAiGqdW+qScUevE32PxS4=
-X-Gm-Gg: AR+sD125QhT3MBMfLW4Bj7vI192a75Tbjzf6ZMspqzsvlbz4PmLDtJUD/DzYWC7LM2H
-	mwfBo2jAT0lB+iur28BNccdJRZLSLNfH8cQhu3F+ScVtGe5E3O5tcJBkYG1QSLSJKxYjeZHKbVz
-	12rRZtbKpm+HclJfgXkgtA1Slkf1TZBWYsol7UpOaVOKeNuwmqfdoQcHGAuAzP30J1Qi0uDmicM
-	+hl0268zXp7XZFiv9mDJkK4Ki+qzYUNRDFuy9wviu/VhJxEnlMTMW6Sh7r+4DDONRf/gnpwvZsg
-	MDI5FewuxsUquVaJg++sIxn2IzohzkiiooYMwmwk0kmZfMuP5HzU4sblTrjUiJKeuZ7y3xRTG0o
-	/NOU=
-X-Received: by 2002:a05:620a:470a:b0:92c:103d:63dd with SMTP id
- af79cd13be357-9371e30d64bmr825382685a.39.1787188981058; Wed, 19 Aug 2026
- 18:23:01 -0700 (PDT)
+	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="Noupx53v"
+Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
+	(authenticated bits=0)
+	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67K5FXPI018865
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
+	Thu, 20 Aug 2026 14:15:33 +0900 (JST)
+	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
+DKIM-Signature: a=rsa-sha256; bh=rU0/NaSZSW+ptE5GcwPdHmgUY4qSm99dpqANL/CZykY=;
+        c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
+        h=From:Message-ID:To:Subject:Date;
+        s=rs20250326; t=1787202934; v=1;
+        b=Noupx53vV2twwFagNuE5qy2FBh49dOSiK6/fvZQ3oMSzJqQm0WwAgdJM1OHBMWgG
+         CKu0CCgJxzLzraIuu4UKKbCMmSIXbj8LY4e1P7WVa5tk1AgNBD866/mUPLLu3iK1
+         m2wjgdguAn19PYUa1Ia5+uljbJ8pzR+dTVzJk7PHgFCXs3GcXayVjW18Q733iV6q
+         M2NQbIJWQCSySsX+U0iLJ/s/jUQl9Bbwjq21MW7qoGFrnLGizuYVSOh+gQg8fRoh
+         ifKCqOQG/To682BAEZOLynkiNGbwruQ3L7f0wQCOhqIfOenQOQiUKIAzbRPBfDYK
+         4+PidQEgyXthUSmNufHi1g==
+Message-ID: <5d8e3d91-de60-4747-88d1-e135e3c6e7c1@rsg.ci.i.u-tokyo.ac.jp>
+Date: Thu, 20 Aug 2026 14:15:33 +0900
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
+User-Agent: Mozilla Thunderbird
+Subject: Re: [PATCH RFC v2 04/13] hw/virtio/vhost-shadow-virtqueue: used
+ callback
+To: Connor Kite <connorkite@gmail.com>
+Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
+        Stefano Garzarella <sgarzare@redhat.com>,
+        =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
+        Viresh Kumar <viresh.kumar@linaro.org>,
+        Gerd Hoffmann <kraxel@redhat.com>,
+        Mathieu Poirier <mathieu.poirier@linaro.org>,
+        Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
+        Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>,
+        Hanna Reitz <hreitz@redhat.com>,
+        =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>,
+        Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
+        Stefan Hajnoczi <stefanha@redhat.com>,
+        Milan Zamazal <mzamazal@redhat.com>,
+        Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org,
+        virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
+        zhenwei pi <zhenwei.pi@linux.dev>,
+        =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?=
+ <berrange@redhat.com>,
+        Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>,
+        Jason Wang <jasowangio@gmail.com>, Peter Xu <peterx@redhat.com>,
+        =?UTF-8?Q?Eugenio_P=C3=A9rez?=
+ <eperezma@redhat.com>,
+        Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>,
+        20260817233147.2867623-1-connorkite@gmail.com
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-13-948aae960abb@gmail.com> <15427c56-a585-48ff-b024-e48a2fdea697@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <15427c56-a585-48ff-b024-e48a2fdea697@rsg.ci.i.u-tokyo.ac.jp>
-From: Connor Kite <connorkite@gmail.com>
-Date: Wed, 19 Aug 2026 18:22:48 -0700
-X-Gm-Features: AcwNN1WYAAFsNg32RpeVzWj-vcYKbWhQ5GN-92FmFalaloYu8x_uy2_lP3Y2MrY
-Message-ID: <CA+spn3qZ9psOFGyVR-5=ou8hExDFZg0Yg0TdUxeC91tNKmhCTA@mail.gmail.com>
-Subject: Re: [PATCH RFC v2 13/13] net/vhost-user: add memory isolation
-To: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
-	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
-	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
-	Mathieu Poirier <mathieu.poirier@linaro.org>, 
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
-	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
-	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
-	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
-	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
-	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
-	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
-	Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
-	Peter Xu <peterx@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, 
-	Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+ <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com>
+ <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
+ <CA+spn3rouMQ=yG1m2fS=vm40c-zWWMZPK+yk0K_ip5iXzLZWow@mail.gmail.com>
+Content-Language: en-US
+From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
+In-Reply-To: <CA+spn3rouMQ=yG1m2fS=vm40c-zWWMZPK+yk0K_ip5iXzLZWow@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 8bit
 
-On Wed, Aug 19, 2026 at 12:37=E2=80=AFAM Akihiko Odaki
-<odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
->
-> On 2026/08/18 14:12, Connor Kite wrote:
-> > Add a memory-isolation property to NetdevPassOptions and
-> > NetDevVhostUserOptions in net.json.  This property will
-> > be used for vhost-user devices to disable access to guest
-> > memory from vhost-user backends.
->
-> The cover letter says multiqueue is not supported but the code just
-> continues with multiqueue and breaks.
->
-> Regards,
-> Akihiko Odaki
->
-> >
+On 2026/08/20 10:06, Connor Kite wrote:
+> On Tue, Aug 18, 2026 at 11:23 PM Akihiko Odaki
+> <odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
+>>
+>>> +
+>>> +                if (r < 0) {
+>>> +                    /* VQ or handler is broken. Do not set guest notifier */
+>>
+>> This comment is extraneous. It is obvious that event_notifier_set()
+>> below is not called, and it is same with the existing error path below.
+>>
+>> What matters here is the difference with the existing error path. Why
+>> doesn't it call virtqueue_fill() nor virtqueue_flush()? They need to be
+>> addressed here.
+>>
+>> Regards,
+>> Akihiko Odaki
+>>
+> 
+> Here, apart from not calling event_notifier_set (not notifying the
+> guest), we are also not calling vhost_svq_enable_notification, so the
+> device is directed not to send any more call notifications.  If the
+> guest isn't receiving notifications, and the device isn't sending
+> them, is there a purpose to flushing the current element?  With the
+> current implementation, I'm not sure there is a path to re-enable
+> calls on either the front-end or back-end, but maybe a case could be
+> made that it's good hygiene to flush the known bad element?  For now,
+> I will add the calls to add and flush the element
 
-Adding multiqueue support is my main focus for Rev 3!  My testing so
-far hasn't included backends with the multiqueue option, but I will
-correct that.
+Skipping event_notifier_set() only suppresses this guest interrupt, and
+disabling SVQ notifications only suppresses backend call notifications; 
+it does not stop backend ring processing. The error should be propagated 
+with virtio_error().
 
-Thanks!
-Connor
+I looked into the virtqueue_fill() and virtqueue_flush() calls in the 
+existing error path. The virtqueue_fill() call detaches the element and 
+publishes it to the guest. Detaching the element is necessary and should 
+be done in the new error path too. On the other hand, publishing the 
+failed element is wrong and should not be done.
+
+virtqueue_flush(vq, i) is still required to publish and account for the 
+preceding successfully filled elements.
+
+Regards,
+Akihiko Odaki

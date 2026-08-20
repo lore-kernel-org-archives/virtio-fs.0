@@ -1,305 +1,144 @@
-Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+Received: from mail-qk1-f175.google.com (mail-qk1-f175.google.com [209.85.222.175])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id E1B1D3D4118
-	for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 07:37:54 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
-ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787125081; cv=none; b=VThyfrDZYwepI0JUwdf7OtfOjuSPlGPNULlPHfWZnKBOqofavl+wnecMy6z3gfTY1wEdK/BqQKBEevKeRIECVAC3FWonxCecWB3l4GH8RifD/fRrU2QfN1kFieO3ZC4bNXT5o+lY3I1qnqyQUOgzj89IHBwnBNCg2NzF3F1lLPk=
-ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787125081; c=relaxed/simple;
-	bh=O9phaCMNj18FnxNU2e4RVow0NQ5FdQn25/vqb7Uv7nk=;
-	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
-	 In-Reply-To:Content-Type; b=HAcUwPEqdrBbopMr2+NHQL5v6jpc1TQC0F11bku2isWKtN1LbSAc7P8XiywTvU2hC35EA3wL33qtbO+CcA/5iurfrpY94JnhWf1mHa7Ys7aYHp9oftC5LwrJRjIVO4vIDKeez66WoHs8VPBdA/AzPdFQf88zekOjmB0q5ok0dsU=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=lItwiR/j; arc=none smtp.client-ip=49.212.243.89
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 437CE145B27
+	for <virtio-fs@lists.linux.dev>; Thu, 20 Aug 2026 01:06:43 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.222.175
+ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1787188004; cv=pass; b=ReLQ3gOB6iv5JVL7yFBDUfCi2qhuJCbwQfu62scuQY2ybRa1sVfVIwV+JDNHEEUEmbWBFCQLr/V6WuRHnqRCDBTeiOZCbhUuRxB9ozlAygBeEb4ILtmDOeAYD9B8LpSFdsmG9Atbs35PiaxABRXc6x/by/v6jrJG/lR2YPdaa1g=
+ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1787188004; c=relaxed/simple;
+	bh=DQwQIh7JWR3BSaP+Z16UoM/z0GvwsKDlhiuv0AYd4S4=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=lRdTIX4fpH5iKb5u9RQ06vjAmB74Aj6CifgMdWggp9XufyXH1BlIejFzAWK0MuRwWXRV5ZW+74hNnHO0vqu/+EYzsjhPOkFCJY7KXD0NxlFNPCrL5unNLSiTyXAIYKATtkr9SKQHpw3AfRBwwUYIE+7NoNPE/tNsEqEBMgeDONg=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=kME74a1i; arc=pass smtp.client-ip=209.85.222.175
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="lItwiR/j"
-Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
-	(authenticated bits=0)
-	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67J7amgi038287
-	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
-	Wed, 19 Aug 2026 16:36:48 +0900 (JST)
-	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
-DKIM-Signature: a=rsa-sha256; bh=sU0gqa4C+i3Xz2UlWLl4+rqgtHs/aOVm+MzXGyzQm4g=;
-        c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
-        h=From:Message-ID:To:Subject:Date;
-        s=rs20250326; t=1787125008; v=1;
-        b=lItwiR/j8w2LKyyTdkM2hL+ZRowXzBrAKHKCXkPgyRn7xrlZnl0wpHJ2Rqo61o4V
-         kwexDyi+RPCivTfeLuXB+xqGjtdnmC3NoHMCJDoZVCA+92SdUukKPZywAM53Rr2r
-         oe29jjESDW4DMTye1/lZkKiFqUCtm0PGnz+seaJdxA366tExwTw52Ief6YJKF6Nj
-         PZI6GTAXRGGAkZoUHp3TBRxqAJlMBGdBgBpFNbAu1yhLLslhnthoX2x/fvqAw9A2
-         9mxQsyjx03Z9iSHW23v0Zom8z5SITXtx+sq+0XneO3cZcb0NLSDvnbuCNN7yqf7I
-         zyHTljMNoKeM4XhJ/Damog==
-Message-ID: <ab5f4ec8-0ef3-49df-94c1-b7145d4153d4@rsg.ci.i.u-tokyo.ac.jp>
-Date: Wed, 19 Aug 2026 16:36:47 +0900
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="kME74a1i"
+Received: by mail-qk1-f175.google.com with SMTP id af79cd13be357-936d00181abso85172685a.2
+        for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 18:06:43 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1787188002; cv=none;
+        d=google.com; s=arc-20260327;
+        b=NDOJJM838Tp7dt0mqSaBc+iAAij2LXZ6f3CsRBbeAFzSQGlMZGuXzIlWxfRYPAPniq
+         n4Ze+kbevxqYZ8NzPGzpT4iGul1MMyKY8i810QVK7DNGHcpATaTo9IVtbvhipsG5GBRk
+         GO0dTAih7xAVqGMYjymqptlgDniUEaJnSyVZZeqXKFuT8utOU5Amc2ZcVIlE+zrwdx8J
+         hLX3qn/i2PiAGsyfoAIHD8GxkunivdEtNN2g+Y724OfHck0W5kNGWqzD5GJroJB5GhkE
+         N1HeJPU7GY6t2WazKA2p7vxKSdnJCg9q/OD1nxuUnjzUvrh9oS4hzpPy9VXlfJdP7BWt
+         9AEQ==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=content-transfer-encoding:cc:to:subject:message-id:date:from
+         :in-reply-to:references:mime-version:dkim-signature;
+        bh=vsWCscNzkxiVMmU/QBKBdlqpIVF9XvSYTxKTjjRPnYA=;
+        fh=xffSJC2yMC0tnidGp07KaClMqoEn4Do6Hck9+h6wgJQ=;
+        b=mxO08cDK+SblSXMfHWb6W3ElEeHAoopQnCndglIRUvkh9E5jh0THtZcOCAyaNy03ZY
+         DGHJigXPSb5ISwEKP7XMV0mLF1iOahiec8w8+XggpSTvON1RdOu7tidKSxTaZEdIhL1F
+         +KFirX10Klo6pbPCZQIafJs9qo+b4F0Fdr2bjUMuKLX3FLQnVhnIDXBD2214LVnI06yw
+         4F1UZNAk8koY0MS4kpyIgcXACjecVYB7rYSNVOvBICwag2pvk31yJx8k11puehaqrFCx
+         DAfi7l2Y0gebztykYJt5zYMayvkKT8D2QPtLx3Byt819UFzj/ELwghJl1gm5JOn0V2Ea
+         vioQ==;
+        darn=lists.linux.dev
+ARC-Authentication-Results: i=1; mx.google.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20251104; t=1787188002; x=1787792802; darn=lists.linux.dev;
+        h=content-transfer-encoding:content-type:cc:to:subject:message-id
+         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
+         :date:message-id:reply-to:content-type;
+        bh=vsWCscNzkxiVMmU/QBKBdlqpIVF9XvSYTxKTjjRPnYA=;
+        b=kME74a1iVwj1kDd1jXYEvfIrNZDgEm/+Mzr86xy9evNO7vnjmAqRyM3RnZs/6v6ird
+         f5lCXuMFPO9WBUWLR3YZX0TsuXrRzdmmO866lOQOACygGdRQSGeijolzy1zhWHZW4Sau
+         VkanO+seQCENXo76SCwTAypB65xBaG+RoRwZi35N5/zipD3C6MirGwi6tJa2j4PxEju4
+         U6Nji6VCkAZBCF5bjGFiQhgNiSYts95LKMy8R16nX2UmBQME7dVYZB8SInsgtnmfZ6tb
+         IH4i+7lLK6Zjd8sHFM3vgWbRdzSbbp8fWh9nUqN+HCP0Dvif+huZA8THxhrTfbqffXMe
+         Lj4Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20251104; t=1787188002; x=1787792802;
+        h=content-transfer-encoding:content-type:cc:to:subject:message-id
+         :date:from:in-reply-to:references:mime-version:x-gm-gg
+         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=vsWCscNzkxiVMmU/QBKBdlqpIVF9XvSYTxKTjjRPnYA=;
+        b=ZSEBRrRfuuOzIlDisETnj4W1MNAKVUXrqBv05Ep4klGDaoW5dgmvy2BhGs+fxyYNKx
+         PHzmKuNx1+enGmaDI/EUllAetSTMhZtS1OYEToPJoULSpqvV3m2ikwPE/Ats4x9Xdfrr
+         pmRBDSIYyKec6cswZ15D+VN6m8F6ewwSj40jd6KLyv9jd4z8mH6Lo1L2YVzlhatSheCH
+         9FzcDcrII7SQmZHvLcoPdv1xjotadMwGKsXO2vYzubJnCUjxGScN1YBpqg542qSMpIfa
+         aMIHPj+ClrZ7ey4iLGsWy36ZP2p9aCh+I0FW6dNygQ7FyDA6VYqUKlhTREiutxlsubeX
+         vNtA==
+X-Forwarded-Encrypted: i=1; AHgh+RqTaIgyxkvhQPoesUgtckCbNBNzozKT4R3Cj7Lg0bTndQvep5OCkIGMxP8JrtoloYN18bEtt+vgqLQ=@lists.linux.dev
+X-Gm-Message-State: AOJu0YzG9jHDuOOlk3sHqocmFsbb5ol6Dzfde/gAA2aMDEEDCU5TmAyE
+	m2zsfhJG6svsJVIha1JGse2I4zkiJMXbLKMR4tS4rSmDvrSt5QjRGV6+XpJoXAVnYYVmn8/PWJH
+	BZg9DJ+lJK5MzNho9MS/H5nZG5f9+R9s=
+X-Gm-Gg: AR+sD13de9UsMQE/a/9KviUJrYwvd50OT0eH+MBiJXTPnVfCAHzwDZiCYum2PhJTFCx
+	Ld3Xzd/IhlpjrpCl3wGtDLcgqtrhN19X4A9/0FKqTe/cERf+1NB4wf3JLLEDQiEN7iWcCGg0fn9
+	z34Kd2BgqZcSfApFQp+BQ52p5i1V68XTAmfdTM0E0IGAJXbOuaCVV88u10K8/I/xhTS2rX0IKLC
+	t185IPFxgFUbLIXYJOyRjK19+HL/982xpJ3vO0jE2gbIUynqIDgx/rbMjZsd5Oq8OZu+PJhBipi
+	PFbQhYI/aKUw0EgCEGEx0VQk45NOl9bxvu9ZrbdgOX9LWPju07DLF/u6vMOX/9dIqit0Qmb/yFB
+	YP68=
+X-Received: by 2002:a05:620a:6015:b0:92e:7cc9:a888 with SMTP id
+ af79cd13be357-9371e2cf759mr924864285a.2.1787188002133; Wed, 19 Aug 2026
+ 18:06:42 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-User-Agent: Mozilla Thunderbird
-Subject: Re: [PATCH RFC v2 07/13] hw/virtio/vhost-user: create isolation
- region
-To: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org
-Cc: "Michael S. Tsirkin" <mst@redhat.com>,
-        Stefano Garzarella <sgarzare@redhat.com>,
-        =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
-        Viresh Kumar <viresh.kumar@linaro.org>,
-        Gerd Hoffmann <kraxel@redhat.com>,
-        Mathieu Poirier <mathieu.poirier@linaro.org>,
-        Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
-        Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>,
-        Hanna Reitz <hreitz@redhat.com>,
-        =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>,
-        Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
-        Stefan Hajnoczi <stefanha@redhat.com>,
-        Milan Zamazal <mzamazal@redhat.com>,
-        Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org,
-        virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
-        zhenwei pi <zhenwei.pi@linux.dev>,
-        =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?=
- <berrange@redhat.com>,
-        Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>,
-        Jason Wang <jasowangio@gmail.com>, Peter Xu <peterx@redhat.com>,
-        =?UTF-8?Q?Eugenio_P=C3=A9rez?=
- <eperezma@redhat.com>,
-        Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>,
-        20260817233147.2867623-1-connorkite@gmail.com
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-7-948aae960abb@gmail.com>
-Content-Language: en-US
-From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <20260817-vhost-user-isolated-memory-v2-7-948aae960abb@gmail.com>
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
+ <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com> <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
+In-Reply-To: <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
+From: Connor Kite <connorkite@gmail.com>
+Date: Wed, 19 Aug 2026 18:06:30 -0700
+X-Gm-Features: AcwNN1Vitk5XJi1kg1YAvcpdy9Kk9-83pUVn-HXmmhlZta59p0cOti38aI4rTGg
+Message-ID: <CA+spn3rouMQ=yG1m2fS=vm40c-zWWMZPK+yk0K_ip5iXzLZWow@mail.gmail.com>
+Subject: Re: [PATCH RFC v2 04/13] hw/virtio/vhost-shadow-virtqueue: used callback
+To: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
+Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
+	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
+	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
+	Mathieu Poirier <mathieu.poirier@linaro.org>, 
+	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
+	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
+	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
+	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
+	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
+	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
+	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
+	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
+	Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
+	Peter Xu <peterx@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, 
+	Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>, 
+	20260817233147.2867623-1-connorkite@gmail.com
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-On 2026/08/18 14:12, Connor Kite wrote:
-> If memory isolation mode is active for the vhost-user device adds
-> features to:
-> - Gather the size required for bounce buffers and vrings in shared
->    isolation region
-> - Allocate the required space in an anonymous file
-> - Create a vhost-iova-tree with space to map entire isolation region
-> - Map guest memory regions and shared vrings into the tree
-> - Release these resources upon backend cleanup
-> 
-> Signed-off-by: Connor Kite <connorkite@gmail.com>
-> ---
->   hw/virtio/vhost-user.c | 136 +++++++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 136 insertions(+)
-> 
-> diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-> index 1c003e4d9d..7e9233e174 100644
-> --- a/hw/virtio/vhost-user.c
-> +++ b/hw/virtio/vhost-user.c
-> @@ -18,6 +18,7 @@
->   #include "hw/virtio/vhost-backend.h"
->   #include "hw/virtio/virtio.h"
->   #include "hw/virtio/virtio-net.h"
-> +#include "hw/virtio/vhost-iova-tree.h"
->   #include "chardev/char-fe.h"
->   #include "io/channel-socket.h"
->   #include "system/kvm.h"
-> @@ -25,6 +26,7 @@
->   #include "qemu/main-loop.h"
->   #include "qemu/uuid.h"
->   #include "qemu/sockets.h"
-> +#include "qemu/memfd.h"
->   #include "system/runstate.h"
->   #include "system/cryptodev.h"
->   #include "migration/postcopy-ram.h"
-> @@ -320,6 +322,17 @@ static VhostUserMsg m __attribute__ ((unused));
->   /* The version of the protocol we support */
->   #define VHOST_USER_VERSION    (0x1)
->   
-> +/* Memory region shared with back-end when memory-isolation is active */
-> +typedef struct {
-> +    void *shared_mem_addr; /* mapped shared memory */
-> +    VhostIOVATree *tree; /* controls mapping of regions into IOVA space */
-> +    void *vring_hva_addr; /* beginning of vring region in shared memory */
-> +    size_t vring_region_size; /* amount of shared memory reserved for vrings */
-> +    size_t size; /* size of the mapped shared memory */
-> +    int fd; /* descriptor of anonymous file backing shared iso region */
-> +    Int128 iso_iova_offset; /* translation from IOVA to hva of iso region */
+On Tue, Aug 18, 2026 at 11:23=E2=80=AFPM Akihiko Odaki
+<odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
+>
+> > +
+> > +                if (r < 0) {
+> > +                    /* VQ or handler is broken. Do not set guest notif=
+ier */
+>
+> This comment is extraneous. It is obvious that event_notifier_set()
+> below is not called, and it is same with the existing error path below.
+>
+> What matters here is the difference with the existing error path. Why
+> doesn't it call virtqueue_fill() nor virtqueue_flush()? They need to be
+> addressed here.
+>
+> Regards,
+> Akihiko Odaki
+>
 
-This Int128 usage is misleading. The value derived from iso_iova_offset 
-is always consumed with int128_get64(), which asserts the value fits in 
-64-bit. But we actually need to enforce that the address before 
-translation resides in the shared memory. So making iso_iova_offset 
-Int128 is not a good way to assert the real invariant.
+Here, apart from not calling event_notifier_set (not notifying the
+guest), we are also not calling vhost_svq_enable_notification, so the
+device is directed not to send any more call notifications.  If the
+guest isn't receiving notifications, and the device isn't sending
+them, is there a purpose to flushing the current element?  With the
+current implementation, I'm not sure there is a path to re-enable
+calls on either the front-end or back-end, but maybe a case could be
+made that it's good hygiene to flush the known bad element?  For now,
+I will add the calls to add and flush the element
 
-Furthermore, "[PATCH RFC v2 10/13] hw/virtio/vhost-user: handle data 
-movement with shadow vqs" has:
-
-     ptrdiff_t offset = u->iso_mem_ctx.iso_iova_offset;
-
-If defined(CONFIG_INT128) && !defined(CONFIG_TCG_INTERPRETER), this will 
-overflow with u->iso_mem_ctx.iso_iova_offset > PTRDIFF_MAX. Otherwise, 
-Int128 will be a struct, which causes a compilation error.
-
-uintptr_t is sufficient if the invariant is enforced in some alternative 
-way. A negative offset would be represented as wraparound, and a 
-positive one will never result in wraparound. Just always ensure the 
-address before translation resides in the shared memory.
-
-Regards,
-Akihiko Odaki
-
-> +} IsolationModeCtx;
-> +
->   struct vhost_user {
->       struct vhost_dev *dev;
->       /* Shared between vhost devs of the same virtio device */
-> @@ -353,6 +366,9 @@ struct vhost_user {
->        * by the backend (see @features).
->        */
->       uint64_t protocol_features;
-> +
-> +    /* Data specfic to isolated memory mode */
-> +    IsolationModeCtx iso_mem_ctx;
->   };
->   
->   struct scrub_regions {
-> @@ -1112,6 +1128,125 @@ static int vhost_user_set_mem_table_postcopy(struct vhost_dev *dev,
->       return 0;
->   }
->   
-> +static void cleanup_isolation_regions(struct vhost_dev *dev)
-> +{
-> +    struct vhost_user *u = dev->opaque;
-> +    if (u->iso_mem_ctx.shared_mem_addr) {
-> +        vhost_iova_tree_delete(u->iso_mem_ctx.tree);
-> +        qemu_memfd_free(u->iso_mem_ctx.shared_mem_addr,
-> +                        u->iso_mem_ctx.size,
-> +                        u->iso_mem_ctx.fd);
-> +        memset(&u->iso_mem_ctx, 0, sizeof(IsolationModeCtx));
-> +    }
-> +}
-> +
-> +__attribute__((unused))
-> +static int init_isolation_regions(struct vhost_dev *dev,
-> +                                  VhostUserMsg *msg,
-> +                                  int *fds, size_t *fd_num)
-> +{
-> +    Error *err = NULL;
-> +    struct vhost_user *u = dev->opaque;
-> +    uint32_t nregions = dev->mem->nregions;
-> +
-> +    g_autofree DMAMap *buffer_regions = g_new0(DMAMap, nregions);
-> +    size_t buffer_reg_size = 0;
-> +    size_t total_vring_size = 0;
-> +    size_t total_mmap_size;
-> +    char *reg_name;
-> +    uint64_t first_IOVA_addr;
-> +    uint64_t last_IOVA_addr;
-
-Variables should be lower_case_with_underscores as per:
-docs/devel/style.rst
-
-> +    DMAMap *map;
-> +    DMAMap vring_map;
-> +    int r;
-> +
-> +    msg->hdr.request = VHOST_USER_SET_MEM_TABLE;
-> +
-> +    /* In case of reset, clear old regions */
-> +    cleanup_isolation_regions(dev);
-> +
-> +    /* Gather information for bounce buffers to be mapped */
-> +    for (u_int32_t i = 0; i < nregions; i++) {
-> +        hwaddr size = ROUND_UP(dev->mem->regions[i].memory_size,
-> +                      qemu_real_host_page_size());
-> +        buffer_regions[i].size = size - 1;
-> +        buffer_regions[i].perm = IOMMU_RW;
-> +
-> +        buffer_reg_size += size;
-> +    }
-> +
-> +    /* Get space required for all vrings */
-> +    for (int i = 0; i < dev->nvqs; i++) {
-> +        VirtQueue *vq = virtio_get_queue(dev->vdev, dev->vq_index + i);
-> +        total_vring_size += vhost_svq_vring_total_size(dev->vdev, vq);
-> +    }
-> +
-> +    total_mmap_size = buffer_reg_size + total_vring_size;
-> +    u->iso_mem_ctx.size = total_mmap_size;
-> +
-> +    /* Allocate and map an anonymous file to hold the isolation region */
-> +    reg_name = g_strconcat("iso_mem_", dev->vdev->name, NULL);
-> +    u->iso_mem_ctx.shared_mem_addr = qemu_memfd_alloc(reg_name,
-> +                                     total_mmap_size,
-> +                                     F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL,
-> +                                     &u->iso_mem_ctx.fd, &err);
-> +
-> +    assert(u->iso_mem_ctx.fd >= 0);
-> +    g_free(reg_name);
-> +
-> +    if (err) {
-> +        error_report_err(err);
-> +        cleanup_isolation_regions(dev);
-> +        return -1;
-> +    }
-> +
-> +    /* vhost-iova-tree enforces non-zero lower address */
-> +    first_IOVA_addr = qemu_real_host_page_size();
-> +    last_IOVA_addr = first_IOVA_addr + total_mmap_size - 1;
-> +    assert(last_IOVA_addr > first_IOVA_addr);
-> +
-> +    /* Use 128-bit operation in case of large negative offset */
-> +    u->iso_mem_ctx.iso_iova_offset =
-> +        int128_sub(int128_make64((uint64_t)u->iso_mem_ctx.shared_mem_addr),
-> +        int128_make64(first_IOVA_addr));
-> +
-> +    /*
-> +     * Instantiates iova tree sized to map bounce buffers and vrings to the
-> +     * isolation region in host va.
-> +     */
-> +    u->iso_mem_ctx.tree =
-> +        vhost_iova_tree_new(first_IOVA_addr, last_IOVA_addr);
-> +
-> +    /* Map vrings into IOVA tree */
-> +    vring_map.perm = IOMMU_RW;
-> +    vring_map.size = total_vring_size - 1;
-> +    r = vhost_iova_tree_map_alloc(u->iso_mem_ctx.tree, &vring_map,
-> +                                  (hwaddr)u->iso_mem_ctx.shared_mem_addr);
-> +
-> +    if (r != IOVA_OK) {
-> +        cleanup_isolation_regions(dev);
-> +        return r;
-> +    }
-> +
-> +    u->iso_mem_ctx.vring_hva_addr = (void *)int128_get64(
-> +                                    int128_add(int128_make64(vring_map.iova),
-> +                                               u->iso_mem_ctx.iso_iova_offset));
-> +    u->iso_mem_ctx.vring_region_size = total_vring_size;
-> +
-> +    for (int i = 0; i < nregions; i++) {
-> +        map = &buffer_regions[i];
-> +        r = vhost_iova_tree_map_alloc_gpa(u->iso_mem_ctx.tree, map,
-> +                                          dev->mem->regions[i].guest_phys_addr);
-> +
-> +        if (r != IOVA_OK) {
-> +            cleanup_isolation_regions(dev);
-> +            return r;
-> +        }
-> +    }
-> +
-> +    return 0;
-> +}
-> +
->   static int vhost_user_set_mem_table(struct vhost_dev *dev,
->                                       struct vhost_memory *mem)
->   {
-> @@ -2684,6 +2819,7 @@ static int vhost_user_backend_cleanup(struct vhost_dev *dev)
->       g_free(u->region_rb_offset);
->       u->region_rb_offset = NULL;
->       u->region_rb_len = 0;
-> +    cleanup_isolation_regions(dev);
->       g_free(u);
->       dev->opaque = 0;
->   
-> 
-
+Thank you!
+Connor

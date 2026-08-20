@@ -1,82 +1,82 @@
-Received: from mail-qk1-f175.google.com (mail-qk1-f175.google.com [209.85.222.175])
+Received: from mail-qk1-f176.google.com (mail-qk1-f176.google.com [209.85.222.176])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 437CE145B27
-	for <virtio-fs@lists.linux.dev>; Thu, 20 Aug 2026 01:06:43 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.222.175
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 4978A13D886
+	for <virtio-fs@lists.linux.dev>; Thu, 20 Aug 2026 01:23:02 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.222.176
 ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787188004; cv=pass; b=ReLQ3gOB6iv5JVL7yFBDUfCi2qhuJCbwQfu62scuQY2ybRa1sVfVIwV+JDNHEEUEmbWBFCQLr/V6WuRHnqRCDBTeiOZCbhUuRxB9ozlAygBeEb4ILtmDOeAYD9B8LpSFdsmG9Atbs35PiaxABRXc6x/by/v6jrJG/lR2YPdaa1g=
+	t=1787188983; cv=pass; b=IhSf+pBG0frNpuPwaHpxXX8kobW+cvUNppwyUbtjNbKrg0VddEgXzgwheTJnR/ZNK3klmlHljJUQJIDshznOL3PXxHoDUFrZcoduHcE57dhH9BiIp/b+E5gRyeZIM55dCf0qEKHH3mpykqtyM5q/fXExDd1P+naeNW/omMSK7m8=
 ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787188004; c=relaxed/simple;
-	bh=DQwQIh7JWR3BSaP+Z16UoM/z0GvwsKDlhiuv0AYd4S4=;
+	s=arc-20240116; t=1787188983; c=relaxed/simple;
+	bh=IzD5WkVaqb9IoNA5w11jZZ80BB1le8+DrEpLAAUIvvY=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=lRdTIX4fpH5iKb5u9RQ06vjAmB74Aj6CifgMdWggp9XufyXH1BlIejFzAWK0MuRwWXRV5ZW+74hNnHO0vqu/+EYzsjhPOkFCJY7KXD0NxlFNPCrL5unNLSiTyXAIYKATtkr9SKQHpw3AfRBwwUYIE+7NoNPE/tNsEqEBMgeDONg=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=kME74a1i; arc=pass smtp.client-ip=209.85.222.175
+	 To:Cc:Content-Type; b=p06scWfCNS066XnohF8gMsu0PqclIUKwyfY/UMEFLDr3MkXeXSopuEmDoOB8hsYY8DB8wvhW/sZ7NA7D5dYhKElvy+hrIyQxlRr+Ldu0aZ9xYUDIapsirFZg2o7Q9eAw2cy9Ewf93BAcWcx8KyRI8mi3+eTnqvetoT5KKPAAs+U=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=W9q+QtEn; arc=pass smtp.client-ip=209.85.222.176
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="kME74a1i"
-Received: by mail-qk1-f175.google.com with SMTP id af79cd13be357-936d00181abso85172685a.2
-        for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 18:06:43 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1787188002; cv=none;
+	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="W9q+QtEn"
+Received: by mail-qk1-f176.google.com with SMTP id af79cd13be357-92f0b5ed131so148502285a.3
+        for <virtio-fs@lists.linux.dev>; Wed, 19 Aug 2026 18:23:02 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1787188981; cv=none;
         d=google.com; s=arc-20260327;
-        b=NDOJJM838Tp7dt0mqSaBc+iAAij2LXZ6f3CsRBbeAFzSQGlMZGuXzIlWxfRYPAPniq
-         n4Ze+kbevxqYZ8NzPGzpT4iGul1MMyKY8i810QVK7DNGHcpATaTo9IVtbvhipsG5GBRk
-         GO0dTAih7xAVqGMYjymqptlgDniUEaJnSyVZZeqXKFuT8utOU5Amc2ZcVIlE+zrwdx8J
-         hLX3qn/i2PiAGsyfoAIHD8GxkunivdEtNN2g+Y724OfHck0W5kNGWqzD5GJroJB5GhkE
-         N1HeJPU7GY6t2WazKA2p7vxKSdnJCg9q/OD1nxuUnjzUvrh9oS4hzpPy9VXlfJdP7BWt
-         9AEQ==
+        b=bR/qaFQ0j9x4MCYDrq4x4LaJPoHpSnYQhXNcVQyANizgFMZfkPEyQTorzhYFuIcn2q
+         9lN/ssEimjl44z6+XpO6K2MJYo5vjxMVPsUsregtoEzPu24B+G5v6FLL7ibsDwz7UvAe
+         +yBaEdv4eVjPwIyUx+Mlu8vLxxbDcm1Ua4Bl93YzZOkwNcDkvrpVY2EZMYYbQ5kS8Zl9
+         Qwin+x+V7YCc0BW7kO/L7ds0UMQsECvUhsdovy8Or3gIyQpScx1hy3Du+aDwveTzdqN+
+         Q41cUa2YXCGK1ZpFdnHvEmbUdcO1F4m+v/TVr1Bsd5lxjBqj8XkJKKaFkSjCnyEUR27v
+         uz8w==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=content-transfer-encoding:cc:to:subject:message-id:date:from
          :in-reply-to:references:mime-version:dkim-signature;
-        bh=vsWCscNzkxiVMmU/QBKBdlqpIVF9XvSYTxKTjjRPnYA=;
-        fh=xffSJC2yMC0tnidGp07KaClMqoEn4Do6Hck9+h6wgJQ=;
-        b=mxO08cDK+SblSXMfHWb6W3ElEeHAoopQnCndglIRUvkh9E5jh0THtZcOCAyaNy03ZY
-         DGHJigXPSb5ISwEKP7XMV0mLF1iOahiec8w8+XggpSTvON1RdOu7tidKSxTaZEdIhL1F
-         +KFirX10Klo6pbPCZQIafJs9qo+b4F0Fdr2bjUMuKLX3FLQnVhnIDXBD2214LVnI06yw
-         4F1UZNAk8koY0MS4kpyIgcXACjecVYB7rYSNVOvBICwag2pvk31yJx8k11puehaqrFCx
-         DAfi7l2Y0gebztykYJt5zYMayvkKT8D2QPtLx3Byt819UFzj/ELwghJl1gm5JOn0V2Ea
-         vioQ==;
+        bh=fEPJshVvRAljzQG147X6Ty6PBl0uhRhyX5+dH7xacrU=;
+        fh=VLrgB28A4OVoFR2Ra3kTdYm/Nw5cmxuikkxsIJOh98s=;
+        b=KXguKdXZTfhZRU6J4fpprtAK7LFTy0n2EqzkeDeMC85KDfQNPn/8Sh6aqNAeuHKAjC
+         JkaRSYdw5J8sXgQOmvWUc+HtSuETJaKaEN8o9Cvo5Rj3HrbDqbLyAxOdV/y4zr74hedo
+         Z2BwYDLXZEc+1UBUzkQG04HJ/VINnblvsUkng2pbF35RGqOIiObZ4ny3zPZipeplTKRH
+         rP/oXzjbl28GLglx9VEpdlq+voy8FEVide7jNedlgAT2kkj0+POYfpf8pEL9BbECq1GO
+         FslzwmPKEQfq/dXUQDC9kJDaF+g36+ji0tJyo1r/SZK/KC5IoQ0mQqFkxZC6r8fkC7O9
+         c1SA==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1787188002; x=1787792802; darn=lists.linux.dev;
+        d=gmail.com; s=20251104; t=1787188981; x=1787793781; darn=lists.linux.dev;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:from:to:cc:subject
          :date:message-id:reply-to:content-type;
-        bh=vsWCscNzkxiVMmU/QBKBdlqpIVF9XvSYTxKTjjRPnYA=;
-        b=kME74a1iVwj1kDd1jXYEvfIrNZDgEm/+Mzr86xy9evNO7vnjmAqRyM3RnZs/6v6ird
-         f5lCXuMFPO9WBUWLR3YZX0TsuXrRzdmmO866lOQOACygGdRQSGeijolzy1zhWHZW4Sau
-         VkanO+seQCENXo76SCwTAypB65xBaG+RoRwZi35N5/zipD3C6MirGwi6tJa2j4PxEju4
-         U6Nji6VCkAZBCF5bjGFiQhgNiSYts95LKMy8R16nX2UmBQME7dVYZB8SInsgtnmfZ6tb
-         IH4i+7lLK6Zjd8sHFM3vgWbRdzSbbp8fWh9nUqN+HCP0Dvif+huZA8THxhrTfbqffXMe
-         Lj4Q==
+        bh=fEPJshVvRAljzQG147X6Ty6PBl0uhRhyX5+dH7xacrU=;
+        b=W9q+QtEnMBsLuuUIBdFkyZ4UO+23F62lu37F3mqLAqdNPBnK3dRSz6FvdCy8NfQhAv
+         3Yc18Jsfa2Qa39OKtlFKdf9pSSb0ydn0y7Q+JmrPui75fJR6ev3sEQ9xCpvxnSjD94IV
+         tNXhithQF/xhz+06yoSLA91WbqlEImMbQWdKmb44aUfNMLtu71K4IuBbTX3ZB+B0L94U
+         dpdfd8tC8e72sHdRyX7jMrD9CjOoEwNT3o7YePuv7/Ye2tkOs7hyWdjt79naeyNrO3uZ
+         JbWuuPF1Gloa0afeUiiK6JG18KPBQ5c+23YoEcm5z1l1ex+hA+rU+issVi8cew/fgbWf
+         T1Mg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1787188002; x=1787792802;
+        d=1e100.net; s=20251104; t=1787188981; x=1787793781;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=vsWCscNzkxiVMmU/QBKBdlqpIVF9XvSYTxKTjjRPnYA=;
-        b=ZSEBRrRfuuOzIlDisETnj4W1MNAKVUXrqBv05Ep4klGDaoW5dgmvy2BhGs+fxyYNKx
-         PHzmKuNx1+enGmaDI/EUllAetSTMhZtS1OYEToPJoULSpqvV3m2ikwPE/Ats4x9Xdfrr
-         pmRBDSIYyKec6cswZ15D+VN6m8F6ewwSj40jd6KLyv9jd4z8mH6Lo1L2YVzlhatSheCH
-         9FzcDcrII7SQmZHvLcoPdv1xjotadMwGKsXO2vYzubJnCUjxGScN1YBpqg542qSMpIfa
-         aMIHPj+ClrZ7ey4iLGsWy36ZP2p9aCh+I0FW6dNygQ7FyDA6VYqUKlhTREiutxlsubeX
-         vNtA==
-X-Forwarded-Encrypted: i=1; AHgh+RqTaIgyxkvhQPoesUgtckCbNBNzozKT4R3Cj7Lg0bTndQvep5OCkIGMxP8JrtoloYN18bEtt+vgqLQ=@lists.linux.dev
-X-Gm-Message-State: AOJu0YzG9jHDuOOlk3sHqocmFsbb5ol6Dzfde/gAA2aMDEEDCU5TmAyE
-	m2zsfhJG6svsJVIha1JGse2I4zkiJMXbLKMR4tS4rSmDvrSt5QjRGV6+XpJoXAVnYYVmn8/PWJH
-	BZg9DJ+lJK5MzNho9MS/H5nZG5f9+R9s=
-X-Gm-Gg: AR+sD13de9UsMQE/a/9KviUJrYwvd50OT0eH+MBiJXTPnVfCAHzwDZiCYum2PhJTFCx
-	Ld3Xzd/IhlpjrpCl3wGtDLcgqtrhN19X4A9/0FKqTe/cERf+1NB4wf3JLLEDQiEN7iWcCGg0fn9
-	z34Kd2BgqZcSfApFQp+BQ52p5i1V68XTAmfdTM0E0IGAJXbOuaCVV88u10K8/I/xhTS2rX0IKLC
-	t185IPFxgFUbLIXYJOyRjK19+HL/982xpJ3vO0jE2gbIUynqIDgx/rbMjZsd5Oq8OZu+PJhBipi
-	PFbQhYI/aKUw0EgCEGEx0VQk45NOl9bxvu9ZrbdgOX9LWPju07DLF/u6vMOX/9dIqit0Qmb/yFB
-	YP68=
-X-Received: by 2002:a05:620a:6015:b0:92e:7cc9:a888 with SMTP id
- af79cd13be357-9371e2cf759mr924864285a.2.1787188002133; Wed, 19 Aug 2026
- 18:06:42 -0700 (PDT)
+        bh=fEPJshVvRAljzQG147X6Ty6PBl0uhRhyX5+dH7xacrU=;
+        b=NZBcDK5nTRvwIfHbPPQtRo+yNgHleqtwalkUU+8H8xMfSZc9gzV5+tbBz7hEEYh+Rk
+         UsZMNbQGT+r0KCn5SgKBORbFknn+XMqdCiu9CoJecJ5i9xHNnDEt1do7DPYL9FijiiGr
+         JFfdoZEdQttDoJotE16tTa6/zbA7o+XeOabtAS8bxZq1hxQuz2Km8Gpr2tivQNE0ncvJ
+         YzQdO9awANHSyXCW9PfDT5T7hqv8WjC8Js8TIXJHdyCCUTP7KPaip4QsYLYfX00S5LRT
+         u+suTnTXPDpbYppyJsitXXROrYJFdcULWhQzWEqvHhjA8+gNOpjeqGMctvNplyaPHQci
+         0JTw==
+X-Forwarded-Encrypted: i=1; AHgh+RoSqj/bwK/hJ7zdtmU2t+Brvl2lsU3rMcHDIk/8pJNfXbAon4zdi1kBwhjXZsrlF3IUSKDjpWF1L8w=@lists.linux.dev
+X-Gm-Message-State: AOJu0Yz+SL2jfxSuRaBXdjO5BjS9QmK/HmRnekzkGWivqNivFXe6W9Ai
+	f1I45z7dDggf+SJxh/GcdWK0nvBijp6De1pjSuRcF2bYclO8CCOvOOD7EMf5opQcUCOoSXADpNh
+	0lNQIDHwyf3XAiGqdW+qScUevE32PxS4=
+X-Gm-Gg: AR+sD125QhT3MBMfLW4Bj7vI192a75Tbjzf6ZMspqzsvlbz4PmLDtJUD/DzYWC7LM2H
+	mwfBo2jAT0lB+iur28BNccdJRZLSLNfH8cQhu3F+ScVtGe5E3O5tcJBkYG1QSLSJKxYjeZHKbVz
+	12rRZtbKpm+HclJfgXkgtA1Slkf1TZBWYsol7UpOaVOKeNuwmqfdoQcHGAuAzP30J1Qi0uDmicM
+	+hl0268zXp7XZFiv9mDJkK4Ki+qzYUNRDFuy9wviu/VhJxEnlMTMW6Sh7r+4DDONRf/gnpwvZsg
+	MDI5FewuxsUquVaJg++sIxn2IzohzkiiooYMwmwk0kmZfMuP5HzU4sblTrjUiJKeuZ7y3xRTG0o
+	/NOU=
+X-Received: by 2002:a05:620a:470a:b0:92c:103d:63dd with SMTP id
+ af79cd13be357-9371e30d64bmr825382685a.39.1787188981058; Wed, 19 Aug 2026
+ 18:23:01 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
@@ -84,13 +84,13 @@ List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
 References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com> <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
-In-Reply-To: <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
+ <20260817-vhost-user-isolated-memory-v2-13-948aae960abb@gmail.com> <15427c56-a585-48ff-b024-e48a2fdea697@rsg.ci.i.u-tokyo.ac.jp>
+In-Reply-To: <15427c56-a585-48ff-b024-e48a2fdea697@rsg.ci.i.u-tokyo.ac.jp>
 From: Connor Kite <connorkite@gmail.com>
-Date: Wed, 19 Aug 2026 18:06:30 -0700
-X-Gm-Features: AcwNN1Vitk5XJi1kg1YAvcpdy9Kk9-83pUVn-HXmmhlZta59p0cOti38aI4rTGg
-Message-ID: <CA+spn3rouMQ=yG1m2fS=vm40c-zWWMZPK+yk0K_ip5iXzLZWow@mail.gmail.com>
-Subject: Re: [PATCH RFC v2 04/13] hw/virtio/vhost-shadow-virtqueue: used callback
+Date: Wed, 19 Aug 2026 18:22:48 -0700
+X-Gm-Features: AcwNN1WYAAFsNg32RpeVzWj-vcYKbWhQ5GN-92FmFalaloYu8x_uy2_lP3Y2MrY
+Message-ID: <CA+spn3qZ9psOFGyVR-5=ou8hExDFZg0Yg0TdUxeC91tNKmhCTA@mail.gmail.com>
+Subject: Re: [PATCH RFC v2 13/13] net/vhost-user: add memory isolation
 To: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
 Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
 	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
@@ -106,39 +106,30 @@ Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
 	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
 	Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
 	Peter Xu <peterx@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, 
-	Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>, 
-	20260817233147.2867623-1-connorkite@gmail.com
+	Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Aug 18, 2026 at 11:23=E2=80=AFPM Akihiko Odaki
+On Wed, Aug 19, 2026 at 12:37=E2=80=AFAM Akihiko Odaki
 <odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
 >
-> > +
-> > +                if (r < 0) {
-> > +                    /* VQ or handler is broken. Do not set guest notif=
-ier */
+> On 2026/08/18 14:12, Connor Kite wrote:
+> > Add a memory-isolation property to NetdevPassOptions and
+> > NetDevVhostUserOptions in net.json.  This property will
+> > be used for vhost-user devices to disable access to guest
+> > memory from vhost-user backends.
 >
-> This comment is extraneous. It is obvious that event_notifier_set()
-> below is not called, and it is same with the existing error path below.
->
-> What matters here is the difference with the existing error path. Why
-> doesn't it call virtqueue_fill() nor virtqueue_flush()? They need to be
-> addressed here.
+> The cover letter says multiqueue is not supported but the code just
+> continues with multiqueue and breaks.
 >
 > Regards,
 > Akihiko Odaki
 >
+> >
 
-Here, apart from not calling event_notifier_set (not notifying the
-guest), we are also not calling vhost_svq_enable_notification, so the
-device is directed not to send any more call notifications.  If the
-guest isn't receiving notifications, and the device isn't sending
-them, is there a purpose to flushing the current element?  With the
-current implementation, I'm not sure there is a path to re-enable
-calls on either the front-end or back-end, but maybe a case could be
-made that it's good hygiene to flush the known bad element?  For now,
-I will add the calls to add and flush the element
+Adding multiqueue support is my main focus for Rev 3!  My testing so
+far hasn't included backends with the multiqueue option, but I will
+correct that.
 
-Thank you!
+Thanks!
 Connor

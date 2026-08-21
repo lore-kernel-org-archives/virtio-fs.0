@@ -1,133 +1,144 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
+Received: from www3579.sakura.ne.jp (www3579.sakura.ne.jp [49.212.243.89])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 9E1023C4B64
-	for <virtio-fs@lists.linux.dev>; Fri, 21 Aug 2026 05:54:41 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 28EC6396B9A
+	for <virtio-fs@lists.linux.dev>; Fri, 21 Aug 2026 07:27:08 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=49.212.243.89
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1787291683; cv=none; b=THhcW7NUtZtlzh0CNJjSFLKPgvAfwjPxa9UgT4/D0c5eFPU1eF77eA6v+ey989mEqEq9a2E+QiY6cP1sOSsxCY3KSh0JembJk0kz6j1yUKsWnZRwCUrsDHeazYZILjNoXLz8QCyemk1/zDRdPZQLQzICnx/ga8v2Y8PZGi7RbeQ=
+	t=1787297232; cv=none; b=ZCNjjhyMrgzi8VxkUlG3/ZUJrRx35j2DRipKISy+NXC9OwW0fk24cRTAm8LlcPcRK9r78NqC2dJY9EAY6rTaDKwkZonJRDriUUHcGXRKT5lO9OQD9OhUiLPHTQBs+ikCaJ7SJYl6WEg6q9K8PhIVs7d+9xA5w1RhPM2pAgp/FMQ=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1787291683; c=relaxed/simple;
-	bh=ItJ4vmpzzan0xAq/Q5wdKW9vMt0OMXHAe5gMUH4m44M=;
-	h=From:To:Cc:Subject:In-Reply-To:References:Date:Message-ID:
-	 MIME-Version:Content-Type; b=IwK4Zu0RT4Dy2KDrQ/w2fD27aicFr6vCfS5x4o3FxqW6pTrKbp7EGFObi7cAqGMBqHFCPfNmjkVKphLsQCo/DCw8KCkFdPkQro8J6kfd45kIZT0GUO50G+eaVS/Y/5HpTcmv25uZ3bPTM9HKv0fxCwE3Sq4BPNqf/fgSL+VtIZU=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=JqXUY/oW; arc=none smtp.client-ip=170.10.129.124
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
+	s=arc-20240116; t=1787297232; c=relaxed/simple;
+	bh=BOIPcWzYQgxfXMBkByLiwMMwYOSgoWObyIbjQSl3P2k=;
+	h=Message-ID:Date:MIME-Version:Subject:To:Cc:References:From:
+	 In-Reply-To:Content-Type; b=iglMDMZuUpKZJ5rG75u9PktttCN8v2XVQ9ngRsDaEpkh96lxstZtRWqZV5BfDZ8BwY3XecuxmajA6NgtqN8Nlfo0Wlx9Vixx4TsrEy8JjD9gRmGexhMOkMq6K9vX34KCKIMBkRZUB/tl3f6K/43eZk6m9T1VXAZHe7CmuhnqRjQ=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp; dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b=FTxA5mvO; arc=none smtp.client-ip=49.212.243.89
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=rsg.ci.i.u-tokyo.ac.jp
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=rsg.ci.i.u-tokyo.ac.jp
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="JqXUY/oW"
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1787291680;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references;
-	bh=IITfrQYVQZTRWeGyLUAzKTecmtJHIaQ1eqmBG4Gip/I=;
-	b=JqXUY/oWUhspe3hljER6AlRAjNkpfbGYeZGK6I4GlPa977z8rrpeP3BCMZ5V8+eEdcEYR0
-	IgZLQj6dFF8nrTqLfb1mkbu5I/IZ3Hnj5s40hHR4X6H5pw2EuxXWeHXcNiekdbCcsQgzve
-	TPqf1hCCoFLDeqxQuW6DUqnu295yj9Q=
-Received: from mx-prod-mc-01.mail-002.prod.us-west-2.aws.redhat.com
- (ec2-54-186-198-63.us-west-2.compute.amazonaws.com [54.186.198.63]) by
- relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
- cipher=TLS_AES_256_GCM_SHA384) id us-mta-45-XxR4cDKLMhaZoBaEXWyhVw-1; Fri,
- 21 Aug 2026 01:54:34 -0400
-X-MC-Unique: XxR4cDKLMhaZoBaEXWyhVw-1
-X-Mimecast-MFC-AGG-ID: XxR4cDKLMhaZoBaEXWyhVw_1787291672
-Received: from mx-prod-int-03.mail-002.prod.us-west-2.aws.redhat.com (mx-prod-int-03.mail-002.prod.us-west-2.aws.redhat.com [10.30.177.12])
-	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
-	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
-	(No client certificate requested)
-	by mx-prod-mc-01.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id BBC3C195609D;
-	Fri, 21 Aug 2026 05:54:30 +0000 (UTC)
-Received: from blackfin.pond.sub.org (unknown [10.44.22.12])
-	by mx-prod-int-03.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 56CA41955F03;
-	Fri, 21 Aug 2026 05:54:29 +0000 (UTC)
-Received: by blackfin.pond.sub.org (Postfix, from userid 1000)
-	id A0A9421E6920; Fri, 21 Aug 2026 07:54:26 +0200 (CEST)
-From: Markus Armbruster <armbru@redhat.com>
-To: Connor Kite <connorkite@gmail.com>
-Cc: qemu-devel@nongnu.org,  "Michael S. Tsirkin" <mst@redhat.com>,  Stefano
- Garzarella <sgarzare@redhat.com>,  Alex =?utf-8?Q?Benn=C3=A9e?=
- <alex.bennee@linaro.org>,
-  Viresh Kumar <viresh.kumar@linaro.org>,  Gerd Hoffmann
- <kraxel@redhat.com>,  Mathieu Poirier <mathieu.poirier@linaro.org>,  Manos
- Pitsidianakis <manos.pitsidianakis@linaro.org>,  Raphael Norwitz
- <rnorwitz@nvidia.com>,  Kevin Wolf <kwolf@redhat.com>,  Hanna Reitz
- <hreitz@redhat.com>,  =?utf-8?Q?Marc-Andr=C3=A9?= Lureau
- <marcandre.lureau@redhat.com>,
-  Paolo Bonzini <pbonzini@redhat.com>,  Fam Zheng <fam@euphon.net>,  Stefan
- Hajnoczi <stefanha@redhat.com>,  Milan Zamazal <mzamazal@redhat.com>,
-  Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>,  Dmitry Osipenko
- <dmitry.osipenko@collabora.com>,  qemu-block@nongnu.org,
-  virtio-fs@lists.linux.dev,  "Gonglei (Arei)" <arei.gonglei@huawei.com>,
-  zhenwei pi <zhenwei.pi@linux.dev>,  Daniel P. =?utf-8?Q?Berrang=C3=A9?=
- <berrange@redhat.com>,  Eric Blake <eblake@redhat.com>,  Jason Wang
- <jasowangio@gmail.com>,  Peter Xu <peterx@redhat.com>,  Eugenio
- =?utf-8?Q?P=C3=A9rez?=
- <eperezma@redhat.com>,  Alyssa Ross <hi@alyssa.is>,  Demi Marie Obenour
- <demiobenour@gmail.com>
-Subject: Re: [PATCH RFC v2 13/13] net/vhost-user: add memory isolation
-In-Reply-To: <CA+spn3qK+n+buANnmkT6J8Yu4ZbwS_CqRbisE1uOmNsn1835iw@mail.gmail.com>
-	(Connor Kite's message of "Thu, 20 Aug 2026 17:39:15 -0700")
-References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
-	<20260817-vhost-user-isolated-memory-v2-13-948aae960abb@gmail.com>
-	<87lda12mhy.fsf@pond.sub.org>
-	<CA+spn3qK+n+buANnmkT6J8Yu4ZbwS_CqRbisE1uOmNsn1835iw@mail.gmail.com>
-Date: Fri, 21 Aug 2026 07:54:26 +0200
-Message-ID: <87lda010j1.fsf@pond.sub.org>
-User-Agent: Gnus/5.13 (Gnus v5.13)
+	dkim=pass (2048-bit key) header.d=rsg.ci.i.u-tokyo.ac.jp header.i=@rsg.ci.i.u-tokyo.ac.jp header.b="FTxA5mvO"
+Received: from [133.11.54.183] (h183.csg.ci.i.u-tokyo.ac.jp [133.11.54.183])
+	(authenticated bits=0)
+	by www3579.sakura.ne.jp (8.16.1/8.16.1) with ESMTPSA id 67L7L9r4016626
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
+	Fri, 21 Aug 2026 16:21:09 +0900 (JST)
+	(envelope-from odaki@rsg.ci.i.u-tokyo.ac.jp)
+DKIM-Signature: a=rsa-sha256; bh=PrsqeCZo14bsILafP5HHdnaphT9v1lbdzWwjJUXM0xE=;
+        c=relaxed/relaxed; d=rsg.ci.i.u-tokyo.ac.jp;
+        h=From:Message-ID:To:Subject:Date;
+        s=rs20250326; t=1787296869; v=1;
+        b=FTxA5mvOOEI7AhkX2w6BWNaVmWamog2Inu7DLYtOTZeH3+GNW4KguyOPHH/DsDzP
+         fAiojAJGWnZOmQHUN1llA2z23FEm8qqCHv3AsrawF08uKo5aZWIHA1ZnV2Z9TAtU
+         Y0KSe41Yz9UJtKxJ5599zdtCXZHQ9RrQF9g5Bv/S6gbgZYwn540QscEK84p+d8UT
+         UBdy9xifdgtatT7nzBjVgstV6VuUKXQp37nq+BxZcpXEnz4iPyWS/5wpdL4m8onR
+         yWSN9tZUV+vcP9yNAXn1NiZcfD3cGp94xJKQStlAhvHhu/eJ7qTNwt784ywc11W5
+         /F4C5nDfdah9Fsx0j2vdoA==
+Message-ID: <eca888c2-b760-4773-9b47-711328d16e22@rsg.ci.i.u-tokyo.ac.jp>
+Date: Fri, 21 Aug 2026 16:21:08 +0900
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-X-Scanned-By: MIMEDefang 3.0 on 10.30.177.12
-X-Mimecast-MFC-PROC-ID: -mZ4Kfj0KPA-9qicmuyxKf7LzLvH9Ax2SKPQaodTN6M_1787291672
-X-Mimecast-Originator: redhat.com
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: quoted-printable
+User-Agent: Mozilla Thunderbird
+Subject: Re: [PATCH RFC v2 04/13] hw/virtio/vhost-shadow-virtqueue: used
+ callback
+To: Connor Kite <connorkite@gmail.com>
+Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>,
+        Stefano Garzarella <sgarzare@redhat.com>,
+        =?UTF-8?Q?Alex_Benn=C3=A9e?= <alex.bennee@linaro.org>,
+        Viresh Kumar <viresh.kumar@linaro.org>,
+        Gerd Hoffmann <kraxel@redhat.com>,
+        Mathieu Poirier <mathieu.poirier@linaro.org>,
+        Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
+        Raphael Norwitz <rnorwitz@nvidia.com>, Kevin Wolf <kwolf@redhat.com>,
+        Hanna Reitz <hreitz@redhat.com>,
+        =?UTF-8?Q?Marc-Andr=C3=A9_Lureau?= <marcandre.lureau@redhat.com>,
+        Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
+        Stefan Hajnoczi <stefanha@redhat.com>,
+        Milan Zamazal <mzamazal@redhat.com>,
+        Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org,
+        virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>,
+        zhenwei pi <zhenwei.pi@linux.dev>,
+        =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?=
+ <berrange@redhat.com>,
+        Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>,
+        Jason Wang <jasowangio@gmail.com>, Peter Xu <peterx@redhat.com>,
+        =?UTF-8?Q?Eugenio_P=C3=A9rez?=
+ <eperezma@redhat.com>,
+        Alyssa Ross <hi@alyssa.is>, Demi Marie Obenour <demiobenour@gmail.com>
+References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
+ <20260817-vhost-user-isolated-memory-v2-4-948aae960abb@gmail.com>
+ <b6f79ec9-7842-47ff-b210-855036712547@rsg.ci.i.u-tokyo.ac.jp>
+ <CA+spn3rouMQ=yG1m2fS=vm40c-zWWMZPK+yk0K_ip5iXzLZWow@mail.gmail.com>
+ <5d8e3d91-de60-4747-88d1-e135e3c6e7c1@rsg.ci.i.u-tokyo.ac.jp>
+ <CA+spn3o18uuZqfyGE+R2QGZ6KRoTJ9hmK7HyEQ6cg4wxN9QPsw@mail.gmail.com>
+Content-Language: en-US
+From: Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>
+In-Reply-To: <CA+spn3o18uuZqfyGE+R2QGZ6KRoTJ9hmK7HyEQ6cg4wxN9QPsw@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 8bit
 
-Connor Kite <connorkite@gmail.com> writes:
-
-> On Thu, Aug 20, 2026 at 2:02=E2=80=AFAM Markus Armbruster <armbru@redhat.=
-com> wrote:
+On 2026/08/21 8:42, Connor Kite wrote:
+> On Wed, Aug 19, 2026 at 10:15 PM Akihiko Odaki
+> <odaki@rsg.ci.i.u-tokyo.ac.jp> wrote:
 >>
 >>
->> Any guidance on when to enable it?
+>> Skipping event_notifier_set() only suppresses this guest interrupt, and
+>> disabling SVQ notifications only suppresses backend call notifications;
+>> it does not stop backend ring processing. The error should be propagated
+>> with virtio_error().
 >>
-> ...
->
->> Likewise.
+>> I looked into the virtqueue_fill() and virtqueue_flush() calls in the
+>> existing error path. The virtqueue_fill() call detaches the element and
+>> publishes it to the guest. Detaching the element is necessary and should
+>> be done in the new error path too. On the other hand, publishing the
+>> failed element is wrong and should not be done.
 >>
->
-> In both cases, you would enable this for added security.  There's
-> obviously a performance hit, but it prevents a potentially misbehaving
-> vhost-user backend from reading or modifying undesired portions of
-> guest memory, since data transfer occurs wholly via bounce buffers.
-> This may be more useful in the generic netdev vhost user case than it
-> is with the passt version, but the goal is for the mode to be
-> accessible for any vhost-user device.
+>> virtqueue_flush(vq, i) is still required to publish and account for the
+>> preceding successfully filled elements.
+>>
+>> Regards,
+>> Akihiko Odaki
+> 
+> Thank you for the explanation!  I was not aware of virtio_error.  This
+> error path will now follow the following order:
+> 
+>      if (r < 0) {
+>          virtio_error(svq->vdev, "Vhost shadow virtqueue error while
+> handling used element.\n");
+>          virtqueue_detach_element(vq, elem, 0);
+>          g_free(elem);
 
-Work this into the commit message, please.
+This must be removed. elem is declared g_autofree, so returning after an 
+explicit free would free it twice.
 
-> Do you think guidance is needed here in net.json?  I was thinking
-> that, if isolation-mode gets to a point of being merged, then
-> information like this would make sense somewhere in the online
-> documentation, but I'm happy to add something here as well.  I was
-> just trying to be similarly short and to-the-point as the other option
-> descriptions for these structs.
+>          virtqueue_flush(vq, i);
 
-I think it needs to be somewhere in the user documentation.  We have so
-many configuration options, and so little guidance on what to do with
-them.
+virtio_error() must come last. It sets vdev->broken, after which 
+virtqueue_flush() takes its disabled-device shortcut and merely 
+subtracts i; it does not publish the preceding used entries.
 
-The doc comments in the QAPI schema are reference documentation (they go
-into the "QEMU QMP Reference Manual").  Reference documentation should
-be concise and to the point.  When you have more useful things to say
-than fit there, you need to find nother place, and maybe link to it from
-the reference docs.
+>          return;
+>      }
+> 
+> One thing still seems a little strange here about how vq->inuse is
+> modified by these operations.  The count provided to virtqueue_flush
+> in the svq code is the number of elements that have been added.
+> However, depending on which type of flush occurs, the value of
+> vq->inuse is decreased by either this count (virtqueue_split_flush) or
+> the number of descriptors in the flushed elements
+> (virtqueue_packed_flush, virtqueue_ordered_flush).  Also, the
+> virtqueue_detach_element always decrements vq->inuse by the number of
+> descriptors.
+> 
+> I'm possibly just misunderstanding something, but this seems like
+> vq->inuse could potentially end up in an incorrect state.  Maybe that
+> doesn't matter in this case once virtio_error gets called...
 
-I suggest to try adding brief guidance to the doc comment, and then we
-see how we feel about it.
+The corresponding virtqueue_pop() function that increments vq->inuse 
+also changes the count conditionally with the negotiated features, so I 
+expect they are balanced.
 
+Regards,
+Akihiko Odaki

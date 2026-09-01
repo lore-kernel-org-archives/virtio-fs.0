@@ -1,204 +1,202 @@
-Received: from mail-qt1-f169.google.com (mail-qt1-f169.google.com [209.85.160.169])
+Received: from mail-pl1-f200.google.com (mail-pl1-f200.google.com [209.85.214.200])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id D15F6368D7F
-	for <virtio-fs@lists.linux.dev>; Tue,  1 Sep 2026 19:09:54 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.169
-ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1788289796; cv=pass; b=f/sVyxTQiWJOz5+vRDPU84kPXBwQdCBXMODfVo4OXoih0Aj9QcqvbMoW99qrDkWS+GdaKfKVagrxe8Clr7czuQWXMyaX0Lbf8zuauvR+cWtqQ5M6hPBjPxYr6ZwRonZez9WwkVAvgmdN/f/OClInoXOm8xhR53RJTZ0S5YwDaxU=
-ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1788289796; c=relaxed/simple;
-	bh=mAQIG/zHz5/rsCJGVAvuXEVPh6n4h86XOWbkLdw3fK4=;
-	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=fSRQh/C3+ilbPJteyyGbEn42PaauP3FuCozb99um7Ej3O0Bh8hrm8l6Iu+7sTqXphQXEjK50qdRb+lk8W8Zqsr0WSS69Jc3IQoQmFbB5akfsCeLvrp5y7bqLkA4ZFqHi8YdcUitgS+Hw6Cdko8sh2zVn0przBu9xIXzaVRPdJ+M=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b=RxDSl5zz; arc=pass smtp.client-ip=209.85.160.169
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=gmail.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=gmail.com
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 00C4E331EDD
+	for <virtio-fs@lists.linux.dev>; Tue,  1 Sep 2026 21:34:14 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.214.200
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1788298456; cv=none; b=IZxrQrEhlxI9sCqzOyOSvUQ1NhOKpQaO0aLKAbNDAD1B+Cy9JS3f+OVOXgQcYA4QQKfa0FKyiqZ1aVSbfmb0XdIYDsGaWV5T2W3pNax4SBfDN1syfYVnARXCJ0Hm80TY5Z7A1h4m41TH/DB/nMJN6zpW3AYSml+ciMtcUBsiAoI=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1788298456; c=relaxed/simple;
+	bh=Ose34srI3hrAxlZZz+7jEVM8bnJ/tOc2D7m3K6ahiJ0=;
+	h=Date:Mime-Version:Message-ID:Subject:From:To:Cc:Content-Type; b=AwfwLCvSrhkrBNzzCmiatB7JAZhWotB2F/hnhps9MPtrTQU0n65T7mL1Q/GCUObEfW7mMN8Mpgn7BT5PK0IOMPOHo0i1PQybWz1FoDG2oXm+UCKJLiQlNAcrZVYQemHzVkj/Zerz5CTRtKChSz3DXcSbRlxCp/UmE/7PgwcF/P4=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com; spf=pass smtp.mailfrom=flex--changyuanl.bounces.google.com; dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b=CZ6J5ajH; arc=none smtp.client-ip=209.85.214.200
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=flex--changyuanl.bounces.google.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RxDSl5zz"
-Received: by mail-qt1-f169.google.com with SMTP id d75a77b69052e-52de50e77ffso1643441cf.2
-        for <virtio-fs@lists.linux.dev>; Tue, 01 Sep 2026 12:09:54 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1788289794; cv=none;
-        d=google.com; s=arc-20260327;
-        b=mmd5Vf+wKZ1W092QsxaVcqm5c/ym60R5Eyf5yytBu+ZN6djPHw3LLG/ltI3USbu4nS
-         GolmMTP8wgyXclFllGGWfJCGN2P70dk1dhWxBgyzKsQsHY876+k2flG9rsGWvJasdtuy
-         OBuiSskeMjPJWqjoL4ja7kfQQ8mjpzSmTDwjJVZ9aTZ6J9SKb2sVYbQjXnd7wiEkO4P3
-         DxeawUkXkH8t1cJ7V2GrOJxosifG10Lw8fLF5nJvr71x4IABMlj/G4kpgUg6vO8viokl
-         vPe720BVbkcKCQ0aIYsbCVPB+FftFeyTmMl/YL6S8Via59kBUxR/qrndCa+f/V57ew00
-         dkkA==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
-        h=content-transfer-encoding:cc:to:subject:message-id:date:from
-         :in-reply-to:references:mime-version:dkim-signature;
-        bh=LzrY3kQLyl1dbjndSKm2x24o7tAe9NeimDIm782FwvM=;
-        fh=F5jLWIBHvhx40Z1O7mL0ZTQgopc/3+9IzRIXx9AKIdc=;
-        b=lshOjNOdS/R8qIgAFWRWmntJPt0ZpwO6+JVn41t9nbVZVR4YkzYCm9Hrk4x6DU5YGr
-         5Hzd9BEUnbCOWeAhB6v2moU2cu+LJNCdBTHVoHmj+tez4MnmW2gpSwn2rtqbIyu5/jZn
-         cuLmsgMb0N5+Pk2+V9A2qdz0wGlrp1XT2olQws7YL7oNihWaOFMXyuNTcHA26o11dfks
-         m0hk1kJKMkMNEeEzqsFNU0cGlt7Ap+OAgBf+j2DOvIiA3KmWoI+uXbFP7wDCHayfVHV1
-         BYN5TCy0RQ8Wg3HDni2D8tv9QFzjOuusEplfOuBcQV/M6aI9ZiaKPBwMR9NsyHq5ICvg
-         +o2A==;
-        darn=lists.linux.dev
-ARC-Authentication-Results: i=1; mx.google.com; arc=none
+	dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b="CZ6J5ajH"
+Received: by mail-pl1-f200.google.com with SMTP id d9443c01a7336-2d6c166bafcso3283545ad.2
+        for <virtio-fs@lists.linux.dev>; Tue, 01 Sep 2026 14:34:14 -0700 (PDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=gmail.com; s=20251104; t=1788289794; x=1788894594; darn=lists.linux.dev;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
-         :date:message-id:reply-to:content-type;
-        bh=LzrY3kQLyl1dbjndSKm2x24o7tAe9NeimDIm782FwvM=;
-        b=RxDSl5zzXrSxDGsB9HAfEMZwZaAMdKbWvt3HB5S77gXFqOXFyHkl8pykQQDw2ftUHN
-         5Yy02wYe+yHJ1tl+AW9Q8Vd+H7KifkAySoS1WIZLsL5d0NXXuoHk5Ptju/B4MpYVX/7I
-         tbtJRKq+mgy3I8pmo4gVQK7rrPY3g0y+kNxMWBtTegXMPaGrEFTO0y26I7jJgGqMsr/B
-         6YK7UBn1UANwYtZ79y+ZxKr5IM1EXs3X4w733/DiwASc9b8SR1RAeXwReaGjnrKnwQ/6
-         rbEN76lVbBw67FIBlAVfjDgvkZV1nYggYuZVkjOADcs9xPOW0l4JdjEnJhnRmb3KMyDx
-         kGHA==
+        d=google.com; s=20251104; t=1788298454; x=1788903254; darn=lists.linux.dev;
+        h=content-type:cc:to:from:subject:message-id:mime-version:date:from
+         :to:cc:subject:date:message-id:reply-to:content-type;
+        bh=snVEO/sl2HX+PIDOygdJc1iuoXl2isJC1BgiDdwU6RM=;
+        b=CZ6J5ajHHw+ZjtAuF+OMFXV1pzJvf7GzS4RyI/dBPjJstxD1rQma+CIX3gIg1P9OVD
+         WSeFPzoWA5QoTW42LtJybDF+FF15KaveSB8lc8TVlJJMwA1azE1l/uTicHv/ctLXvbN8
+         G2kCuPuRBZ51JhxEf0Kfr9lHE1agB4Yua/LqT3QkUSSJLb+s72Exa/w18IbAU1GhOlEs
+         dyuc+wSUQ1yqk+tfjP/VbuXz4k8q2KPk/kIYevwF1E3BhzWGQI777z17pX+91OM7d1XL
+         w6IO9Gk+YjI73LGsng7Hgp4n3o+HyV0xdJYdLnIqQ/tKZpk+2rzQuUxPqrDD87tnmzGs
+         7yeg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1788289794; x=1788894594;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:x-gm-gg
+        d=1e100.net; s=20251104; t=1788298454; x=1788903254;
+        h=content-type:cc:to:from:subject:message-id:mime-version:date
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=LzrY3kQLyl1dbjndSKm2x24o7tAe9NeimDIm782FwvM=;
-        b=A5LV2RkpOc1lOpkGcWkXt4MYETWUZSuCJmUWUOzNtFwAaWQYOPGYqmRIGzWZKTuuUD
-         LysbyDZLh/CBARssI2uC9sx18pqlp4jy1NQGkYazD9Gf/2aINzmbdTWxP4UUrkFGfgso
-         9fMYhlEvONAfHfPKzhkD/gHFNWQkIli/akS771fzAmOuKWk2MDvcW8xQct5QBEOAcVE+
-         cFnkX0WfpHBuLolFmn+b+He0MnsgqTP98bpf/V1S2LVltKZpwPgO2l7/dgCZB1pmJeqI
-         mfDlNLAbWrJniZ8HCU2fqW0dzUr3rNthDAltjQiPGPGab7ZYKUleuot1ww/AwO49FnJC
-         dZGg==
-X-Forwarded-Encrypted: i=1; AHgh+RpgdBlXuBl7FxS2OAvaO3TqP11sbMe2GHTXP4jljIQ/68D23UfcIA56c9jlHz4rvujHrE66rXK0+ek=@lists.linux.dev
-X-Gm-Message-State: AFuF++mkVW9swXsFhWhRJNxzxCvQN5MOietFrWBg7G2kpyicHQTALz/i
-	pyLNnlGb4JslJlrCctBq4Gb3SffAByRX++WVExVz6TUW7pOt1ksZiHZFpdtIGHUBtYSGK+JXlHZ
-	YoZNb2/xrvWel6N8KdR80Z3EEOUUbP3I=
-X-Gm-Gg: AR+sD12IVQSKRTFjM71MwSlOt71Q71Ix8BXldlIuHQ7lYVxrhUJYtdfs+HgzS2LR3b+
-	emlatWFPFVF/IfLqf57ZiLwkUovgS3yfHYXybCY7aOUOXEt/b/7iTm6HkI/k+srPL0X8qxOBonJ
-	T45Ojww5FRnUs4uwnbP+11qhUbpM7gOHIhtfEaoCtm3ZdInPNslnmNokdRpUg/70A+wRX5JJDbP
-	2iGxlJYohJZ2AldJwjGlT7pQBXHrNO2LH1juH+zNh2swq8Av1FRgDxmxFjf2L6Xqj6nzye5HF3W
-	Nse2CO22doaZnokg79b3TGlflNs/8EWh3QaIj23vCJmWtkgupe5f2Tx3zfwMFihIOiQ1T+W/MZF
-	m6X6JMRL9qQT7cg==
-X-Received: by 2002:ac8:5702:0:b0:52d:cf85:aeea with SMTP id
- d75a77b69052e-530342b8cddmr5193391cf.24.1788289793744; Tue, 01 Sep 2026
- 12:09:53 -0700 (PDT)
+        bh=snVEO/sl2HX+PIDOygdJc1iuoXl2isJC1BgiDdwU6RM=;
+        b=YqApb45uvIdzu96YXL73yokpLcq4jIlqZTSbQWyYVGhtJQREihNssRPtqJZetxrJmm
+         kyUPtcWsIvPlgc97JT9YTikc83C6kLWZ/sark9K6NPTuGCAT9TrQpXn/X+Ei5BFCWre2
+         85/+xtK5WOiWPaCfMwo3pLBZEwHyWs5bUvYHjJzU0bkw1q9obvhKeJhW3txAihJ5CqPi
+         iSGjEfvBlRhRNDj3CAzClPOLDUAAFa7WFwt8Eg/RjULAmggN82/QbMgldMVeNTjUuZf0
+         vb+kYvgGhP7Te+PBl+nfgcgl+TETqxC6WrSSCyIFNyEqrWxfpErQVz9fgL7fQXSv/dX3
+         Sq3A==
+X-Forwarded-Encrypted: i=1; AKwUvBxHmqd6QJrTPpzbTvGrCgESrrDbKUVFqjXE61iYljwg/++jFxBYtc9qO17RlGfFjqClT5+Q8KTf6HQ=@lists.linux.dev
+X-Gm-Message-State: AFuF++l0Oc6VzBs1QRyyPX6gc8r0BkCThUpxGfsChN4evAfGGKZ0Vd3/
+	rEEv0wse+0NDeoMSo9S6YR69VtSGp8kEDBSNiWLhdn9AATAwCBDsQ2UbDSlRalj1JYESB/ewECx
+	0znl5wy6k72ixh4p1MkxM2A==
+X-Received: from dycaa14.prod.google.com ([2002:a05:7301:540e:b0:315:877c:f169])
+ (user=changyuanl job=prod-delivery.src-stubby-dispatcher) by
+ 2002:a17:90b:5110:b0:38e:97f0:aa4b with SMTP id 98e67ed59e1d1-39ae83dc551mr1602194a91.13.1788298453859;
+ Tue, 01 Sep 2026 14:34:13 -0700 (PDT)
+Date: Tue,  1 Sep 2026 14:34:12 -0700
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
-MIME-Version: 1.0
-References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-5-948aae960abb@gmail.com> <CAJaqyWcO3bSakzykPr-p=eBrqntNaTdUuvZdo2-B_DVxrt6wjw@mail.gmail.com>
-In-Reply-To: <CAJaqyWcO3bSakzykPr-p=eBrqntNaTdUuvZdo2-B_DVxrt6wjw@mail.gmail.com>
-From: Connor Kite <connorkite@gmail.com>
-Date: Tue, 1 Sep 2026 12:09:42 -0700
-X-Gm-Features: AcwNN1XNCKTlqjQGZhm19tCi0YpaqKL7VfH06S3TiO1xT5RaoJw_SlMzUkJivoE
-Message-ID: <CA+spn3pSp6ZEnF+Y7_ukirg570QX8Nwa71fPEw=02h3_k3r6jw@mail.gmail.com>
-Subject: Re: [PATCH RFC v2 05/13] hw/virtio/vhost-shadow-virtqueue: specified
- vring placement
-To: Eugenio Perez Martin <eperezma@redhat.com>
-Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
-	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
-	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
-	Mathieu Poirier <mathieu.poirier@linaro.org>, 
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
-	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
-	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
-	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
-	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
-	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
-	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
-	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
-	Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
-	Peter Xu <peterx@redhat.com>, Alyssa Ross <hi@alyssa.is>, 
-	Demi Marie Obenour <demiobenour@gmail.com>
+Mime-Version: 1.0
+X-Mailer: git-send-email 2.55.0.966.g6673acef38-goog
+Message-ID: <20260901213412.1763253-1-changyuanl@google.com>
+Subject: [RFC] Handling 0-sized pseudo-files (cgroupfs/sysfs/procfs) in
+ virtiofs and FUSE
+From: Changyuan Lyu <changyuanl@google.com>
+To: fuse-devel@lists.linux.dev, virtio-fs@lists.linux.dev
+Cc: Miklos Szeredi <miklos@szeredi.hu>, khazhy@google.com, peternewman@google.com, 
+	German Maglione <gmaglione@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, posk@google.com
 Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
 
-On Fri, Aug 28, 2026 at 5:16=E2=80=AFAM Eugenio Perez Martin
-<eperezma@redhat.com> wrote:
->
-> On Tue, Aug 18, 2026 at 7:12=E2=80=AFAM Connor Kite <connorkite@gmail.com=
-> wrote:
-> >
-> > By default svq vrings are placed in an anonymous memory map. As svqs
-> > will be leveraged to enable memory isolation in vhost-user, it is usefu=
-l
-> > to be able to place the vrings in a shared isolation memory region.
-> >
-> > Adds the option to specify vring placement by providing a vring base
-> > address before starting the svq.
-> >
-> > Signed-off-by: Connor Kite <connorkite@gmail.com>
-> > ---
-> >  hw/virtio/vhost-shadow-virtqueue.c | 69 ++++++++++++++++++++++++++++++=
-++------
-> >  hw/virtio/vhost-shadow-virtqueue.h |  8 ++++-
-> >  2 files changed, 66 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/hw/virtio/vhost-shadow-virtqueue.c b/hw/virtio/vhost-shado=
-w-virtqueue.c
-> > index 496e7e58a3..f54a61439a 100644
-> > --- a/hw/virtio/vhost-shadow-virtqueue.c
-> > +++ b/hw/virtio/vhost-shadow-virtqueue.c
-> > @@ -812,6 +812,13 @@ size_t vhost_svq_device_area_size(const VhostShado=
-wVirtqueue *svq)
-> >      return ROUND_UP(used_size, qemu_real_host_page_size());
-> >  }
-> >
-> > +size_t vhost_svq_vring_total_size(VirtIODevice *vdev, VirtQueue *vq)
-> > +{
-> > +    VhostShadowVirtqueue svq;
-> > +    svq.vring.num =3D virtio_queue_get_num(vdev, virtio_get_queue_inde=
-x(vq));
-> > +    return vhost_svq_driver_area_size(&svq) + vhost_svq_device_area_si=
-ze(&svq);
-> > +}
-> > +
-> >  /**
-> >   * Set a new file descriptor for the guest to kick the SVQ and notify =
-for avail
-> >   *
-> > @@ -842,6 +849,19 @@ void vhost_svq_set_svq_kick_fd(VhostShadowVirtqueu=
-e *svq, int svq_kick_fd)
-> >      }
-> >  }
-> >
-> > +/**
-> > + * Set vring base address if using fixed locations
-> > + *
-> > + * @svq: Shadow Virtqueue
-> > + * @addr: Points to new base address
-> > + */
-> > +
-> > + void vhost_svq_set_base_addr(VhostShadowVirtqueue *svq, void *addr)
-> > + {
-> > +    svq->base_addr =3D addr;
-> > + }
-> > +
->
-> Would it work to keep that allocation detail in SVQ, instead of
-> letting it leak outside? Something like a flag to allocate the areas
-> with mmap or qemu_memfd_alloc, instead of the base_addr itself.
->
+Hi all,
 
-For the purposes of the isolation mode as it currently stands, I'm not
-sure the allocation can be entirely hidden without adding significant
-complexity.  The vrings need to be allocated in a region that gets
-sent to the vhost-user backend.  If
-VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS isn't negotiated, then we
-are limited to 8 regions in total, so it is beneficial to be able to
-allocate them all in the same region, and in fact, the vrings are
-currently tacked onto the beginning of one of the bounce buffer
-regions so that they don't count against the limit.
+We have been investigating an issue when sharing host pseudo-filesystems
+(such as /sys/fs/cgroup, /proc, and /sys) into a guest VM via virtiofs.
+For our environment, we would like to provide statistics about the
+enclosing host-level container (such as cgroup metrics) to feed into
+application decisions in the VM guest, for which we would like to pass
+through pseudo-filesystems like /sys/fs/cgroup.
 
-Having said that, a longer term desire would be to update the
-isolation region implementation such that it is no longer organized as
-a 1:1 copy of guest memory in terms of size and number of subregions.
-We would then need an allocator when copying guest buffers into the
-shared region, but it would be much less wasteful, and we could
-guarantee that only 1 region need be sent to the backend for the
-bounce buffers.  At that point, the vrings could be mapped into their
-own region.  There would need to be some mechanism to ensure they all
-get mapped into the same region, but I think those implementation
-details could be kept within SVQ.
+Virtiofs does not support this well today. When guest applications read
+dynamic pseudo-files (for example, /sys/fs/cgroup/cgroup.controllers or
+cgroup.stat), they frequently receive 0 bytes (EOF), even though the host
+file contains live dynamic content.
 
-Thanks!
-Connor
+We would like to discuss our findings and proposed solutions for both
+virtiofsd and the guest kernel FUSE client.
+
+
+1. Problem Analysis
+===================
+
+In Linux, kernel pseudo-files (kernfs, cgroupfs, procfs) report
+st_mode = S_IFREG and st_size = 0 via stat()/statx() because their
+content is generated dynamically on read().
+
+In virtiofsd with the default CachePolicy::Auto mode, open_flags is 0
+(FOPEN_DIRECT_IO is not set). Consequently, the guest kernel routes reads
+through the page cache:
+
+  fuse_file_read_iter()
+    -> fuse_cache_read_iter()
+      -> generic_file_read_iter()  (mm/filemap.c)
+
+In generic_file_read_iter(), the kernel checks:
+  if (iocb->ki_pos >= i_size_read(inode))
+      return 0;
+
+Because inode->i_size is 0, generic_file_read_iter() immediately returns
+0 bytes (EOF) from guest RAM without ever issuing a FUSE_READ request to
+virtiofsd.
+
+
+2. Host Daemon (virtiofsd) Solution
+===================================
+
+To prevent generic_file_read_iter() from truncating reads at i_size == 0,
+the guest must open the file with FOPEN_DIRECT_IO so that reads go through
+fuse_direct_read_iter() and dispatch FUSE_READ to virtiofsd.
+
+However, setting FOPEN_DIRECT_IO unconditionally on all 0-sized files is
+problematic because regular empty files (e.g. touch empty.txt) grown
+while open via ftruncate() may encounter mmap(MAP_SHARED) limitations on
+older kernels without FUSE_DIRECT_IO_ALLOW_MMAP.
+
+In virtiofsd [1], we implemented an automatic detection in
+do_open() and create():
+When a regular file has st_size == 0, virtiofsd inspects the underlying
+host filesystem type using fstatfs64(). If the file resides on a known
+pseudo-filesystem (e.g. CGROUP2_SUPER_MAGIC, CGROUP_SUPER_MAGIC,
+PROC_SUPER_MAGIC, SYSFS_MAGIC, TRACEFS_MAGIC, DEBUGFS_MAGIC,
+SECURITYFS_MAGIC, BPF_FS_MAGIC), virtiofsd sets OpenOptions::DIRECT_IO
+(FOPEN_DIRECT_IO) in the open reply:
+
+  if flags & (libc::O_DIRECTORY as u32) == 0
+      && !opts.contains(OpenOptions::DIRECT_IO)
+      && is_zero_sized_pseudo_file(&file)?
+  {
+      opts |= OpenOptions::DIRECT_IO;
+  }
+
+With this change, standard read() syscalls (e.g. via dd, head, or runtimes)
+in the guest receive FOPEN_DIRECT_IO and successfully read dynamic host
+pseudo-file content.
+
+
+3. Guest Kernel Issue: fuse_splice_read()
+=========================================
+
+Even with FOPEN_DIRECT_IO returned by virtiofsd, utilities that use
+splice()/sendfile() (such as BusyBox cat, GNU cat in certain cases, or cp)
+still fail and return 0 bytes.
+
+Looking at fs/fuse/file.c:fuse_splice_read():
+
+  static ssize_t fuse_splice_read(struct file *in, loff_t *ppos,
+                                  struct pipe_inode_info *pipe, size_t len,
+                                  unsigned int flags)
+  {
+      struct fuse_file *ff = in->private_data;
+
+      /* FOPEN_DIRECT_IO overrides FOPEN_PASSTHROUGH */
+      if (fuse_file_passthrough(ff) && !(ff->open_flags & FOPEN_DIRECT_IO))
+          return fuse_passthrough_splice_read(in, ppos, pipe, len, flags);
+      else
+          return filemap_splice_read(in, ppos, pipe, len, flags);
+  }
+
+Notice that when FOPEN_DIRECT_IO is set, fuse_splice_read() falls back to
+filemap_splice_read() in mm/filemap.c. filemap_splice_read() also checks
+*ppos >= i_size_read() and immediately breaks with 0 bytes spliced.
+
+Other filesystems (such as 9p, ceph, cifs, kernfs) handle direct I/O
+splice reads by delegating to copy_splice_read(), which invokes
+in->f_op->read_iter() (fuse_direct_read_iter).
+
+We propose the following fix for the guest kernel fs/fuse/file.c:
+
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -1884,6 +1884,8 @@ static ssize_t fuse_splice_read(struct file *in, loff_t *ppos,
+ 	/* FOPEN_DIRECT_IO overrides FOPEN_PASSTHROUGH */
+ 	if (fuse_file_passthrough(ff) && !(ff->open_flags & FOPEN_DIRECT_IO))
+ 		return fuse_passthrough_splice_read(in, ppos, pipe, len, flags);
++	else if (ff->open_flags & FOPEN_DIRECT_IO)
++		return copy_splice_read(in, ppos, pipe, len, flags);
+ 	else
+ 		return filemap_splice_read(in, ppos, pipe, len, flags);
+ }
+
+
+Questions for Upstream
+======================
+
+1. For virtiofsd: Does the automatic detection of pseudo-filesystems via
+   fstatfs magic match upstream expectations, or would upstream prefer an
+   explicit configuration option (such as per-path cache policies)?
+2. For the kernel: Does the proposed copy_splice_read() fallback for
+   FOPEN_DIRECT_IO files in fuse_splice_read() look acceptable?
+
+Any feedback and suggestions would be greatly appreciated.
+
+[1] https://gitlab.com/Lencerf/virtiofsd/-/commit/ee9445c7d2963a60e554f8483bd47b7c1634d569
+
+Thanks,
+Changyuan Lyu

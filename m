@@ -1,202 +1,111 @@
-Received: from mail-pl1-f200.google.com (mail-pl1-f200.google.com [209.85.214.200])
+Received: from mail-qt1-f181.google.com (mail-qt1-f181.google.com [209.85.160.181])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 00C4E331EDD
-	for <virtio-fs@lists.linux.dev>; Tue,  1 Sep 2026 21:34:14 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.214.200
-ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1788298456; cv=none; b=IZxrQrEhlxI9sCqzOyOSvUQ1NhOKpQaO0aLKAbNDAD1B+Cy9JS3f+OVOXgQcYA4QQKfa0FKyiqZ1aVSbfmb0XdIYDsGaWV5T2W3pNax4SBfDN1syfYVnARXCJ0Hm80TY5Z7A1h4m41TH/DB/nMJN6zpW3AYSml+ciMtcUBsiAoI=
-ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1788298456; c=relaxed/simple;
-	bh=Ose34srI3hrAxlZZz+7jEVM8bnJ/tOc2D7m3K6ahiJ0=;
-	h=Date:Mime-Version:Message-ID:Subject:From:To:Cc:Content-Type; b=AwfwLCvSrhkrBNzzCmiatB7JAZhWotB2F/hnhps9MPtrTQU0n65T7mL1Q/GCUObEfW7mMN8Mpgn7BT5PK0IOMPOHo0i1PQybWz1FoDG2oXm+UCKJLiQlNAcrZVYQemHzVkj/Zerz5CTRtKChSz3DXcSbRlxCp/UmE/7PgwcF/P4=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com; spf=pass smtp.mailfrom=flex--changyuanl.bounces.google.com; dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b=CZ6J5ajH; arc=none smtp.client-ip=209.85.214.200
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=flex--changyuanl.bounces.google.com
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id BE269352010
+	for <virtio-fs@lists.linux.dev>; Wed,  2 Sep 2026 07:46:10 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.160.181
+ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1788335173; cv=pass; b=TGJMuBuIro8Kg59dfO7ofVbKT0g72fFQOjSn7XNy0PumlFEVoXIIatNmM+sXJPYGxRN6/yzLwVZpCLjAY02YTwCbodt8YkUe30lGmn6pAamB7GN6uyyt8rMeZOGN/teNTBfAFnvM12vYvpVwBz9VbL4WBvY2uNrtXAcnGs3AmqQ=
+ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1788335173; c=relaxed/simple;
+	bh=Ff42/5Zin2A49xGekI+VoPU4wwYez+C35cPmEHD27Io=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=XwYo3l2LMJicl7vvbtyg3Pp54GjjuwegW2Am28B5uYBGHdfG/7n2S2qtyXOCd/hOx/V3SEvEDQBN+fC3ibjF2DnqRm1Wd7Wwe8A8axTiuChY79AI5uf9e788KpyHA3zf9QkItIFFs/Ben0iwlpWIcwDU49iqXfhLDUC7jcKfhzM=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=szeredi.hu; spf=pass smtp.mailfrom=szeredi.hu; dkim=pass (1024-bit key) header.d=szeredi.hu header.i=@szeredi.hu header.b=BewLp586; arc=pass smtp.client-ip=209.85.160.181
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=szeredi.hu
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=szeredi.hu
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b="CZ6J5ajH"
-Received: by mail-pl1-f200.google.com with SMTP id d9443c01a7336-2d6c166bafcso3283545ad.2
-        for <virtio-fs@lists.linux.dev>; Tue, 01 Sep 2026 14:34:14 -0700 (PDT)
+	dkim=pass (1024-bit key) header.d=szeredi.hu header.i=@szeredi.hu header.b="BewLp586"
+Received: by mail-qt1-f181.google.com with SMTP id d75a77b69052e-52d7a3defe8so7308061cf.0
+        for <virtio-fs@lists.linux.dev>; Wed, 02 Sep 2026 00:46:10 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1788335169; cv=none;
+        d=google.com; s=arc-20260327;
+        b=ZNXrzHtyJ5xcqK6GQJ+9do+ufc1P6OI7rnmUoY/zF6+7omkKIaR+u45Ll4jeZ2RfiD
+         O1aV3kDsaW8bU0O+W/3NtRw3e7h9+zOPzuW2TF431jRNDuj/azK46bLoiCKLWqM+7YQf
+         Gs8rJ/i+p3ooLRH7LMXJO+8CCVnTwXf3UcmAVqNJnaRmXU0ttK8dHHjgrfUvGe3TWVdM
+         RwR1nUIwgeQTgE0MrCpWqGppdxgIAzSdqhjWWmHbzGD7C1FI9xeTxQ+DZZm6e8glrWs4
+         Xb67EyEaRHm6BB4p9SOLDnubtccaf7EyHd4RaEjslhYxdPhi0f364cQ6gvbhvk8ctxfX
+         DAAA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=cc:to:subject:message-id:date:from:in-reply-to:references
+         :mime-version:dkim-signature;
+        bh=IvhExhiWnI8V1WRxlxJqXXVBUw3gqvoomsk9oVMgNog=;
+        fh=4RYEem5CTodqtsUEYws2JSXsNwm3HJ7ThofUmNBn0tk=;
+        b=Q528LPCtlCWqMD+kkBHl3IPo+N+B+65Sa1VbaJUyzqOmfcxzWgbWdMJHLSFaMP1ISM
+         j5s8e6VXfMYudXmc4z5rlBD6Trjd2fWT8Hd8T643Mr+pZ4A+jLGGtqAM0abVIrNVTUON
+         Xe0yziO5bNZCbuVXVR0sgqgq2pOCxKmgxZwSeRjHf9J1/3EeAo14D3CKze0/AHh013A6
+         IJI0INkRSh0B8rO0/x3zMDrfbI8UQO7F6TmJFBlbsRa9bkYXxuacjfCsSTONVLZcnd4v
+         Y/nS6uFGE6zbt8ZqGLuvMhfextEsmn7WfL2RWr3dWqr1L3j6Q+vs8m/oZmBe57qqgoCB
+         EIWg==;
+        darn=lists.linux.dev
+ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=google.com; s=20251104; t=1788298454; x=1788903254; darn=lists.linux.dev;
-        h=content-type:cc:to:from:subject:message-id:mime-version:date:from
-         :to:cc:subject:date:message-id:reply-to:content-type;
-        bh=snVEO/sl2HX+PIDOygdJc1iuoXl2isJC1BgiDdwU6RM=;
-        b=CZ6J5ajHHw+ZjtAuF+OMFXV1pzJvf7GzS4RyI/dBPjJstxD1rQma+CIX3gIg1P9OVD
-         WSeFPzoWA5QoTW42LtJybDF+FF15KaveSB8lc8TVlJJMwA1azE1l/uTicHv/ctLXvbN8
-         G2kCuPuRBZ51JhxEf0Kfr9lHE1agB4Yua/LqT3QkUSSJLb+s72Exa/w18IbAU1GhOlEs
-         dyuc+wSUQ1yqk+tfjP/VbuXz4k8q2KPk/kIYevwF1E3BhzWGQI777z17pX+91OM7d1XL
-         w6IO9Gk+YjI73LGsng7Hgp4n3o+HyV0xdJYdLnIqQ/tKZpk+2rzQuUxPqrDD87tnmzGs
-         7yeg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1788298454; x=1788903254;
-        h=content-type:cc:to:from:subject:message-id:mime-version:date
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
+        d=szeredi.hu; s=google; t=1788335169; x=1788939969; darn=lists.linux.dev;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=snVEO/sl2HX+PIDOygdJc1iuoXl2isJC1BgiDdwU6RM=;
-        b=YqApb45uvIdzu96YXL73yokpLcq4jIlqZTSbQWyYVGhtJQREihNssRPtqJZetxrJmm
-         kyUPtcWsIvPlgc97JT9YTikc83C6kLWZ/sark9K6NPTuGCAT9TrQpXn/X+Ei5BFCWre2
-         85/+xtK5WOiWPaCfMwo3pLBZEwHyWs5bUvYHjJzU0bkw1q9obvhKeJhW3txAihJ5CqPi
-         iSGjEfvBlRhRNDj3CAzClPOLDUAAFa7WFwt8Eg/RjULAmggN82/QbMgldMVeNTjUuZf0
-         vb+kYvgGhP7Te+PBl+nfgcgl+TETqxC6WrSSCyIFNyEqrWxfpErQVz9fgL7fQXSv/dX3
-         Sq3A==
-X-Forwarded-Encrypted: i=1; AKwUvBxHmqd6QJrTPpzbTvGrCgESrrDbKUVFqjXE61iYljwg/++jFxBYtc9qO17RlGfFjqClT5+Q8KTf6HQ=@lists.linux.dev
-X-Gm-Message-State: AFuF++l0Oc6VzBs1QRyyPX6gc8r0BkCThUpxGfsChN4evAfGGKZ0Vd3/
-	rEEv0wse+0NDeoMSo9S6YR69VtSGp8kEDBSNiWLhdn9AATAwCBDsQ2UbDSlRalj1JYESB/ewECx
-	0znl5wy6k72ixh4p1MkxM2A==
-X-Received: from dycaa14.prod.google.com ([2002:a05:7301:540e:b0:315:877c:f169])
- (user=changyuanl job=prod-delivery.src-stubby-dispatcher) by
- 2002:a17:90b:5110:b0:38e:97f0:aa4b with SMTP id 98e67ed59e1d1-39ae83dc551mr1602194a91.13.1788298453859;
- Tue, 01 Sep 2026 14:34:13 -0700 (PDT)
-Date: Tue,  1 Sep 2026 14:34:12 -0700
+        bh=IvhExhiWnI8V1WRxlxJqXXVBUw3gqvoomsk9oVMgNog=;
+        b=BewLp5864fLI59deg+/275iAUTRhS+A9MbGn9dCjYfyB+UAKIpbn2gQJOIO0qZY0tX
+         eR6VzsSOAJg7AYrwhirq9+jkuR9ZMlpS6he0OmaxdfL7m94jBXjc4OKi6iJVF2OZBNIu
+         TWnHWHAGeLLPAm+7MSkEo3jNMDGxtAG/BscRE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20251104; t=1788335169; x=1788939969;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:x-gm-gg:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to:content-type;
+        bh=IvhExhiWnI8V1WRxlxJqXXVBUw3gqvoomsk9oVMgNog=;
+        b=aNq+JIPhf6a0T0RSQj/7WlqmSa49n5pcPlS3rb6mEl8kxA7vo2znGwzo68bjhzSYIH
+         VTeizzGreD2sGmCaJ/CyHP2YiQp++U8OrS9C4bhm+bbFthr4xU5o40KI9xibnvrSuZWp
+         rWGNjbhb5csA+G3FpJZW6jAGw3iwRehpgLIyTEksT16T0sWJi1qTg9/1IniQejO7o2dP
+         mdv970/UbErfdWp59KGXj8AbLefmXqZBkxa/uHeVjtBsof6eGzAGR2CU6qHxVsECmsXm
+         BFnYS2b9cegO+yj9yba8zxnz3+4OjLmKYUKIAl94XTC1d0Yf+gGshm4wOZcLcqycnstP
+         Dgng==
+X-Forwarded-Encrypted: i=1; AHgh+RpvGE4eQRjvEcauGn8F7nLrz6OnLtCN7VZ7HltP48njJq1GFEg+tnetZNWD/lcCUXFSrHZF3iryQbo=@lists.linux.dev
+X-Gm-Message-State: AFuF++m4E33U8DDlqWmW4qE55rxob5dzwuhpDvlxSx3powi0e8ggCYUU
+	yDMTPqvy22NR0eK/YJe6CDTN2UtRx+doYujOb2u53GuK6TG/lNFU1GBoKDgB2bOTWLnkgLPtdtU
+	RRI88wGq+wlxyoMNr5VMC5Qi8BbApKbyFS2MXYR8Ifg==
+X-Gm-Gg: AR+sD12sD2/HIPMt+6kZLqnQxem0aBY/n9v88Yv0/iv1fI0prOuGtfGFe6Av67Chhcu
+	bMAZVWbbvi8BXRMu08JCjukxomSrd1rZi7BRNP3qjEAkWrnn4wpGOX15QILRudM8PIU/Efqffgq
+	oW/SMmNTH6R7ppOWrRSFxbfHfCL+5GEKYXTN37t+SndtLS480EaukUDMRRDtWUXnbLALMNkq9ul
+	lmH9jnaHBzxKaWc2+1aQ7PM1F2twIM7Jlv7fzs1fbXasO5PnPTKwtwaA462ptgxEKVSxEcoYHe5
+	UGdNj+Y2iEi8eRE77VAOzZZu8UaBzOfG07SPZqrqSI/GQTcDnbZwbd+Y4QfqxprO/zlc7g8GR2x
+	WZYqy9fK2hhU=
+X-Received: by 2002:a05:622a:14c6:b0:51c:f8f:13d with SMTP id
+ d75a77b69052e-53036d70d07mr26470561cf.37.1788335169278; Wed, 02 Sep 2026
+ 00:46:09 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
-Mime-Version: 1.0
-X-Mailer: git-send-email 2.55.0.966.g6673acef38-goog
-Message-ID: <20260901213412.1763253-1-changyuanl@google.com>
-Subject: [RFC] Handling 0-sized pseudo-files (cgroupfs/sysfs/procfs) in
+MIME-Version: 1.0
+References: <20260901213412.1763253-1-changyuanl@google.com>
+In-Reply-To: <20260901213412.1763253-1-changyuanl@google.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Wed, 2 Sep 2026 09:45:58 +0200
+X-Gm-Features: AcwNN1UFf7VhA4ev-1okF184xxRRDQXQHWQimzIKZ-vmP1OFAqzs-nCx_0ZY4jI
+Message-ID: <CAJfpegtWYP-q82428iHd9gOBkAmoB=mgfGZRs3oi2FiAm3W-yA@mail.gmail.com>
+Subject: Re: [RFC] Handling 0-sized pseudo-files (cgroupfs/sysfs/procfs) in
  virtiofs and FUSE
-From: Changyuan Lyu <changyuanl@google.com>
-To: fuse-devel@lists.linux.dev, virtio-fs@lists.linux.dev
-Cc: Miklos Szeredi <miklos@szeredi.hu>, khazhy@google.com, peternewman@google.com, 
-	German Maglione <gmaglione@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, posk@google.com
+To: Changyuan Lyu <changyuanl@google.com>
+Cc: fuse-devel@lists.linux.dev, virtio-fs@lists.linux.dev, khazhy@google.com, 
+	peternewman@google.com, German Maglione <gmaglione@redhat.com>, 
+	Hanna Czenczek <hreitz@redhat.com>, posk@google.com
 Content-Type: text/plain; charset="UTF-8"
 
-Hi all,
+On Tue, 1 Sept 2026 at 23:34, Changyuan Lyu <changyuanl@google.com> wrote:
 
-We have been investigating an issue when sharing host pseudo-filesystems
-(such as /sys/fs/cgroup, /proc, and /sys) into a guest VM via virtiofs.
-For our environment, we would like to provide statistics about the
-enclosing host-level container (such as cgroup metrics) to feed into
-application decisions in the VM guest, for which we would like to pass
-through pseudo-filesystems like /sys/fs/cgroup.
+> 1. For virtiofsd: Does the automatic detection of pseudo-filesystems via
+>    fstatfs magic match upstream expectations, or would upstream prefer an
+>    explicit configuration option (such as per-path cache policies)?
 
-Virtiofs does not support this well today. When guest applications read
-dynamic pseudo-files (for example, /sys/fs/cgroup/cgroup.controllers or
-cgroup.stat), they frequently receive 0 bytes (EOF), even though the host
-file contains live dynamic content.
+Why not just set "--cache never" for the pseudo fs export?
 
-We would like to discuss our findings and proposed solutions for both
-virtiofsd and the guest kernel FUSE client.
+> 2. For the kernel: Does the proposed copy_splice_read() fallback for
+>    FOPEN_DIRECT_IO files in fuse_splice_read() look acceptable?
 
-
-1. Problem Analysis
-===================
-
-In Linux, kernel pseudo-files (kernfs, cgroupfs, procfs) report
-st_mode = S_IFREG and st_size = 0 via stat()/statx() because their
-content is generated dynamically on read().
-
-In virtiofsd with the default CachePolicy::Auto mode, open_flags is 0
-(FOPEN_DIRECT_IO is not set). Consequently, the guest kernel routes reads
-through the page cache:
-
-  fuse_file_read_iter()
-    -> fuse_cache_read_iter()
-      -> generic_file_read_iter()  (mm/filemap.c)
-
-In generic_file_read_iter(), the kernel checks:
-  if (iocb->ki_pos >= i_size_read(inode))
-      return 0;
-
-Because inode->i_size is 0, generic_file_read_iter() immediately returns
-0 bytes (EOF) from guest RAM without ever issuing a FUSE_READ request to
-virtiofsd.
-
-
-2. Host Daemon (virtiofsd) Solution
-===================================
-
-To prevent generic_file_read_iter() from truncating reads at i_size == 0,
-the guest must open the file with FOPEN_DIRECT_IO so that reads go through
-fuse_direct_read_iter() and dispatch FUSE_READ to virtiofsd.
-
-However, setting FOPEN_DIRECT_IO unconditionally on all 0-sized files is
-problematic because regular empty files (e.g. touch empty.txt) grown
-while open via ftruncate() may encounter mmap(MAP_SHARED) limitations on
-older kernels without FUSE_DIRECT_IO_ALLOW_MMAP.
-
-In virtiofsd [1], we implemented an automatic detection in
-do_open() and create():
-When a regular file has st_size == 0, virtiofsd inspects the underlying
-host filesystem type using fstatfs64(). If the file resides on a known
-pseudo-filesystem (e.g. CGROUP2_SUPER_MAGIC, CGROUP_SUPER_MAGIC,
-PROC_SUPER_MAGIC, SYSFS_MAGIC, TRACEFS_MAGIC, DEBUGFS_MAGIC,
-SECURITYFS_MAGIC, BPF_FS_MAGIC), virtiofsd sets OpenOptions::DIRECT_IO
-(FOPEN_DIRECT_IO) in the open reply:
-
-  if flags & (libc::O_DIRECTORY as u32) == 0
-      && !opts.contains(OpenOptions::DIRECT_IO)
-      && is_zero_sized_pseudo_file(&file)?
-  {
-      opts |= OpenOptions::DIRECT_IO;
-  }
-
-With this change, standard read() syscalls (e.g. via dd, head, or runtimes)
-in the guest receive FOPEN_DIRECT_IO and successfully read dynamic host
-pseudo-file content.
-
-
-3. Guest Kernel Issue: fuse_splice_read()
-=========================================
-
-Even with FOPEN_DIRECT_IO returned by virtiofsd, utilities that use
-splice()/sendfile() (such as BusyBox cat, GNU cat in certain cases, or cp)
-still fail and return 0 bytes.
-
-Looking at fs/fuse/file.c:fuse_splice_read():
-
-  static ssize_t fuse_splice_read(struct file *in, loff_t *ppos,
-                                  struct pipe_inode_info *pipe, size_t len,
-                                  unsigned int flags)
-  {
-      struct fuse_file *ff = in->private_data;
-
-      /* FOPEN_DIRECT_IO overrides FOPEN_PASSTHROUGH */
-      if (fuse_file_passthrough(ff) && !(ff->open_flags & FOPEN_DIRECT_IO))
-          return fuse_passthrough_splice_read(in, ppos, pipe, len, flags);
-      else
-          return filemap_splice_read(in, ppos, pipe, len, flags);
-  }
-
-Notice that when FOPEN_DIRECT_IO is set, fuse_splice_read() falls back to
-filemap_splice_read() in mm/filemap.c. filemap_splice_read() also checks
-*ppos >= i_size_read() and immediately breaks with 0 bytes spliced.
-
-Other filesystems (such as 9p, ceph, cifs, kernfs) handle direct I/O
-splice reads by delegating to copy_splice_read(), which invokes
-in->f_op->read_iter() (fuse_direct_read_iter).
-
-We propose the following fix for the guest kernel fs/fuse/file.c:
-
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -1884,6 +1884,8 @@ static ssize_t fuse_splice_read(struct file *in, loff_t *ppos,
- 	/* FOPEN_DIRECT_IO overrides FOPEN_PASSTHROUGH */
- 	if (fuse_file_passthrough(ff) && !(ff->open_flags & FOPEN_DIRECT_IO))
- 		return fuse_passthrough_splice_read(in, ppos, pipe, len, flags);
-+	else if (ff->open_flags & FOPEN_DIRECT_IO)
-+		return copy_splice_read(in, ppos, pipe, len, flags);
- 	else
- 		return filemap_splice_read(in, ppos, pipe, len, flags);
- }
-
-
-Questions for Upstream
-======================
-
-1. For virtiofsd: Does the automatic detection of pseudo-filesystems via
-   fstatfs magic match upstream expectations, or would upstream prefer an
-   explicit configuration option (such as per-path cache policies)?
-2. For the kernel: Does the proposed copy_splice_read() fallback for
-   FOPEN_DIRECT_IO files in fuse_splice_read() look acceptable?
-
-Any feedback and suggestions would be greatly appreciated.
-
-[1] https://gitlab.com/Lencerf/virtiofsd/-/commit/ee9445c7d2963a60e554f8483bd47b7c1634d569
+Yes, in fact this patch has been sitting in my local tree for a week.
+ Pushed out now, updated with a link to this report as well.
 
 Thanks,
-Changyuan Lyu
+Miklos

@@ -1,205 +1,126 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+Received: from mail-qk1-f172.google.com (mail-qk1-f172.google.com [209.85.222.172])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 3A6C035201E
-	for <virtio-fs@lists.linux.dev>; Wed,  2 Sep 2026 08:25:02 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id EB37B3B3BF3
+	for <virtio-fs@lists.linux.dev>; Wed,  2 Sep 2026 19:35:05 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=209.85.222.172
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1788337504; cv=none; b=rBCNFZRoPCPtE61bdH0hCNJGyQgFJq9k6jXwHGGQ0mo3eMhXDwidNuaoVcG3mV7TGbcQ9n2foMU1fFj1K0/w4IX9/3/fMEHXjhxDdO1BaeB/FhodaFM4MLCG0JgwIwkEwxZlA2VBRpY7wOu4pgmeHBv5bMpzz1xZi5fbuFOOJUY=
+	t=1788377712; cv=none; b=ljVa2swCwYVLbKmpPMV2u5Zdl0R+7pIXvIP5quS1SBgFPsv0CLHo3KBu6hN/l/JHPOzIcth5aU3xBAOsxar3iU44wRpo565beaOfSJkwqmgp6o3NwCFJfsHDrfPZvaTLBMJfZf2Z8w5tsCtjLWUwcreVQEkjfm6x+3sI3MPI4FA=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1788337504; c=relaxed/simple;
-	bh=qLk48G2PhAkYDNfkfYjf02uvSevvadhGP5DVjOq6b8E=;
+	s=arc-20240116; t=1788377712; c=relaxed/simple;
+	bh=BvdDyPUvlOpdi9wnTRyO+uo5N4XFvGV8H4S7yy3KuIQ=;
 	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=dLyZW+kOgbhP5mcWlj1LeF6RrxzhevkrOniWf1VN0ABn6ThHJ7B4jUDw7TOan0q7b1cWY+Vs8eBriAQG4N/hAyp/mn4qeIx3/LIvxfYDn8q//rCQ4rcB286nV1vo9QmYSNIYuvOzAnn9Tt8oA/xXTvofeLFxQZOYSz6kd53lPFU=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=Bd7KCmvq; arc=none smtp.client-ip=170.10.133.124
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
+	 To:Cc:Content-Type; b=naIyjN/SWotVrT/OGHlG65c0PldnLwdgMfTfK0RrFqWE5pDtn+WIIkt7DheAfHEV4+GodBOW/zJONo7GF7iHRiMfILzNCzSmunib9MZQ5d9hRb/u518zNNx1XP5cd+w4zwfcAu49wNSNfOtKcGUW77VKTSTjB8QEs4cK4cyMDzU=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=chromium.org; spf=pass smtp.mailfrom=chromium.org; dkim=pass (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b=DS+R64jP; arc=none smtp.client-ip=209.85.222.172
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=chromium.org
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=chromium.org
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="Bd7KCmvq"
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1788337502;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	 content-transfer-encoding:content-transfer-encoding:
-	 in-reply-to:in-reply-to:references:references;
-	bh=XLuwEcoYlZMRIp51yDsHxNP7hpRb1BmADwZOEKjwdQE=;
-	b=Bd7KCmvqFPoQ+WdLfuumCVq6MGWGE276eh8LGDlwOFAnmnixixMmLjz+DHIo4EQ22zPe+m
-	jTOM606uWvLXrBYvRmFaOYZZ6qinFwGGjIe3QHRxH8LyWQ7MEcrczgywz2E/7njtVZPBuN
-	Qvz8x7c6nwOI0EPJQ19pBfBdWR4cJLk=
-Received: from mail-yw1-f198.google.com (mail-yw1-f198.google.com
- [209.85.128.198]) by relay.mimecast.com with ESMTP with STARTTLS
- (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-472-vjZW9jtUPdiaVCaPUcVioQ-1; Wed, 02 Sept 2026 04:25:00 -0400
-X-MC-Unique: vjZW9jtUPdiaVCaPUcVioQ-1
-X-Mimecast-MFC-AGG-ID: vjZW9jtUPdiaVCaPUcVioQ_1788337500
-Received: by mail-yw1-f198.google.com with SMTP id 00721157ae682-836c9f68dcbso14227557b3.0
-        for <virtio-fs@lists.linux.dev>; Wed, 02 Sep 2026 01:25:00 -0700 (PDT)
+	dkim=pass (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="DS+R64jP"
+Received: by mail-qk1-f172.google.com with SMTP id af79cd13be357-93903d81a82so146693685a.2
+        for <virtio-fs@lists.linux.dev>; Wed, 02 Sep 2026 12:35:05 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=chromium.org; s=google; t=1788377702; x=1788982502; darn=lists.linux.dev;
+        h=content-transfer-encoding:content-type:cc:to:subject:message-id
+         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
+         :date:message-id:reply-to:content-type;
+        bh=CZzpxxPA75w/wx7lhKvy8pkZXTVKN6GbmCrT4ENXQUA=;
+        b=DS+R64jPIsZNELGcaAECY59L6Gwjgu+BnlhUdtFAsiJFwKiaPV8V8OiWx2NQ6LaNxt
+         8gmiYbto80yn0lo6z14rJ7a9ySzJtsHv7LZejz5rf109HdWKef01VhUOk13d4D7uteFp
+         VohEk0sakBSsfRA8YW47FHzO6vnqGpq5+LpRk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1788337500; x=1788942300;
+        d=1e100.net; s=20251104; t=1788377702; x=1788982502;
         h=content-transfer-encoding:content-type:cc:to:subject:message-id
          :date:from:in-reply-to:references:mime-version:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=XLuwEcoYlZMRIp51yDsHxNP7hpRb1BmADwZOEKjwdQE=;
-        b=ew0AfIwq2zSJCd1D2xF9hAYGOco3cZUoxA875V1sk72S0jRJYXyFqq3mpojjLLCUNS
-         vS0jcaAAipqSL6z60bnUVadEgGV9cVLCLHk7j8wbVnJf9GJlseyNGp1t5+K0d5mFtY4j
-         Cbku1oK7eO9C3y+wJ5uzPTlI0Xm93pdsSq2Zm3JqzMq413mWwin5GXKNF08WFm5Dktr4
-         JrLqpIsVpdw0BQJq0OFlTN9Z03xFDryjaYawKFEdKzrnSHReOLQufkCfSw47FB/H80ob
-         bf68l/SD2QObMVCgpTPXX8vV1SmR5M4lazU1EfB9UCppGb5OlV5agP37mSQxsVbHV+5h
-         Dslg==
-X-Forwarded-Encrypted: i=1; AKwUvByQAMiCNhtHZceh1gfe5b6NZh6rdkGkr0gd+WU72/OoCD2ewltCWZYEaoptQtfVex5HCDNoxjfGC1A=@lists.linux.dev
-X-Gm-Message-State: AFuF++kHug24bA6Tp74HH0XfJN7mXxvSEbwlo0rokMDmTLJQIjw9nVmE
-	nU5qOCYISHHuqN5X/nxaKQPDLkoHxnNFgmku1k3SLr2A2BFyDxJkpJu6bzpfeXQfNRJAvFq/NDU
-	ZV3RgiWk3hIJEt/gyIoHrHrx+Shbq7fNI/vKojz8wylJ1bSdt1DffyoNtwz4XY2Bk3/IR0Mw0ms
-	71EN2RBoqiQUOsHUY8B672/wYel22M1vR8RErO
-X-Gm-Gg: AYBFou1mZT9/kOUHxTHVHiJUrTna6Tij2LaWqqw7057i/Vn+L1Zjto2vxD9PKMkCb0q
-	fiyg7K57xpHdgNbjS04h4FrMO4yQHYBb5v4ZMIpReFJhNB8Qp1JiT+2gd3iQxk6sXEz1fb29Cpu
-	jWhq32nDgpjqIDagznp3fuFg+MUznkVoWgd1q9qkXJj1580QyK/Y+D3Fj92D/5WLR5uRi2+0MyY
-	c5lOq7KxfEiRhbLiUEW5hlyNTsawwdTEwm0QSSzD+dV/2lBBV+jZrNRwYI=
-X-Received: by 2002:a05:690c:85:b0:81e:abe2:e01b with SMTP id 00721157ae682-86c54546feamr14084437b3.26.1788337499939;
-        Wed, 02 Sep 2026 01:24:59 -0700 (PDT)
-X-Received: by 2002:a05:690c:85:b0:81e:abe2:e01b with SMTP id
- 00721157ae682-86c54546feamr14084257b3.26.1788337499500; Wed, 02 Sep 2026
- 01:24:59 -0700 (PDT)
+        bh=CZzpxxPA75w/wx7lhKvy8pkZXTVKN6GbmCrT4ENXQUA=;
+        b=diC5e7zjb7KV7pvYaP6BjbhOq2D41Zf+0/GjXJJeAeqiv1395+Qa5OGCFMfr/94J80
+         l8gln4myA5bNzqSMS5zL2RZ5zz8614GVhX4HMbPKLw7CEpkGD6ESmK2I8dDl3rl40d4M
+         yQmL08/isnLEU+S5U1gK5gjumqiKDRQd+FKEHiNLBLSOLQkG0s20f0gbGY4SBcp9sfZV
+         eO5xCvQMZUaarVPDOI0gAEiP3bxecY+f17TKNGa8ct/HsgOIL8dzbSuEC/GwYwe9I4CI
+         0N9T7pMJFCkClkPq7ub/VdyQlO36BBk3i1N5NpytS0z4oPw1FAU3ekxLZtH8+67kwMcr
+         dkZA==
+X-Forwarded-Encrypted: i=1; AKwUvBzhc54xAYOyLTiKLd1mhhAjwjzUY8ROcNExvgH7IVrn5Vz3keL9KP0BZOOLaTonC2cbd+/d8ubLQHI=@lists.linux.dev
+X-Gm-Message-State: AFuF++mx98mPiPBScI3uiXQxCxrxw1fHdu3hn6OkqDPDeNRo4pVtuLLr
+	1GhF6KJQ4SaWYrekjbSR/pH4U4+YBMinMIprMClyCfC8Fj8BJNLvSldLMqpbxOvfEoZL7orUlbh
+	4ctJeEw==
+X-Gm-Gg: AYBFou32MvIb3LMObtbp/b+16Wkp954CKH1xqZICSe9OeFCGbUIeENts9DooY8TTFHB
+	xyIQCVhspcE+OUi2MaFdq3bfdBBmPSc0EjGuuT+DbhNNQFCUdTrT1+yQ6FlCnwo96lHxPio5fK0
+	nJTpn5j3hYmZdfI/pBgRYSHS7g7ML0lcds1HAbPq61y9+GQCFNMvyBeFDVDMMdqOAgF41ub6UCu
+	/SU9x6uBkXBV9sj4LXrs25drC2nWnvQBCa1gbX0xFbbZA+Mo1FceTE9EFDSJl1IP7vO4bTTMSDf
+	jT3lkKw8yTQk/ff8iB3CZ1naAUkl4K54OXm8IO95GeIkYKA3rF/5PevwTlTJeBCKN7ykdq0ubLp
+	amq5H+B+3RD03RhqDCl7WGW2/fJer2Z0jfMD9zonWoXuy/zqpDnAWdq9H1yDG8KzQk0GOrj8YER
+	xrkZRRe2kAC1mZJurFr2Pf5btiZeu0slQPVk+NkPJzKMnmOSn24Cd7TJD2fqohAIM/72GtVJizN
+	rrxcm7xU/q9GiNZlJ+sQ8eHNg==
+X-Received: by 2002:a05:620a:19aa:b0:939:31b5:4e08 with SMTP id af79cd13be357-939608a7d9cmr871741285a.0.1788377701845;
+        Wed, 02 Sep 2026 12:35:01 -0700 (PDT)
+Received: from mail-qk2-f12.google.com (mail-qk2-f12.google.com. [74.125.230.204])
+        by smtp.gmail.com with ESMTPSA id af79cd13be357-9395f361042sm291937685a.26.2026.09.02.12.35.01
+        for <virtio-fs@lists.linux.dev>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Wed, 02 Sep 2026 12:35:01 -0700 (PDT)
+Received: by mail-qk2-f12.google.com with SMTP id d75a77b69052e-52e3de6309cso185831cf.1
+        for <virtio-fs@lists.linux.dev>; Wed, 02 Sep 2026 12:35:01 -0700 (PDT)
+X-Forwarded-Encrypted: i=1; AKwUvBxIAKBmzFqat7VWeTcD+1TzgazwI1DhvyNTdAUIT2Ry5bkrS+gLl1mhfVzvho7/mrX1IpQqAm8b1GY=@lists.linux.dev
+X-Received: by 2002:a05:622a:22a1:b0:52e:2243:6292 with SMTP id
+ d75a77b69052e-53043cb05d3mr3477651cf.2.1788377700377; Wed, 02 Sep 2026
+ 12:35:00 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-5-948aae960abb@gmail.com>
- <CAJaqyWcO3bSakzykPr-p=eBrqntNaTdUuvZdo2-B_DVxrt6wjw@mail.gmail.com> <CA+spn3pSp6ZEnF+Y7_ukirg570QX8Nwa71fPEw=02h3_k3r6jw@mail.gmail.com>
-In-Reply-To: <CA+spn3pSp6ZEnF+Y7_ukirg570QX8Nwa71fPEw=02h3_k3r6jw@mail.gmail.com>
-From: Eugenio Perez Martin <eperezma@redhat.com>
-Date: Wed, 2 Sep 2026 10:24:21 +0200
-X-Gm-Features: AcwNN1VFs3JiV82m8NsHxkJ5WoGL26ISmwsJoyVHQSjMN_WVexonJK0rZLR1tLI
-Message-ID: <CAJaqyWfeMEznFZvJwNXVD=01=u7Mk-4qJZ1LChPGFgUh3TrOqA@mail.gmail.com>
-Subject: Re: [PATCH RFC v2 05/13] hw/virtio/vhost-shadow-virtqueue: specified
- vring placement
-To: Connor Kite <connorkite@gmail.com>
-Cc: qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, 
-	Stefano Garzarella <sgarzare@redhat.com>, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, 
-	Viresh Kumar <viresh.kumar@linaro.org>, Gerd Hoffmann <kraxel@redhat.com>, 
-	Mathieu Poirier <mathieu.poirier@linaro.org>, 
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>, 
-	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, 
-	=?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, 
-	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, 
-	Stefan Hajnoczi <stefanha@redhat.com>, Milan Zamazal <mzamazal@redhat.com>, 
-	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>, 
-	Dmitry Osipenko <dmitry.osipenko@collabora.com>, qemu-block@nongnu.org, 
-	virtio-fs@lists.linux.dev, "Gonglei (Arei)" <arei.gonglei@huawei.com>, 
-	zhenwei pi <zhenwei.pi@linux.dev>, =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>, 
-	Eric Blake <eblake@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowangio@gmail.com>, 
-	Peter Xu <peterx@redhat.com>, Alyssa Ross <hi@alyssa.is>, 
-	Demi Marie Obenour <demiobenour@gmail.com>
-X-Mimecast-Spam-Score: 0
-X-Mimecast-MFC-PROC-ID: M3ZJUvopgliU3HlJHrVVxZnzABTBRqwrH1OwDuOrD2Q_1788337500
-X-Mimecast-Originator: redhat.com
+References: <20260901213412.1763253-1-changyuanl@google.com> <CAJfpegtWYP-q82428iHd9gOBkAmoB=mgfGZRs3oi2FiAm3W-yA@mail.gmail.com>
+In-Reply-To: <CAJfpegtWYP-q82428iHd9gOBkAmoB=mgfGZRs3oi2FiAm3W-yA@mail.gmail.com>
+From: Khazhy Kumykov <khazhy@chromium.org>
+Date: Wed, 2 Sep 2026 12:34:49 -0700
+X-Gmail-Original-Message-ID: <CACGdZYK7wk0fMz7v7K_HSBfJvOYRmpWvaeNF8fBfU=j041gYuA@mail.gmail.com>
+X-Gm-Features: AcwNN1X1Mg4LYCUjdd1XdfvBEc5eboyV6sEgS52Rgi2jqZ-kCC6ZRG_IJMk3rMs
+Message-ID: <CACGdZYK7wk0fMz7v7K_HSBfJvOYRmpWvaeNF8fBfU=j041gYuA@mail.gmail.com>
+Subject: Re: [RFC] Handling 0-sized pseudo-files (cgroupfs/sysfs/procfs) in
+ virtiofs and FUSE
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: Changyuan Lyu <changyuanl@google.com>, fuse-devel@lists.linux.dev, 
+	virtio-fs@lists.linux.dev, peternewman@google.com, 
+	German Maglione <gmaglione@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, posk@google.com
 Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Sep 1, 2026 at 9:10=E2=80=AFPM Connor Kite <connorkite@gmail.com> w=
-rote:
+On Wed, Sep 2, 2026 at 12:46=E2=80=AFAM Miklos Szeredi <miklos@szeredi.hu> =
+wrote:
 >
-> On Fri, Aug 28, 2026 at 5:16=E2=80=AFAM Eugenio Perez Martin
-> <eperezma@redhat.com> wrote:
-> >
-> > On Tue, Aug 18, 2026 at 7:12=E2=80=AFAM Connor Kite <connorkite@gmail.c=
-om> wrote:
-> > >
-> > > By default svq vrings are placed in an anonymous memory map. As svqs
-> > > will be leveraged to enable memory isolation in vhost-user, it is use=
-ful
-> > > to be able to place the vrings in a shared isolation memory region.
-> > >
-> > > Adds the option to specify vring placement by providing a vring base
-> > > address before starting the svq.
-> > >
-> > > Signed-off-by: Connor Kite <connorkite@gmail.com>
-> > > ---
-> > >  hw/virtio/vhost-shadow-virtqueue.c | 69 ++++++++++++++++++++++++++++=
-++++------
-> > >  hw/virtio/vhost-shadow-virtqueue.h |  8 ++++-
-> > >  2 files changed, 66 insertions(+), 11 deletions(-)
-> > >
-> > > diff --git a/hw/virtio/vhost-shadow-virtqueue.c b/hw/virtio/vhost-sha=
-dow-virtqueue.c
-> > > index 496e7e58a3..f54a61439a 100644
-> > > --- a/hw/virtio/vhost-shadow-virtqueue.c
-> > > +++ b/hw/virtio/vhost-shadow-virtqueue.c
-> > > @@ -812,6 +812,13 @@ size_t vhost_svq_device_area_size(const VhostSha=
-dowVirtqueue *svq)
-> > >      return ROUND_UP(used_size, qemu_real_host_page_size());
-> > >  }
-> > >
-> > > +size_t vhost_svq_vring_total_size(VirtIODevice *vdev, VirtQueue *vq)
-> > > +{
-> > > +    VhostShadowVirtqueue svq;
-> > > +    svq.vring.num =3D virtio_queue_get_num(vdev, virtio_get_queue_in=
-dex(vq));
-> > > +    return vhost_svq_driver_area_size(&svq) + vhost_svq_device_area_=
-size(&svq);
-> > > +}
-> > > +
-> > >  /**
-> > >   * Set a new file descriptor for the guest to kick the SVQ and notif=
-y for avail
-> > >   *
-> > > @@ -842,6 +849,19 @@ void vhost_svq_set_svq_kick_fd(VhostShadowVirtqu=
-eue *svq, int svq_kick_fd)
-> > >      }
-> > >  }
-> > >
-> > > +/**
-> > > + * Set vring base address if using fixed locations
-> > > + *
-> > > + * @svq: Shadow Virtqueue
-> > > + * @addr: Points to new base address
-> > > + */
-> > > +
-> > > + void vhost_svq_set_base_addr(VhostShadowVirtqueue *svq, void *addr)
-> > > + {
-> > > +    svq->base_addr =3D addr;
-> > > + }
-> > > +
-> >
-> > Would it work to keep that allocation detail in SVQ, instead of
-> > letting it leak outside? Something like a flag to allocate the areas
-> > with mmap or qemu_memfd_alloc, instead of the base_addr itself.
-> >
+> On Tue, 1 Sept 2026 at 23:34, Changyuan Lyu <changyuanl@google.com> wrote=
+:
 >
-> For the purposes of the isolation mode as it currently stands, I'm not
-> sure the allocation can be entirely hidden without adding significant
-> complexity.  The vrings need to be allocated in a region that gets
-> sent to the vhost-user backend.  If
-> VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS isn't negotiated, then we
-> are limited to 8 regions in total, so it is beneficial to be able to
-> allocate them all in the same region, and in fact, the vrings are
-> currently tacked onto the beginning of one of the bounce buffer
-> regions so that they don't count against the limit.
+> > 1. For virtiofsd: Does the automatic detection of pseudo-filesystems vi=
+a
+> >    fstatfs magic match upstream expectations, or would upstream prefer =
+an
+> >    explicit configuration option (such as per-path cache policies)?
 >
+> Why not just set "--cache never" for the pseudo fs export?
 
-Ok I see. Would it work if those details are encapsulated in a new
-struct, perhaps named SVQDeviceMemory, which all ShadowVirtQueue from
-a given device uses to allocate all memory together? It could use that
-explanation as a comment too.
+Enabling caching does give a pretty noticeable performance improvement
+for those files that can be cached, and we'd like to have just a
+single export instead of setting up multiple and assembling it
+piecemeal. (To this end we do have an out-of-tree extension to the
+virtiofsd-rs passthrough module to allow changing caching duration on
+a per file basis as the protocol allows..., been meaning to start a
+thread if folks are interested in this since it has proven somewhat
+useful for us now).
 
-I'm very bad at naming things so feel free to rename it :).
+But I felt having first class support for this felt more "right" -
+enabling caching shouldn't break reading of certain files, and the
+server is in a position to know if a file would support this or not.
 
-> Having said that, a longer term desire would be to update the
-> isolation region implementation such that it is no longer organized as
-> a 1:1 copy of guest memory in terms of size and number of subregions.
-> We would then need an allocator when copying guest buffers into the
-> shared region, but it would be much less wasteful, and we could
-> guarantee that only 1 region need be sent to the backend for the
-> bounce buffers.  At that point, the vrings could be mapped into their
-> own region.  There would need to be some mechanism to ensure they all
-> get mapped into the same region, but I think those implementation
-> details could be kept within SVQ.
+khazhy
 >
-
-That would be great, and the work on optimizing SVQ indirect
-descriptors could use it too.
-
+> > 2. For the kernel: Does the proposed copy_splice_read() fallback for
+> >    FOPEN_DIRECT_IO files in fuse_splice_read() look acceptable?
+>
+> Yes, in fact this patch has been sitting in my local tree for a week.
+>  Pushed out now, updated with a link to this report as well.
+>
+> Thanks,
+> Miklos

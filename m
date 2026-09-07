@@ -1,143 +1,163 @@
-Received: from mail-qv1-f54.google.com (mail-qv1-f54.google.com [209.85.219.54])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+Received: from forwardcorp1d.mail.yandex.net (forwardcorp1d.mail.yandex.net [178.154.239.200])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id E3994369D51
-	for <virtio-fs@lists.linux.dev>; Thu,  3 Sep 2026 06:02:28 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=209.85.219.54
-ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1788415351; cv=pass; b=d2zwSBdJELrOZ0sxkywcItCR+sNWRjaND9ChqTuoYitbgOR+gstG17FqTUnGt1eQL6SfdwZKRe89PtyjoOv/Q53xHbWS76FYXmXj2JVSxg02ojkJLkH7ga712fB55Q8KFjrG16conDZ+XftlcrgDGyMksfUzgIiaVCzNNgHP/4s=
-ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1788415351; c=relaxed/simple;
-	bh=MqCVsIXApH5rSZl9riM2RDiGAEQhKGYbfZVh9vQvGRk=;
-	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
-	 To:Cc:Content-Type; b=EYK1eDlAj65cno3cy5WSbsyHcPPzKZq2C/hK+tEHk8j9WH0P70XMtHf6lT3C9gE/Z0QvVSDrPJ0aqw0rhaqzsSpZi/94fNv865nUzTYYhAr+GyY/DaWbdfWe/dynxNUbKXNa6fWgmR3Vls2wMoC8LpvhVm398u3zcv6VuBjsB1Q=
-ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=szeredi.hu; spf=pass smtp.mailfrom=szeredi.hu; dkim=pass (1024-bit key) header.d=szeredi.hu header.i=@szeredi.hu header.b=qU5AqwbP; arc=pass smtp.client-ip=209.85.219.54
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=szeredi.hu
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=szeredi.hu
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A83F94964F
+	for <virtio-fs@lists.linux.dev>; Mon,  7 Sep 2026 09:38:35 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=178.154.239.200
+ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1788773921; cv=none; b=QjCZqPlFCNfZljdQYiK/0lkgN9xOfzPXi9BkCwHNfNf2nrgqm8R30CuAKrTX1tcbwRdyVDC1h4dqEifn56sNUGz4ywj0qJoyNZHrDOAVBV0IDraj6idAa9I7syvwOnYoPCt+eogmrAYPD12nB0984/n1A33kPUVxkiz65hfX1D0=
+ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1788773921; c=relaxed/simple;
+	bh=vQA+graD/r4uDH9noGfhMoNm0XDkUtu30WIGpzrxvbw=;
+	h=Message-ID:Date:MIME-Version:Subject:From:To:Cc:References:
+	 In-Reply-To:Content-Type; b=YvjcxKE/5/U0xR2bhLJV2uhyKDccHrgZxdQS/EIb+xVANmzd8wjYvtQMsdKI843u8xUvLUGWYEHuCcG2fuJV8TceKJh+jfb2B4OjBvlwrbZtmPnMr/XrnbkDnh8KBeL0CBSanRSQOL67BWwhD4l2HI8V5DDXasCCUERbNiBqz38=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru; spf=pass smtp.mailfrom=yandex-team.ru; dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b=LbhKpA3j; arc=none smtp.client-ip=178.154.239.200
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=yandex-team.ru
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=yandex-team.ru
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=szeredi.hu header.i=@szeredi.hu header.b="qU5AqwbP"
-Received: by mail-qv1-f54.google.com with SMTP id 6a1803df08f44-90cc107c451so12650376d6.0
-        for <virtio-fs@lists.linux.dev>; Wed, 02 Sep 2026 23:02:28 -0700 (PDT)
-ARC-Seal: i=1; a=rsa-sha256; t=1788415347; cv=none;
-        d=google.com; s=arc-20260327;
-        b=gkp4SkbyiMioZcigtXp4xf2gMskBQvR7og0uoCuJUxQlJe/qR63mJhRLJIjnml5qjb
-         kaCf1Vl6q2kOqTRpGoCVmskmNRoqhPIltKfrfgPbVxkqxWthP3QrBZHw6L/yMSV2/3A1
-         XNPflrK2q6eKq2lk9Ub8o1fEVrpg85rpF5xZd6aaR2E2e4mBO6OfT7y5Wh+S9SCbEXW8
-         kJ//xZgSQvTRsCYYqAXWcxbyG3f1tzrADPr0fIXko0dwltPaaErSA4PDccKUYo9IXWRO
-         7JfAnhuvnn5WH0rrxczykziOl5E6xj0MsN0iPQFD5dFBfqhDAxRPW5UhJ9IKZobBT+gg
-         KbQw==
-ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
-        h=content-transfer-encoding:cc:to:subject:message-id:date:from
-         :in-reply-to:references:mime-version:dkim-signature;
-        bh=g1yu7nHtD7hEUEB0dyUurj+KKcQHD9tfZrm0XNASdrI=;
-        fh=A5o/U0tcLYVrQwFLSrEqtuDqKSwSSpnBIjGkz4Olxx4=;
-        b=jDpSO8UHbbbkhHWwt2lHIQb8KdXyE/nWSdEXhkAIPS5A0mLYoSGa2S634/5Y99DMVx
-         FPxIGdOaE/vYkOBpZN732xNUtnGPy+lVfD0+wE4jwpcIYQyenxa929kxmPptOBr3lVNc
-         I3XIURDTRVDfqsM2TgjBvTe7su/Nn1VY4pkCoyc46tqluwFww7P9xQF4xH4xSRkdWWxG
-         RO7Cy4X33sShFvFgOLervebF6t2ZiO7wkvdwpJx4XFaxfr3fNYq2bWLh9V3ysGRSbeCU
-         WmiRiUV6BoQWgoLggihUg6t/FrJmgEmLWQtqqgEfVjr6yrxrGIokmAAc5Qg8kNwzqKf0
-         bBdw==;
-        darn=lists.linux.dev
-ARC-Authentication-Results: i=1; mx.google.com; arc=none
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=szeredi.hu; s=google; t=1788415347; x=1789020147; darn=lists.linux.dev;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
-         :date:message-id:reply-to:content-type;
-        bh=g1yu7nHtD7hEUEB0dyUurj+KKcQHD9tfZrm0XNASdrI=;
-        b=qU5AqwbPY044LP9Rm0tNf9c3ZViphwEOdMxc6W9W8QofdUCkby5Qv6G+g8yq4aNv5N
-         SpnQmmg9RdCsTD1dDcr3oYIOByCjECflNsb2zXU5CZDtcEvkSTv/HGSgDZemBu4YDxxA
-         jDcvIXNGQnW8o/BszHpb0ESaobO9djuLNRfzE=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1788415347; x=1789020147;
-        h=content-transfer-encoding:content-type:cc:to:subject:message-id
-         :date:from:in-reply-to:references:mime-version:x-gm-gg
-         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
-         :content-type;
-        bh=g1yu7nHtD7hEUEB0dyUurj+KKcQHD9tfZrm0XNASdrI=;
-        b=YV3D3tvQpTmKZctie/K2tQfl4RGHm7RgKfIfARF/YOR2iPu7t8BxxLFuM7coRUUzKe
-         HXAB5o7vI4r4qJfyBghXxUhQQgS5oZNrMmz+99HX/DeQ8ijDFcMjPQiIF2pSFjGgFtiN
-         E3CWNp+Ztz6JFibKPbrMCfSEpa+IPWpHUecdiQnn0HGD7ySWFwF15eMY1GCPWICknvgs
-         RvIm+372sHLEtyQu/g5Rby/TZK/caYtGCDob1+09jpl4NVo7QIz5hEFSdf5b8zi0xucL
-         4qxshRScN1h2t5U5EkR+DqkL9vEwZhuS0feFa40bl7n44AkoOLbb9pY7XUH7aviKqABB
-         +qWA==
-X-Forwarded-Encrypted: i=1; AKwUvBywidPYyTS0esQJVva8eTj4XEs1AY4XIfDGPMN8OLEtZqiWG1hRRCCr2bITr0YlKN1Bzj1AGlwjgYQ=@lists.linux.dev
-X-Gm-Message-State: AFuF++lf9ejts1BzaPsX07YbqH2N6DuRE0UfeWs4uKNa1IIeiddDZAXN
-	ttCXCvy0daFnCRmX3BRAp4FFA3KEQixjN3IxMF5LnFSDtIaLFbeW8vgL7I26nM37XEmKMzLwxrm
-	BKcjewZTyVUSlCzzxg5a4A2JuI1FhEOG5k5ujCEQrkw==
-X-Gm-Gg: AYBFou1dhqKrcXBQl7Q0vWdQ0uWvHig/Z22QXkuX78cYexQG3ld7oKi6gDBoyONhgyY
-	Du9IYYBR/LLVerWTQXiyqHoIhenCVH0pj2O+3LosmDw/lhIhJQPBOwM06ujkTxLD0HN3oOIMkCo
-	bOjXdBag0WJs4skgft6gzAPxDV9jRIF40dHvbQAu6pMQ6ycbqKyJuoz6h2KgasGydMk8tx4YzWp
-	o7GC/v/BkkR7FrmoJ/ZSQy/xwM40pWzAd3VlzHPISKJq0gENk0HcTdPjO+WpMW8TVM2Os9onVVv
-	jjm8QZgy7RPMaDcLg46MdZa6f4wQe/m+MfkusIrqSGW0dY+4YJ9Sps7JwL44u/7d6nf2230VsDj
-	I+kBndOhU9ToYi01R9Q1rgFQ7tTewuAZ8/Q==
-X-Received: by 2002:a05:622a:350:b0:52d:ca81:e5b2 with SMTP id
- d75a77b69052e-53036b92bdfmr107966781cf.5.1788415346430; Wed, 02 Sep 2026
- 23:02:26 -0700 (PDT)
+	dkim=pass (1024-bit key) header.d=yandex-team.ru header.i=@yandex-team.ru header.b="LbhKpA3j"
+Received: from mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net (mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net [IPv6:2a02:6b8:c42:86a0:0:640:75de:0])
+	by forwardcorp1d.mail.yandex.net (postfix) with ESMTPS id 7ACD480D37;
+	Mon, 07 Sep 2026 12:38:27 +0300 (MSK)
+Received: from [IPV6:2a02:6bf:803e:400:af0b:4555:1b5d:9561] (unknown [2a02:6bf:803e:400:af0b:4555:1b5d:9561])
+	by mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net (smtpcorp) with ESMTPSA id NcIJUt1jXCg0-L3xC9DCw;
+	Mon, 07 Sep 2026 12:38:26 +0300
+Precedence: bulk
+X-Yandex-Fwd: 1
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+	s=default; t=1788773906;
+	bh=TvWSqH63hem2hiSF+vN/ZyBXAN2QLhhUWGY2kN253J8=;
+	h=In-Reply-To:Cc:Date:References:To:From:Subject:Message-ID;
+	b=LbhKpA3jwVPFNiz9zrsBvS/0Akx1Dzt4UoW0qYq3QYo/CZXWSCJmn+QHb7ReSHVEy
+	 iVgqvlI3Oypn9kBr7KkHa9nH4JrZsWvd11uIbaw/5HIBV/hKb1evpbv8v1zG2mg3ol
+	 b6H3reei7VTggh4+9q9LIg4xzo8Ca+714Ruqzhhs=
+Authentication-Results: mail-nwsmtp-smtp-corp-main-68.klg.yp-c.yandex.net; dkim=pass header.i=@yandex-team.ru
+Message-ID: <342ed1fe-3c1c-4fab-9c8a-ede5eb6b6d7c@yandex-team.ru>
+Date: Mon, 7 Sep 2026 14:38:23 +0500
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-References: <20260901213412.1763253-1-changyuanl@google.com>
- <CAJfpegtWYP-q82428iHd9gOBkAmoB=mgfGZRs3oi2FiAm3W-yA@mail.gmail.com> <CACGdZYK7wk0fMz7v7K_HSBfJvOYRmpWvaeNF8fBfU=j041gYuA@mail.gmail.com>
-In-Reply-To: <CACGdZYK7wk0fMz7v7K_HSBfJvOYRmpWvaeNF8fBfU=j041gYuA@mail.gmail.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Thu, 3 Sep 2026 08:02:04 +0200
-X-Gm-Features: AcwNN1XVuV6dMjB2XnXfKHVLJna_Qp6Z527eNokz21zXxuW9nXlLJkU0cPkN91g
-Message-ID: <CAJfpegsWp-s1v62mwhafAsGPXsP_aEPTgG_FoOLHVmNeWtevHw@mail.gmail.com>
-Subject: Re: [RFC] Handling 0-sized pseudo-files (cgroupfs/sysfs/procfs) in
- virtiofs and FUSE
-To: Khazhy Kumykov <khazhy@chromium.org>
-Cc: Changyuan Lyu <changyuanl@google.com>, fuse-devel@lists.linux.dev, 
-	virtio-fs@lists.linux.dev, peternewman@google.com, 
-	German Maglione <gmaglione@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, posk@google.com
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+User-Agent: Mozilla Thunderbird
+Subject: Re: [PATCH v6 0/6] vhost-user-blk: allow toggling inflight-migration
+ at runtime
+From: Alexandr Moshkov <dtalexundeer@yandex-team.ru>
+To: qemu-devel@nongnu.org
+Cc: Stefano Garzarella <sgarzare@redhat.com>,
+ Stefan Hajnoczi <stefanha@redhat.com>, zhenwei pi <zhenwei.pi@linux.dev>,
+ "Gonglei (Arei)" <arei.gonglei@huawei.com>, Jason Wang
+ <jasowangio@gmail.com>, Kevin Wolf <kwolf@redhat.com>,
+ Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>,
+ Milan Zamazal <mzamazal@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>,
+ qemu-block@nongnu.org, Hanna Reitz <hreitz@redhat.com>,
+ "Michael S. Tsirkin" <mst@redhat.com>, Fam Zheng <fam@euphon.net>,
+ virtio-fs@lists.linux.dev,
+ Pierrick Bouvier <pierrick.bouvier@oss.qualcomm.com>,
+ Jason Wang <jasowang@redhat.com>, =?UTF-8?Q?Alex_Benn=C3=A9e?=
+ <alex.bennee@linaro.org>, Raphael Norwitz <rnorwitz@nvidia.com>,
+ Pierrick Bouvier <pierrick.bouvier@linaro.org>,
+ "yc-core@yandex-team.ru" <yc-core@yandex-team.ru>
+References: <20260803072853.2920007-1-dtalexundeer@yandex-team.ru>
+ <c6841f52-4d74-4343-b958-067b110fb532@yandex-team.ru>
+Content-Language: en-US
+In-Reply-To: <c6841f52-4d74-4343-b958-067b110fb532@yandex-team.ru>
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 8bit
 
-On Wed, 2 Sept 2026 at 21:35, Khazhy Kumykov <khazhy@chromium.org> wrote:
+Greetings! Another ping :)
+
+On 8/17/26 10:29, Alexandr Moshkov wrote:
+> Greetings! Ping.
 >
-> On Wed, Sep 2, 2026 at 12:46=E2=80=AFAM Miklos Szeredi <miklos@szeredi.hu=
-> wrote:
-> >
-> > On Tue, 1 Sept 2026 at 23:34, Changyuan Lyu <changyuanl@google.com> wro=
-te:
-> >
-> > > 1. For virtiofsd: Does the automatic detection of pseudo-filesystems =
-via
-> > >    fstatfs magic match upstream expectations, or would upstream prefe=
-r an
-> > >    explicit configuration option (such as per-path cache policies)?
-> >
-> > Why not just set "--cache never" for the pseudo fs export?
->
-> Enabling caching does give a pretty noticeable performance improvement
-> for those files that can be cached, and we'd like to have just a
-> single export instead of setting up multiple and assembling it
-> piecemeal. (To this end we do have an out-of-tree extension to the
-> virtiofsd-rs passthrough module to allow changing caching duration on
-> a per file basis as the protocol allows..., been meaning to start a
-> thread if folks are interested in this since it has proven somewhat
-> useful for us now).
->
-> But I felt having first class support for this felt more "right" -
-> enabling caching shouldn't break reading of certain files, and the
-> server is in a position to know if a file would support this or not.
-
-I'm fine with this.  But virtiofsd maintainers will have to make a
-decision about merging or not merging this feature.
-
-One idea that occurs to me is that the kernel is in a much better
-position to give a hint:
-
- - file is normal: POSIX semantics apply
- - file is pseudo; POSIX semantics don't apply
-
-The "normal" category could also be split into:
-
- - file is local: changes always generate fanotify events
- - file is remote: changes do not always generate fanotify events
-
-Thanks,
-Miklos
+> On 8/3/26 12:28, Alexandr Moshkov wrote:
+>> v5 -> v6:
+>> - block changing inflight-migration property while VM is not running
+>> - remove checking runstate in vhost_user_blk_stop() since it's not 
+>> necessary
+>> - updated cover letter: changed subject and description to focus on
+>>    runtime toggling of inflight-migration rather than cross-version
+>>    migration compatibility
+>>
+>> v4 -> v5:
+>> - introduce protocol feature 
+>> VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN
+>>    to guard the new message, instead of reusing the existing
+>>    VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INLIFGHT. Update docs.
+>> - improved commit messages.
+>>
+>> v3 -> v4:
+>> - add new protocol message GET_VRING_BASE_SKIP_DRAIN instead of 
+>> parameter to GET_VRING_BASE message. This new message can be send 
+>> instead of GET_VRING_BASE, allowing back-end to suspend inflight I/O 
+>> immediately instead of waiting and completing them.
+>> - rebase to newer master
+>>
+>> v2 -> v3:
+>> - fix complile problems
+>> - add assert check in do_vhost_virtio_stop
+>> - make inflight-migration property mutable
+>>
+>> v1 -> v2:
+>> - reorganize commits: make refactor commits first, then core semantic 
+>> change
+>> - add additional pre_save check for inflight migration possibility
+>>
+>> ---
+>>
+>> This is v6 of the series previously sent as:
+>> "[PATCH v5 0/6] vhost-user-blk: add compatibility with older qemu 
+>> versions"
+>>
+>> This series allows the inflight-migration property of vhost-user-blk to
+>> be toggled at runtime via qom-set without restarting the VM or
+>> reconnecting to the back-end.
+>>
+>> Currently, the inflight migration behaviour is controlled by
+>> VHOST_USER_PROTOCOL_F_GET_VRING_BASE_INFLIGHT, which is negotiated once
+>> at connection time. Once negotiated, the back-end always uses suspend
+>> semantics on GET_VRING_BASE -- there is no way for the front-end to
+>> request normal drain behaviour on a per-call basis. This makes it
+>> impossible to disable inflight-migration at runtime.
+>>
+>> To solve this, the series introduces a new protocol message
+>> VHOST_USER_GET_VRING_BASE_SKIP_DRAIN (id=45) guarded by a new protocol
+>> feature VHOST_USER_PROTOCOL_F_GET_VRING_BASE_SKIP_DRAIN. The message
+>> instructs the back-end to suspend in-flight I/O immediately rather than
+>> draining it. This gives the front-end explicit per-call control:
+>> GET_VRING_BASE for normal drain, GET_VRING_BASE_SKIP_DRAIN when
+>> inflight-migration is enabled.
+>>
+>> In vhost-user-blk, GET_VRING_BASE_SKIP_DRAIN is sent whenever
+>> inflight-migration is on. The inflight-migration
+>> property can only be changed while the VM is running, so its value at
+>> stop time reliably reflects the user's intent.
+>>
+>> Alexandr Moshkov (6):
+>>    vhost-user: add skip_drain param to do_vhost_virtqueue_stop
+>>    vhost-user: add GET_VRING_BASE_SKIP_DRAIN message
+>>    vhost-user: use skip_drain with GET_VRING_BASE_SKIP_DRAIN message
+>>    vhost-user-blk: make inflight-migration prop mutable on running vm
+>>    vhost-user-blk: move inflight_needed higher
+>>    vhost-user-blk: use GET_VRING_BASE_SKIP_DRAIN when inflight-migration
+>>      is on
+>>
+>>   backends/cryptodev-vhost.c        |  2 +-
+>>   backends/vhost-user.c             |  2 +-
+>>   docs/interop/vhost-user.rst       | 88 +++++++++++++++++++------------
+>>   hw/block/vhost-user-blk.c         | 60 ++++++++++++++++++---
+>>   hw/net/vhost_net.c                |  9 ++--
+>>   hw/scsi/vhost-scsi-common.c       |  2 +-
+>>   hw/virtio/vdpa-dev.c              |  2 +-
+>>   hw/virtio/vhost-user-base.c       |  2 +-
+>>   hw/virtio/vhost-user-fs.c         |  2 +-
+>>   hw/virtio/vhost-user-scmi.c       |  2 +-
+>>   hw/virtio/vhost-user.c            | 47 ++++++++++++++---
+>>   hw/virtio/vhost-vsock-common.c    |  2 +-
+>>   hw/virtio/vhost.c                 | 34 ++++++++----
+>>   include/hw/virtio/vhost-backend.h |  1 +
+>>   include/hw/virtio/vhost-user.h    |  2 +-
+>>   include/hw/virtio/vhost.h         |  7 ++-
+>>   16 files changed, 189 insertions(+), 75 deletions(-)
+>>

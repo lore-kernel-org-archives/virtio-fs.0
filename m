@@ -1,70 +1,70 @@
 Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.129.124])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 810B23998A4
-	for <virtio-fs@lists.linux.dev>; Thu, 10 Sep 2026 20:15:46 +0000 (UTC)
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id A4E6946AA7B
+	for <virtio-fs@lists.linux.dev>; Fri, 11 Sep 2026 09:04:16 +0000 (UTC)
 Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.129.124
 ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1789071350; cv=none; b=rQAOsd5oBLMrolZvGrep8Tz+kZWFWNF78ww8lSx5IlfYwVLtwM3OB+ldJK7Wwr2A0SjoNOmqdMOGgwD9lahCTmeMWxgaVsxdPrQSejVJoBB/Ff12Ld/Zuv3tNsxvf3awFYWMHcVZETliPb0XqpixdFe42rE2RO8hJJyq6iZ00XI=
+	t=1789117459; cv=none; b=QbuONgtvG/e534qj+/0Rhumy4fxwAXASrwiEUU04VVgzLv4C9wVUgkvWazq/84kPI1nh8XDvydtvZ1/iANWHaHp9ffndjC2lFMJCd9PXZ6TXMuZC/oOmQFockyZTiLpO2eXFTx017loGc19HG+F0DROcmGaySvV0ne3gd940jO0=
 ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1789071350; c=relaxed/simple;
-	bh=j0SuyajHdBsyF6spN/2bZYaJ8GEUwRuTG3KSiEE7AbE=;
+	s=arc-20240116; t=1789117459; c=relaxed/simple;
+	bh=kjEqd/Ks/r7Qk9QQRhkFyOPvyWevbQe78ef59b27sxs=;
 	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
-	 In-Reply-To:Content-Type:Content-Disposition; b=nJjD8x1VEQSz0ykm2IOLOG1VMKBYjdPL8UBU8Ciin3n2AFBipSNwTCah1zyakVy518FfqTlWsynvCYygDEZgKl9rweKwVoi/fa4Jo5FqGxsA2S1VL3OPyUqz7Lc+4dxX9e5VhCL0Ng3y67y5pBHFlzN3s9pYFGDfFITfd7UAQe8=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=Bc6HpCZc; arc=none smtp.client-ip=170.10.129.124
+	 In-Reply-To:Content-Type:Content-Disposition; b=q1aExqBi9CUTVFvlX2q0ZBTZHFSZiOzjtfHTdImERmq+ElftU0D9T83NoGwzsE9FxkR8Jlpx6MS5HiPtau/LXC/pi3nIyyIhAO4CV5cHR48rBNn7PI893ltBpaQYukrTAX65PACLpxLZvsu5a4BtmzQtDt6cPVgW5mwvybCItBY=
+ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=JfQckxK0; arc=none smtp.client-ip=170.10.129.124
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="Bc6HpCZc"
+	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="JfQckxK0"
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1789071343;
+	s=mimecast20190719; t=1789117455;
 	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
 	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
 	 in-reply-to:in-reply-to:references:references;
-	bh=VqjojGjFi5nUGCc20Drm+8VeWMIFynXWAu4/zax0fR0=;
-	b=Bc6HpCZciw7ehDtKXCIofv+yHKdUkxuf2f0o3sJ0a53isvzqRU9ejhim8W9NBZ1sFgjxBM
-	sbltX1ndQp5Nfw2o4iSV3O+Cnm88xIE0oMk6VXB9PF+rELh7QMp/hLrFIolC1MuMoSmpcb
-	xKGHFsOH8+puHXOaSZ8iv1oVOKdsL9Y=
+	bh=v1olWRoVJuPWwSBJbdW2ynlLoWLMs3mS5pnDLdXpZdk=;
+	b=JfQckxK0ncI/IpKX9CDgfEqzwFRp1Iq9Obk13n7ioVvQbwZGrdivy27jVtkiFGKxXlrSxk
+	yROcZ5QWW5a3RsKDuZ2nZR0t4G63yWJpxxjhphmzHHQ0D2NupkF2jH/d7F/mDlslevQnRM
+	ykV23m5dfopWtd1BU3whaI4JODS81mw=
 Received: from mail-wr1-f69.google.com (mail-wr1-f69.google.com
  [209.85.221.69]) by relay.mimecast.com with ESMTP with STARTTLS
  (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-103-mp1HKQwNP5epJsWQ22NeYg-1; Thu, 10 Sep 2026 16:15:42 -0400
-X-MC-Unique: mp1HKQwNP5epJsWQ22NeYg-1
-X-Mimecast-MFC-AGG-ID: mp1HKQwNP5epJsWQ22NeYg_1789071341
-Received: by mail-wr1-f69.google.com with SMTP id ffacd0b85a97d-485f6788029so103097f8f.1
-        for <virtio-fs@lists.linux.dev>; Thu, 10 Sep 2026 13:15:42 -0700 (PDT)
+ us-mta-477-0Ai0yRepMP2WNGota3jyyg-1; Fri, 11 Sep 2026 05:04:12 -0400
+X-MC-Unique: 0Ai0yRepMP2WNGota3jyyg-1
+X-Mimecast-MFC-AGG-ID: 0Ai0yRepMP2WNGota3jyyg_1789117451
+Received: by mail-wr1-f69.google.com with SMTP id ffacd0b85a97d-486f1eee015so122753f8f.1
+        for <virtio-fs@lists.linux.dev>; Fri, 11 Sep 2026 02:04:11 -0700 (PDT)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20251104; t=1789071341; x=1789676141;
+        d=1e100.net; s=20251104; t=1789117451; x=1789722251;
         h=in-reply-to:content-disposition:content-type:mime-version
          :references:message-id:subject:cc:to:from:date:x-gm-gg
          :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=VqjojGjFi5nUGCc20Drm+8VeWMIFynXWAu4/zax0fR0=;
-        b=Y6xPZ8rk0g2COyP+7eoCfSHvnSy8UDCjmoTXybP6aGs0Jy2+oCmy+u3IZ7mhUBfFAN
-         +ZkzrqtZeKtAvc88A3ubqz0vLNQo8iO04FOx3snOp0t+SUDiWXPTJZbGWZ0IQcv0Ls1W
-         yuIksKmptAPlYsn4sciI+sOg8BhqdxkV9nCsZkujhD3oy8nDnDyGiWEddPCP/i7eQY+H
-         7g36GYh3lqPmxWK/89DQ63Uu1iubh3z8mR1zC7Bt1zUd1tfiNdlCdJ5tin0Q7RpZ3Qwr
-         TX6IYRBSAID8NsKiaZxQxO9Z8pubm2D5x4jQxKPHRQ4JtniRwV1sDD5xT5JVJACVouIc
-         du9g==
-X-Forwarded-Encrypted: i=1; AKwUvBxg+xWnUUGFjetd5msMQccKxCSDfaizdrG785ThQtKmhLHI6WkmQljDx0Uxu89JhqUbndtTnvi3nvI=@lists.linux.dev
-X-Gm-Message-State: AFuF++lfyu1ZtixaqqGrXTLYhvrSwvl8Q6v+LMQo/SXz2sLjM7R7XlTH
-	FpweUrD/S2cPZa5KOMFcDbTzI0e07ZqqQoZ3u8KhEDD+i4l+j0CcAhvJpxpuiM+YWDgkUWQE3Dt
-	ACuRLpjn8h8MpRE5frgr/eZ5ii4+/BHYzDyZAoI+ty6XpFH4B0ynnNy0u9KwAYg==
-X-Gm-Gg: AYBFou13biJZR4SJ82APplwlxTXXgM1Gw48fSy/2PsjuaxRf6WDEKOJGvjjAE7xvdpm
-	psQvUf32DFNrttYmCLez3oDgX1W2jIN89hjun6KV/+5WWVKxHxjALBgkzTcxct0t8xgLyjIRmJF
-	PqYZhjBwkHuTInwHUYCgdm5IbBYGTsTXsATlT6T77rUaffE49Xa9hCaPNci9oGpSfp6SQHSFSkf
-	hyIl8HVYMb0c4p4IKEahIdHb+B/EJ+xvLF3K90ctqFAQbNjwCusr4F57J75NpUxAvyfdwiFn2j5
-	pdG5j6Vn1Ke3emJbE+KYMegaZPd0zWxZOXqIr67g62ZurOfn07CPIuHPulKVjFdbyJ/EPPKFkGT
-	QS++cIQUI3RGIkHfcc2djFfA=
-X-Received: by 2002:adf:ec86:0:b0:47f:7129:6e2d with SMTP id ffacd0b85a97d-486eb325de3mr1103444f8f.17.1789071340980;
-        Thu, 10 Sep 2026 13:15:40 -0700 (PDT)
-X-Received: by 2002:adf:ec86:0:b0:47f:7129:6e2d with SMTP id ffacd0b85a97d-486eb325de3mr1103352f8f.17.1789071340413;
-        Thu, 10 Sep 2026 13:15:40 -0700 (PDT)
+        bh=v1olWRoVJuPWwSBJbdW2ynlLoWLMs3mS5pnDLdXpZdk=;
+        b=EkrFdoWYbo1qmDuasHGxXW2LoPVd99pdjdKF+cJm8lqKM8T+4DuwWLIAOFp5oPWbfU
+         KPmgwJL+jc14ylt443qUOj7676+rWYmkpN33dV5ZefTKYu/kLrjVR3oYAtxpn/BSs12z
+         kDdhunjeyKjSgfiCTiWAU0XXrHvN4cVKM3xTUGp+Y4Sm6tK6PN8iucSMXR/AB+tYPxy1
+         Sii15V1NQH4s1o/DmajIfHM36FDXgODZffHs3lHAbicL3XArHk+9NZAqh2s+n0vtf9Nz
+         1RnVlePoP8d0sJ2sLTe7Aq1SmosEZhQAMgF8D3xB3uNsKkLX/x+4PVRhvGPCDG10PWqN
+         /vdQ==
+X-Forwarded-Encrypted: i=1; AKwUvByh0dQWVdcarnU7hIwcmfWdFVzj9RKnLiR7VWBhJJNwaMD2c0DTnfqqFX8wwKOleeLEPnx4nr4V5Zo=@lists.linux.dev
+X-Gm-Message-State: AFuF++lkbf7LlZw4nvKjqq77yz2N5f/5bIMS4j1KLueOtwBAJVKxY4fV
+	nHKfk1bvSIxbNmXe7v+pYkyvaIX3CPvYEentwE0kHHVkQOt7HWDy051HL+h0E5NaK7HCvnFwXhd
+	AHaADDzK4HpSN60x/msKckNtxj/Dy4cRg4yB1PFW+X2wNynRnsXXcoKj2sIDwsQ==
+X-Gm-Gg: AYBFou3Y8OvVYox0JoShUPfkRXq5+1VB4DkphVJAwVUBxJDSzysqZphfILlvx1qjmt5
+	lIkKFGXL6/YpDlppxOVzEOZXty3j8AVUzENBILK50LjE218m/dY4GYNMm7KRxrYBccKK3ZlwwQ5
+	1G1EBThs2dVV1LKoq/qehb5EeJ51mGNPPP1WJpCtcd/Z1g6dMXOlNI/Z2wZh0R7Xo6TkAo9mFzJ
+	geYB80AkFaUVhaBrMsnRsg28JFK3WW6WFvjxlGf7F8vsb68lQz/YdNb6dqKQttznS+aW6M4ww10
+	6AdTGWLw/1g2j74i7BqBi7wTzgt6UnagidHwMpYdgoWulqrc6rvqpA1qNLOMc38Stp9odAAdSr/
+	2r97MWZzLrbupuik00UfWlWE=
+X-Received: by 2002:adf:e00b:0:10b0:484:3310:710c with SMTP id ffacd0b85a97d-486eb351000mr4953707f8f.24.1789117450463;
+        Fri, 11 Sep 2026 02:04:10 -0700 (PDT)
+X-Received: by 2002:adf:e00b:0:10b0:484:3310:710c with SMTP id ffacd0b85a97d-486eb351000mr4953596f8f.24.1789117449920;
+        Fri, 11 Sep 2026 02:04:09 -0700 (PDT)
 Received: from redhat.com (IGLD-80-230-79-236.inter.net.il. [80.230.79.236])
-        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-486eb32e6f1sm821976f8f.6.2026.09.10.13.15.38
+        by smtp.gmail.com with ESMTPSA id ffacd0b85a97d-486eb35bed0sm4420473f8f.32.2026.09.11.02.04.06
         (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
-        Thu, 10 Sep 2026 13:15:39 -0700 (PDT)
-Date: Thu, 10 Sep 2026 16:15:37 -0400
+        Fri, 11 Sep 2026 02:04:09 -0700 (PDT)
+Date: Fri, 11 Sep 2026 05:04:06 -0400
 From: "Michael S. Tsirkin" <mst@redhat.com>
 To: qemu-devel@nongnu.org
 Cc: Peter Maydell <peter.maydell@linaro.org>,
@@ -82,21 +82,21 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
 	Stefan Hajnoczi <stefanha@redhat.com>,
 	Milan Zamazal <mzamazal@redhat.com>, qemu-block@nongnu.org,
 	virtio-fs@lists.linux.dev
-Subject: [PULL 84/90] vhost-user: add skip_drain param to
+Subject: [PULL v2 69/75] vhost-user: add skip_drain param to
  do_vhost_virtqueue_stop
-Message-ID: <e8e592c07cec60abce1c406913b8a65312b574e9.1789071043.git.mst@redhat.com>
-References: <cover.1789071042.git.mst@redhat.com>
+Message-ID: <2e6881e1198dcb0c9ec0fe2dbbc04ac5d13ea696.1789117222.git.mst@redhat.com>
+References: <cover.1789117222.git.mst@redhat.com>
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-In-Reply-To: <cover.1789071042.git.mst@redhat.com>
+In-Reply-To: <cover.1789117222.git.mst@redhat.com>
 X-Mailer: git-send-email 2.51.2.2891.g4157995a80.dirty
 X-Mutt-Fcc: =sent
 X-Mimecast-Spam-Score: 0
-X-Mimecast-MFC-PROC-ID: aA5_vT-uDGPDdYA-Di9NwA4MkgQdk8rS6crOWyVCIWo_1789071341
+X-Mimecast-MFC-PROC-ID: Qw4qSVoPMMeVrSsB5LvScKq8Rqe6dhbYx9y1_4GnDbI_1789117451
 X-Mimecast-Originator: redhat.com
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
@@ -134,10 +134,10 @@ Message-ID: <20260803072853.2920007-2-dtalexundeer@yandex-team.ru>
  13 files changed, 39 insertions(+), 25 deletions(-)
 
 diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
-index cd012b99a2..cd6e200538 100644
+index 3db56433b6..0a322efec1 100644
 --- a/include/hw/virtio/vhost.h
 +++ b/include/hw/virtio/vhost.h
-@@ -277,6 +277,7 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev, bool vrings);
+@@ -228,6 +228,7 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev, bool vrings);
   * @hdev: common vhost_dev structure
   * @vdev: the VirtIODevice structure
   * @vrings: true to have vrings disabled in this call
@@ -145,7 +145,7 @@ index cd012b99a2..cd6e200538 100644
   *
   * Stop the vhost device. After the device is stopped the notifiers
   * can be disabled (@vhost_dev_disable_notifiers) and the device can
-@@ -284,7 +285,8 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev, bool vrings);
+@@ -235,7 +236,8 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev, bool vrings);
   *
   * Return: 0 on success, != 0 on error when stopping dev.
   */
@@ -155,7 +155,7 @@ index cd012b99a2..cd6e200538 100644
  
  /**
   * vhost_dev_force_stop() - force stop the vhost device
-@@ -445,7 +447,8 @@ int vhost_device_iotlb_miss(struct vhost_dev *dev, uint64_t iova, int write);
+@@ -396,7 +398,8 @@ int vhost_device_iotlb_miss(struct vhost_dev *dev, uint64_t iova, int write);
  int vhost_virtqueue_start(struct vhost_dev *dev, struct VirtIODevice *vdev,
                            struct vhost_virtqueue *vq, unsigned idx);
  int vhost_virtqueue_stop(struct vhost_dev *dev, struct VirtIODevice *vdev,
@@ -337,7 +337,7 @@ index b79f4c9ce6..4ef037627b 100644
      err = k->set_guest_notifiers(qbus->parent, vvc->vhost_dev.nvqs, false);
      if (err < 0) {
 diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
-index 6c2612a1dd..17b36366dc 100644
+index 52ea142bd4..48fe1805bb 100644
 --- a/hw/virtio/vhost.c
 +++ b/hw/virtio/vhost.c
 @@ -23,6 +23,7 @@
@@ -348,7 +348,7 @@ index 6c2612a1dd..17b36366dc 100644
  #include "hw/mem/memory-device.h"
  #include "migration/blocker.h"
  #include "migration/qemu-file-types.h"
-@@ -1509,8 +1510,13 @@ fail:
+@@ -1499,8 +1500,13 @@ fail:
  static int do_vhost_virtqueue_stop(struct vhost_dev *dev,
                                     struct VirtIODevice *vdev,
                                     struct vhost_virtqueue *vq,
@@ -363,7 +363,7 @@ index 6c2612a1dd..17b36366dc 100644
      int vhost_vq_index = dev->vhost_ops->vhost_get_vq_index(dev, idx);
      struct vhost_vring_state state = {
          .index = vhost_vq_index,
-@@ -1560,9 +1566,10 @@ static int do_vhost_virtqueue_stop(struct vhost_dev *dev,
+@@ -1550,9 +1556,10 @@ static int do_vhost_virtqueue_stop(struct vhost_dev *dev,
  int vhost_virtqueue_stop(struct vhost_dev *dev,
                           struct VirtIODevice *vdev,
                           struct vhost_virtqueue *vq,
@@ -376,7 +376,7 @@ index 6c2612a1dd..17b36366dc 100644
  }
  
  static int vhost_virtqueue_set_busyloop_timeout(struct vhost_dev *dev,
-@@ -2350,7 +2357,8 @@ fail_vq:
+@@ -2307,7 +2314,8 @@ fail_vq:
          vhost_virtqueue_stop(hdev,
                               vdev,
                               hdev->vqs + i,
@@ -386,7 +386,7 @@ index 6c2612a1dd..17b36366dc 100644
      }
  
  fail_mem:
-@@ -2365,7 +2373,7 @@ fail_features:
+@@ -2322,7 +2330,7 @@ fail_features:
  
  /* Host notifiers must be enabled at this point. */
  static int do_vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev,
@@ -395,7 +395,7 @@ index 6c2612a1dd..17b36366dc 100644
  {
      int i;
      int rc = 0;
-@@ -2392,7 +2400,8 @@ static int do_vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev,
+@@ -2349,7 +2357,8 @@ static int do_vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev,
                                        vdev,
                                        hdev->vqs + i,
                                        hdev->vq_index + i,
@@ -405,7 +405,7 @@ index 6c2612a1dd..17b36366dc 100644
      }
      if (hdev->vhost_ops->vhost_reset_status) {
          hdev->vhost_ops->vhost_reset_status(hdev);
-@@ -2414,15 +2423,16 @@ static int do_vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev,
+@@ -2371,15 +2380,16 @@ static int do_vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev,
      return rc;
  }
  

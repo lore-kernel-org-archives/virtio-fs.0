@@ -1,164 +1,159 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+Received: from mail-qk2-f12.google.com (mail-qk2-f12.google.com [74.125.230.204])
+	(using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id AA055488DAF
-	for <virtio-fs@lists.linux.dev>; Fri, 11 Sep 2026 16:26:00 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.client-ip=170.10.133.124
-ARC-Seal:i=1; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
-	t=1789143962; cv=none; b=ERvG57RjC4VetO2G1q7iQf7GxlTLFi5hw+W+V5wAqlXk0Ve7eibr5Ez767rMpj2fH2IGauH/4ug2dm/EbaL0cHEXAqhnlP2A0j/64YSPoYfZeXQZY6eDvqPUPSP1xml6W2gZFHtN0PHkzUZCqqg0EC8ZrJk9iILuPjm2Ys64nOc=
-ARC-Message-Signature:i=1; a=rsa-sha256; d=subspace.kernel.org;
-	s=arc-20240116; t=1789143962; c=relaxed/simple;
-	bh=bquhT/ngeU3LRCEI/rNOxqGD6easUmuD5vQSEkaa5Kc=;
-	h=Date:From:To:Cc:Subject:Message-ID:References:MIME-Version:
-	 Content-Type:Content-Disposition:In-Reply-To; b=kxIwf9lUYH3Wy8q6A3ylbkrYRbxwfia4ZC1EpeJqSxKL/LV42fdJ3h+oMKwfG2QIJVJ1sxTVKlg8cyCOXEuCFFeBykY3y0qm77p2VdnB1MYmYzH//IhOiy23x1tkA4OL8S/H4yzDzsfEQ3iP36m3gmfOuvsM5fFMZG9SMGOlY38=
-ARC-Authentication-Results:i=1; smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com; spf=pass smtp.mailfrom=redhat.com; dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b=YZFA78TW; arc=none smtp.client-ip=170.10.133.124
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=redhat.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 3B104303A35
+	for <virtio-fs@lists.linux.dev>; Mon, 14 Sep 2026 22:01:10 +0000 (UTC)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass smtp.client-ip=74.125.230.204
+ARC-Seal:i=2; a=rsa-sha256; d=subspace.kernel.org; s=arc-20240116;
+	t=1789423271; cv=pass; b=Glxdw0pAfHDH8u9zwrewouIwzvRAeBUyvbkIxHMnERla1btzuKkMI/v9S0EAswguNU/mZiMCjdKb7m7EqxitYdiaU2Q+8YBWoIZ6NA++iDdwTZM0vN7m6lB3YJKPG5fB8oQ0zhO3K6aslturA6qhfENBH/6itsWofu8tWg2oVIw=
+ARC-Message-Signature:i=2; a=rsa-sha256; d=subspace.kernel.org;
+	s=arc-20240116; t=1789423271; c=relaxed/simple;
+	bh=u074ZkJrbh/sxcHtumlTwM+gkaHZ9o4Ni2U3r4twwug=;
+	h=MIME-Version:References:In-Reply-To:From:Date:Message-ID:Subject:
+	 To:Cc:Content-Type; b=fOxM8qoBZjFLxt17nvhaw3adBBCDJMvYj1vVs9WJ8H2j8eB2kJqn1R4zB2lp/fuK8G5yfcb4p6bxPRVKUWNNcsxTH7AixmA27rg38SCQFcFqSw+k7m9wIHmiYApsKoX1L0MF9noocKzAtXARR5Od0nrIrU7U2+IXetv1r4sAfgI=
+ARC-Authentication-Results:i=2; smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com; spf=pass smtp.mailfrom=google.com; dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b=wDciPLCh; arc=pass smtp.client-ip=74.125.230.204
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=reject dis=none) header.from=google.com
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=google.com
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="YZFA78TW"
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1789143959;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	 in-reply-to:in-reply-to:references:references;
-	bh=4q4XIxW/vwNesCg/a34TUO9RXpsXNeKwK6PzYAFAAaI=;
-	b=YZFA78TWlwmtvD/dvEJp5/lxmzXjHl83Dkb8IjRIFSYIuOwgpn0v/M5tdOS7huqY3yYnka
-	aYTlwO9E3F7sjykOCA1SjA8N70eAuU0eaV7ksfHvxNHHZJou72/WplFdtSeRpX5aywC/Fk
-	HsMYLi/muQaSQ47/5Ujq3Az8nBt/8Rc=
-Received: from mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com
- (ec2-54-186-198-63.us-west-2.compute.amazonaws.com [54.186.198.63]) by
- relay.mimecast.com with ESMTP with STARTTLS (version=TLSv1.3,
- cipher=TLS_AES_256_GCM_SHA384) id us-mta-570-BbleVnsAMvOQUHwFoS9lPQ-1; Fri,
- 11 Sep 2026 12:25:55 -0400
-X-MC-Unique: BbleVnsAMvOQUHwFoS9lPQ-1
-X-Mimecast-MFC-AGG-ID: BbleVnsAMvOQUHwFoS9lPQ_1789143952
-Received: from mx-prod-int-10.mail-002.prod.us-west-2.aws.redhat.com (mx-prod-int-10.mail-002.prod.us-west-2.aws.redhat.com [10.30.177.95])
-	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
-	 key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)
-	(No client certificate requested)
-	by mx-prod-mc-03.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTPS id 551D81954B0A;
-	Fri, 11 Sep 2026 16:25:51 +0000 (UTC)
-Received: from localhost (headnet04.pony-001.prod.iad2.dc.redhat.com [10.2.32.116])
-	by mx-prod-int-10.mail-002.prod.us-west-2.aws.redhat.com (Postfix) with ESMTP id 3E455433;
-	Fri, 11 Sep 2026 16:25:48 +0000 (UTC)
-Date: Fri, 11 Sep 2026 12:25:47 -0400
-From: Stefan Hajnoczi <stefanha@redhat.com>
-To: Markus Armbruster <armbru@redhat.com>
-Cc: Connor Kite <connorkite@gmail.com>, qemu-devel@nongnu.org,
-	"Michael S. Tsirkin" <mst@redhat.com>,
-	Stefano Garzarella <sgarzare@redhat.com>,
-	Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>,
-	Viresh Kumar <viresh.kumar@linaro.org>,
-	Gerd Hoffmann <kraxel@redhat.com>,
-	Mathieu Poirier <mathieu.poirier@linaro.org>,
-	Manos Pitsidianakis <manos.pitsidianakis@linaro.org>,
-	Raphael Norwitz <rnorwitz@nvidia.com>,
-	Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>,
-	=?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>,
-	Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>,
-	Milan Zamazal <mzamazal@redhat.com>,
-	Akihiko Odaki <odaki@rsg.ci.i.u-tokyo.ac.jp>,
-	Dmitry Osipenko <dmitry.osipenko@collabora.com>,
-	qemu-block@nongnu.org, virtio-fs@lists.linux.dev,
-	"Gonglei (Arei)" <arei.gonglei@huawei.com>,
-	zhenwei pi <zhenwei.pi@linux.dev>,
-	Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>,
-	Eric Blake <eblake@redhat.com>, Jason Wang <jasowangio@gmail.com>,
-	Peter Xu <peterx@redhat.com>,
-	Eugenio =?iso-8859-1?Q?P=E9rez?= <eperezma@redhat.com>,
-	Alyssa Ross <hi@alyssa.is>,
-	Demi Marie Obenour <demiobenour@gmail.com>
-Subject: Re: [PATCH RFC v2 13/13] net/vhost-user: add memory isolation
-Message-ID: <20260911162547.GA157639@fedora>
-References: <20260817-vhost-user-isolated-memory-v2-0-948aae960abb@gmail.com>
- <20260817-vhost-user-isolated-memory-v2-13-948aae960abb@gmail.com>
- <87lda12mhy.fsf@pond.sub.org>
- <CA+spn3qK+n+buANnmkT6J8Yu4ZbwS_CqRbisE1uOmNsn1835iw@mail.gmail.com>
- <87lda010j1.fsf@pond.sub.org>
+	dkim=pass (2048-bit key) header.d=google.com header.i=@google.com header.b="wDciPLCh"
+Received: by mail-qk2-f12.google.com with SMTP id d75a77b69052e-5306706e89dso20511cf.1
+        for <virtio-fs@lists.linux.dev>; Mon, 14 Sep 2026 15:01:10 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1789423269; cv=none;
+        d=google.com; s=arc-20260327;
+        b=mmwCk2CAA9aOAG8W3xO/16UCuexYxLTGnrj9dLVENbIe5UF6a+IZWZDslEJVPa9Zb/
+         P5Wx6rRPbySMN4ZXvwqPmEilqOy7w5gEZJn9er6f+9+38Qiv49zdKmsRl/rf2Wwbf3KO
+         u0NTvqQpo7ZUJjk+qrQBy7vdNjZQEi+Vo2XXrs9LOgn1MDPi1kW2qC0fXTzl0OlLhfjY
+         JVx8z/bSUC6e6mTvwG3VQ6a1rIY6g8SzCpww45hTI2qom3am8F19LS7dCQb7xwZVGmXj
+         b3ba7OI8gYisoprdSdxQo99h2O5IFhv1CI3bCL8fWturDEGTAqce2P4Axw2joMpEibfE
+         jC8w==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=content-transfer-encoding:cc:to:subject:message-id:date:from
+         :in-reply-to:references:mime-version:dkim-signature;
+        bh=/jUCnXWS5HMAcD9KVLzpXLWgp/l50UoHWvAneYo+hEo=;
+        fh=Cig719i0VfdrAPZ3SGR9HZ7WlUqlVwJqS0yLrFAV4Lk=;
+        b=XTAzHTZGBrhslWVic5GZ5LEig+xoNud1zbue/5+2olTDbumgjxsHijR95Z9vGSJVsL
+         aHcnhnVyxgJm3tEpJ3OxzJhvd6Jy23O5QG4u9ZtXqRkzcEuAfqPHqeH6en4+guAbkr8E
+         yVg27UC4fNkSH1MAqCmtYHkS3NQ6eTao2Jym0NB+XX49Nz57cVyVzZ4ML8qTVuzryE6P
+         Y1pMcKfEN6qBawUY0UjRKsjUeuFR+3EoM2KfyE5xuzaQvq4HNsno22HJfF/PHEQCLYdg
+         1TwDj6qRHRRZkVKwA1LiljpUn/6EmHzJRTqWSDLYJ38SiRPisBxN+iRk2W4D+euM6k2c
+         RL4Q==;
+        darn=lists.linux.dev
+ARC-Authentication-Results: i=1; mx.google.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=google.com; s=20251104; t=1789423269; x=1790028069; darn=lists.linux.dev;
+        h=content-transfer-encoding:content-type:cc:to:subject:message-id
+         :date:from:in-reply-to:references:mime-version:from:to:cc:subject
+         :date:message-id:reply-to:content-type;
+        bh=/jUCnXWS5HMAcD9KVLzpXLWgp/l50UoHWvAneYo+hEo=;
+        b=wDciPLChEGXQZmfZdAPwAYTHBW4/tuFJYuSyRN2fUmnUKIFgJ767ksr5YZIvmySMwt
+         IkwB05IYU5dysfLc/S/8f0lRuW16BL8daBjMA4mE3pM7TnWwMecQLwNSAYC3ZkO5JICk
+         vkdjx/wvzbzivRUznJXCGe9cV1a5GlUZiirXDa+9wiYC74B5+OHU81NEzGUqWJGkT39R
+         xvzzeWsS0oU+AEjPFS8Yf1Wwu1IpP3mPnWwBERHSZmkhkGZ/J1R/1QiUtLnFJhpukfa0
+         0iMP0dYntRNsIvaLEfy5kS5IAi8J8xMximutrpF2ex6xsiPAx0X+2bxJojWaXdlk+Kcj
+         KwBQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20260707; t=1789423269; x=1790028069;
+        h=content-transfer-encoding:content-type:cc:to:subject:message-id
+         :date:from:in-reply-to:references:mime-version:x-gm-gg
+         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=/jUCnXWS5HMAcD9KVLzpXLWgp/l50UoHWvAneYo+hEo=;
+        b=c2K7LRou+QmpCFsmkMu4fkQ3EyxCt2H1/EiGHwXR/KHiBbrZ7uGW6hR+q6kAKfo8eW
+         hanaEbdJHdUFVkcWFM7OqNjpRY6i0FQ1CDgwMp2gtu25uKw+JO0q4cWtUk6wjNE0OOBP
+         FNPXobFsplZ11+42n6eAeT18SNhYcyuBGzkzPm62lrZXpBcCuKzp9nZS627E0hIn1u3k
+         aybgOOm+ufKar9AjfnqeIAFWRdldYHyRuSsRgeqr/vWiVUzOcFgPHuPpyV7vU9JiOQQO
+         J0+m+S3NV0/KLBSnjb1mM8k5yTq8YTITtWXG27RcF5rx9WbodDiD8+BCrdA6gK3jb/UW
+         DZVQ==
+X-Forwarded-Encrypted: i=1; AKwUvBxOiFOevgE+9Mr8eZ8152eDPMvaIvuizul+z509kxlBKQVUm2GOWnPbpon3YF3pt/SYwGh6MDwRRIo=@lists.linux.dev
+X-Gm-Message-State: AFuF++l/k8XP9PMiny8SQY5cM6XodSFeHD8QimwkABDLwgeyT6HYie3e
+	v6/ATrL/WoWsGUoVkTEAckgJUjq4amNkcy22h8fWy9gyCcAflS6u++cKV5CCRZBdCGQTsAllX+u
+	hCDvAu+xqDnPxhpJvdDQUNPJ5b/ZEB2QkoTFNfNoi
+X-Gm-Gg: AYBFou2z6r+eHQxYYURq4KpGCbGgEtz2kCM+tPE0BPMlpPAgLz7HwGbIqwhTezdCR54
+	nYGa7Hu08PlIEWoDkVYqwhuxtgT0/XtPvnTDTGUeqzYHzNBLEFE6PQ1Oc++ixhM8/kp6wxbeOUK
+	WUamX6qJ6jqGVequLOllOD0l4jt1AFf6V5s319RDwUePyIGFFbsNdif7Rvlj0501DCooJf8PjFi
+	pwi1+/9AR7Q3K68J7ytIWQtLqjebWOVuw1VRWv2ynlADfMIHTw6fkZa+h2Y+vWKuADo6mlMUzcA
+	4XHgT2+2la8kIRF99tao+HGmE1+EKj27wH+idlnUL87tAXdrtBLrzVUuBRdk0puEW3KStVGhs+m
+	dGrH3hDtzqrrmxS/KqnxWbgVqARD9cnLRIcY9LYvQzw==
+X-Received: by 2002:a05:622a:144a:b0:530:4182:5a95 with SMTP id
+ d75a77b69052e-5311a5ea835mr1388571cf.2.1789423263806; Mon, 14 Sep 2026
+ 15:01:03 -0700 (PDT)
 Precedence: bulk
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
 List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="KnjVaE+vH1BLpuM3"
-Content-Disposition: inline
-In-Reply-To: <87lda010j1.fsf@pond.sub.org>
-X-Scanned-By: MIMEDefang 3.6 on 10.30.177.95
-
---KnjVaE+vH1BLpuM3
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
+References: <20260901213412.1763253-1-changyuanl@google.com>
+ <CAJfpegtWYP-q82428iHd9gOBkAmoB=mgfGZRs3oi2FiAm3W-yA@mail.gmail.com>
+ <CACGdZYK7wk0fMz7v7K_HSBfJvOYRmpWvaeNF8fBfU=j041gYuA@mail.gmail.com> <CAJfpegsWp-s1v62mwhafAsGPXsP_aEPTgG_FoOLHVmNeWtevHw@mail.gmail.com>
+In-Reply-To: <CAJfpegsWp-s1v62mwhafAsGPXsP_aEPTgG_FoOLHVmNeWtevHw@mail.gmail.com>
+From: Khazhy Kumykov <khazhy@google.com>
+Date: Mon, 14 Sep 2026 15:00:50 -0700
+X-Gm-Features: AcwNN1UAZX6HXGRkfXXv8pnAk8GmfsbACR91va4FlYm2LZCed6LJBVPYR-pRLqw
+Message-ID: <CACGdZYKVz+0mrOuh2nyu2-jY=JXY69HbR=7PP_UHG5F-bB=-+Q@mail.gmail.com>
+Subject: Re: [RFC] Handling 0-sized pseudo-files (cgroupfs/sysfs/procfs) in
+ virtiofs and FUSE
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: Changyuan Lyu <changyuanl@google.com>, fuse-devel@lists.linux.dev, 
+	virtio-fs@lists.linux.dev, peternewman@google.com, 
+	German Maglione <gmaglione@redhat.com>, Hanna Czenczek <hreitz@redhat.com>, posk@google.com
+Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Aug 21, 2026 at 07:54:26AM +0200, Markus Armbruster wrote:
-> Connor Kite <connorkite@gmail.com> writes:
->=20
-> > On Thu, Aug 20, 2026 at 2:02=E2=80=AFAM Markus Armbruster <armbru@redha=
-t.com> wrote:
-> >>
-> >>
-> >> Any guidance on when to enable it?
-> >>
-> > ...
+On Wed, Sep 2, 2026 at 11:02=E2=80=AFPM Miklos Szeredi <miklos@szeredi.hu> =
+wrote:
+>
+> On Wed, 2 Sept 2026 at 21:35, Khazhy Kumykov <khazhy@chromium.org> wrote:
 > >
-> >> Likewise.
-> >>
+> > On Wed, Sep 2, 2026 at 12:46=E2=80=AFAM Miklos Szeredi <miklos@szeredi.=
+hu> wrote:
+> > >
+> > > On Tue, 1 Sept 2026 at 23:34, Changyuan Lyu <changyuanl@google.com> w=
+rote:
+> > >
+> > > > 1. For virtiofsd: Does the automatic detection of pseudo-filesystem=
+s via
+> > > >    fstatfs magic match upstream expectations, or would upstream pre=
+fer an
+> > > >    explicit configuration option (such as per-path cache policies)?
+> > >
+> > > Why not just set "--cache never" for the pseudo fs export?
 > >
-> > In both cases, you would enable this for added security.  There's
-> > obviously a performance hit, but it prevents a potentially misbehaving
-> > vhost-user backend from reading or modifying undesired portions of
-> > guest memory, since data transfer occurs wholly via bounce buffers.
-> > This may be more useful in the generic netdev vhost user case than it
-> > is with the passt version, but the goal is for the mode to be
-> > accessible for any vhost-user device.
->=20
-> Work this into the commit message, please.
->=20
-> > Do you think guidance is needed here in net.json?  I was thinking
-> > that, if isolation-mode gets to a point of being merged, then
-> > information like this would make sense somewhere in the online
-> > documentation, but I'm happy to add something here as well.  I was
-> > just trying to be similarly short and to-the-point as the other option
-> > descriptions for these structs.
->=20
-> I think it needs to be somewhere in the user documentation.  We have so
-> many configuration options, and so little guidance on what to do with
-> them.
->=20
-> The doc comments in the QAPI schema are reference documentation (they go
-> into the "QEMU QMP Reference Manual").  Reference documentation should
-> be concise and to the point.  When you have more useful things to say
-> than fit there, you need to find nother place, and maybe link to it from
-> the reference docs.
->=20
-> I suggest to try adding brief guidance to the doc comment, and then we
-> see how we feel about it.
->=20
-
-Here is the vhost-user documentation:
-docs/system/devices/virtio/vhost-user.rst
-
-You could add a section to this document explaining the memory isolation
-feature.
-
-Stefan
-
---KnjVaE+vH1BLpuM3
-Content-Type: application/pgp-signature; name=signature.asc
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCgAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmqkK4sACgkQnKSrs4Gr
-c8iXVwf8DGpxrzx9sLiqhzx/nPuFuWno1XrNXMpuygfYefGT3kkNbrCM+7Ajf3sF
-Zf+R2yKfp7zLKw4wk2fFXxr9xBC+betiNkPGzHNardyzABhHmDvbaYXsthlzeNp3
-/3Tn7BcLjc8rH7h3BoE30GgnGvRBJSLsJ2iyQodjha2V6SEWq+dqF6T9KduOPXr1
-6C8cIHs6FqBRNP6kPAZ0ZkjUGv3XeMhnC3UXRb9mR447T4la/TucQOXZJtp4qbo8
-O/G2SmK0Kim9OXwljF4zQgXTczoZannQnx4gVgsC3vBU2glM2Bjr7LbbMCzFYkud
-RjaktYz9gizD10dTMLT+tnxBNZS54Q==
-=buAp
------END PGP SIGNATURE-----
-
---KnjVaE+vH1BLpuM3--
-
+> > Enabling caching does give a pretty noticeable performance improvement
+> > for those files that can be cached, and we'd like to have just a
+> > single export instead of setting up multiple and assembling it
+> > piecemeal. (To this end we do have an out-of-tree extension to the
+> > virtiofsd-rs passthrough module to allow changing caching duration on
+> > a per file basis as the protocol allows..., been meaning to start a
+> > thread if folks are interested in this since it has proven somewhat
+> > useful for us now).
+> >
+> > But I felt having first class support for this felt more "right" -
+> > enabling caching shouldn't break reading of certain files, and the
+> > server is in a position to know if a file would support this or not.
+>
+> I'm fine with this.  But virtiofsd maintainers will have to make a
+> decision about merging or not merging this feature.
+Ack. Am hoping this list is the right place to get attention :) I
+tried signing up for gitlab but I think it very much does not like the
+corporate network here -- it was asking me for a credit card to create
+an account (!!!).
+>
+> One idea that occurs to me is that the kernel is in a much better
+> position to give a hint:
+I'm not sure I understand the proposal here: the guest kernel doesn't
+have context beyond what we pass through the inode lookup, right? I
+don't think we have enough information /in the guest/ to know if a
+file was a special pseudo file or not /on the host/. I might be
+missing something...?
+>
+>  - file is normal: POSIX semantics apply
+>  - file is pseudo; POSIX semantics don't apply
+>
+> The "normal" category could also be split into:
+>
+>  - file is local: changes always generate fanotify events
+>  - file is remote: changes do not always generate fanotify events
+>
+> Thanks,
+> Miklos

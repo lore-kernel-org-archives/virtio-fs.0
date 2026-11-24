@@ -1,85 +1,96 @@
-Authentication-Results: smtp.subspace.kernel.org; arc=none smtp.remote-ip=124.126.103.232
-ARC-Seal: i=1; d=subspace.kernel.org; s=arc20261015; a=rsa-sha256; cv=none;
-	t=1795427733;
-	b=poQjmvjBTZaiSHl1uOt9tZ6F/13F37AxGqQrDS87dj2cBmxqhwsGyDw+PcYk+Ma94lXD
-	 1Ztnml6qF+MSgNfzWbYUw/kS4wpXAQUVTDq4jXi0g2dFS6SyJ/bXCLxtFxILhafYz11RQ
-	 x/MAwgwsjHArp8Vl0TjwU7d3Q5QaL9fDI+qi7lNS7nvh2IwqPDFyxW4PomwHusPS7Uaui
-	 x/p7iq8p+Lu8gNESACh0ktTmTqlgRqiA44n0TegEMaobFSkT079MSE9XumPsbeFA7W9py
-	 ALzc0n6Bu8BwRhzy2AkhCJM1x69MnXy+cqb1BpvtyBgEBIpGcj3TFPc4ygr0MGbdsTA==
-ARC-Message-Signature: i=1; d=subspace.kernel.org; s=arc20261015;
-	a=rsa-sha256; c=relaxed/relaxed; t=1795427733;
-	h=DMARC-Filter:X-UUID:X-CTIC-Tags:X-CID-P-RULE:X-CID-O-INFO:X-CID-INFO:
-	 X-CID-META:X-CID-BVR:X-CID-BAS:X-CID-FACTOR:X-CID-RHF:X-UUID:X-User:
-	 Received:From:To:Cc:Subject:Date:Message-Id:X-Mailer:MIME-Version:
-	 Content-Transfer-Encoding;
-	bh=ExBrdivvPGnMfALa1gyv4ambGV9X8LsRbMUTFusz2lM=;
-	b=DiAtWX3bp/chaBbmkf8J0uv3RxlO5OsIOeKhbzDRVt8bFhL7KxBzRdHwM5yKOIlK3MP7
-	 qIaYcmi+JNqkRi/GTlaZUR/dIEfUrbBQZUrrpvPZSd5HBO9yAaYHkBNdGtOY5E6stPcCe
-	 0uycUfPu1N8J3DXU9gzwiNbWIW1HqOfl2PfnKpx9qQdDCqglFXPDBU7WnxlaRL/GY53F8
-	 z1gxfXzlXvu6Xc0a9KGL7DX6IgT6LwfPimU+5cfXQaDH4qjXUBzAvTWxPL5p21p84kohM
-	 pEoPd9/8R2r2d4NB3WufJOxZZnncf4tmIgLxBE6Rhj+l1D22ohqyU8FM0k0PF+zqTCw==
-ARC-Authentication-Results: i=1; smtp.subspace.kernel.org; 
-	dmarc=none header.from=kylinos.cn;
-	spf=pass smtp.mailfrom=kylinos.cn;
-	arc=none smtp.remote-ip=124.126.103.232
-Received: from mailgw.kylinos.cn (mailgw.kylinos.cn [124.126.103.232])
-	(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+Authentication-Results: smtp.subspace.kernel.org; arc=pass header.oldest-pass=0 smtp.remote-ip=209.85.160.181
+ARC-Seal: i=2; d=subspace.kernel.org; s=arc20261015; a=rsa-sha256; cv=pass;
+	t=1795517756;
+	b=DvVTJ0f8w4KNgGGiG/+LQUANIKMRFqSFu+uCpWT3kqM1Ug44ozy4CH2sL79YbBTXJLSf
+	 9IfIG01CZTZRJHd9GIpCVjPVcnr9UO4LFDGHEfSEYfYtm0MoEn5JOnzuPuxGySJ0eCqsX
+	 BGbVnqo/oNvhdPKz5qwi7WYXqyjtpYslYhqgFetCVvaJB8eREZ4j2sMTGuei/c136Ny5Q
+	 6kFf1aTWfLnGTKXK10qbg6WQJ4S75Ybp7XixCnPFNW+4WTyvgnj3KkuKv96bPzeokJTIN
+	 EOPoePzKhohjK8vrP0B9yqFMYhV1vqkC5qPquZJt9wwrNtaAlHbSz5CJ3hEUDTxu7og==
+ARC-Message-Signature: i=2; d=subspace.kernel.org; s=arc20261015;
+	a=rsa-sha256; c=relaxed/relaxed; t=1795517756;
+	h=DMARC-Filter:Received:DKIM-Signature:X-Google-DKIM-Signature:
+	 X-Forwarded-Encrypted:X-Gm-Message-State:X-Gm-Gg:X-Received:
+	 MIME-Version:References:In-Reply-To:From:Date:X-Gm-Features:
+	 Message-ID:Subject:To:Cc:Content-Type;
+	bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
+	b=rZQkYegR5ANjBE91jDLcie8veGmdTsOo2wysOeIsKFBQNm7igNLoSHLNVH4UIBBygs1U
+	 5GoSiwLv+zM8plFa1uMlEqmu6LvIyYaz+SGHO2e0shQERDoEeVTrOSWj9u3JzQYLmIq6+
+	 S9lpk/meuadjh+zhdNATW4uUSccdTn+bXEkDSeBFicn0PyKsStfQTXpHkL1f31LuJVB94
+	 9O6PKgbkJKecqnM5PxcyRRgSVXBJzDbuNUifx2TH5qNDBKv/92mr427SAHasZIWb/Sda3
+	 z6g8VcY4YSMW+WwgvBc1qywg0Z28sbWwE8MBoVcAK38396TXX6HhL+0QUIN0KcCYfUQ==
+ARC-Authentication-Results: i=2; smtp.subspace.kernel.org; 
+	dmarc=pass header.from=szeredi.hu;
+	spf=pass smtp.mailfrom=szeredi.hu;
+	dkim=pass header.d=szeredi.hu header.i=@szeredi.hu header.a=rsa-sha256 header.s=google header.b=aHyUg010;
+	arc=pass header.oldest-pass=0 smtp.remote-ip=209.85.160.181
+Received: from mail-qt1-f181.google.com (mail-qt1-f181.google.com [209.85.160.181])
+	(using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
 	 key-exchange X25519 server-signature ECDSA (prime256v1) server-digest SHA256)
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id E99CC606A31E;
-	Mon, 23 Nov 2026 09:55:30 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.2 smtp.subspace.kernel.org E99CC606A31E
-Authentication-Results: smtp.subspace.kernel.org; dmarc=none (p=none dis=none) header.from=kylinos.cn
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=kylinos.cn
-X-UUID: ff3964bee72311f19a56ed5b684f684d-20261123
-X-CTIC-Tags:
-	HR_CC_CHARSET, HR_CC_CHARSET_NUM, HR_CC_COUNT, HR_CC_DOMAIN_COUNT, HR_CC_NAME
-	HR_CC_NO_NAME, HR_CHARSET, HR_CHARSET_NUM, HR_CTE_8B, HR_CTT_MISS
-	HR_DATE_H, HR_DATE_WKD, HR_DATE_ZONE, HR_FROM_NAME, HR_SJ_LANG
-	HR_SJ_LEN, HR_SJ_LETTER, HR_SJ_NOR_SYM, HR_SJ_PHRASE, HR_SJ_PHRASE_LEN
-	HR_SJ_WS, HR_TO_COUNT, HR_TO_DOMAIN_COUNT, HR_TO_NAME, IP_TRUSTED
-	SRC_TRUSTED, SA_TRUSTED, SA_EXISTED, SN_EXISTED, SPF_NOPASS
-	DKIM_NOPASS, DMARC_NOPASS, CIE_BAD, CIE_GOOD_SPF, GTI_FG_BS
-	GTI_RG_INFO, GTI_C_BU, AMN_GOOD, ABX_MISS_RDNS
-X-CID-P-RULE: Release_Ham
-X-CID-O-INFO: VERSION:1.3.19,REQID:d9d3e7ed-4998-436a-99a2-9ca028c2f262,IP:10,
-	URL:0,TC:0,Content:0,EDM:0,RT:0,SF:0,FILE:0,BULK:0,RULE:Release_Ham,ACTION
-	:release,TS:10
-X-CID-INFO: VERSION:1.3.19,REQID:d9d3e7ed-4998-436a-99a2-9ca028c2f262,IP:10,UR
-	L:0,TC:0,Content:0,EDM:0,RT:0,SF:0,FILE:0,BULK:0,RULE:Release_Ham,ACTION:r
-	elease,TS:10
-X-CID-META: VersionHash:7db8b62,CLOUDID:a8d4509ebbf7a42d767ec0deb1659f01,BulkI
-	D:261123175525VOW09MFG,BulkQuantity:0,SF:17|19|38|66|78|102|127|153|865|89
-	8,TC:nil,Content:0|15|50|99,EDM:-3,IP:-2|1,URL:0,File:nil,RT:nil,Bulk:nil,
-	QS:nil,BEC:nil,COL:0,OSI:0,OSA:0,AV:0,LES:1,SPR:NO,DKR:0,DKP:0,BRR:0,BRE:0
-	,ARC:0
-X-CID-BVR: 2,SSN|SDN
-X-CID-BAS: 2,SSN|SDN,0,_
-X-CID-FACTOR: TF_CID_SPAM_SNR,TF_CID_SPAM_FAS,TF_CID_SPAM_FSD,TF_CID_SPAM_IBB
-X-CID-RHF: D41D8CD98F00B204E9800998ECF8427E
-X-UUID: ff3964bee72311f19a56ed5b684f684d-20261123
-X-User: liwang@kylinos.cn
-Received: from computer.. [(116.128.244.169)] by mailgw.kylinos.cn
-	(envelope-from <liwang@kylinos.cn>)
-	(Generic MTA with TLSv1.3 TLS_AES_256_GCM_SHA384 256/256)
-	with ESMTP id 137605619; Mon, 23 Nov 2026 17:55:21 +0800
-From: Li Wang <liwang@kylinos.cn>
-To: Miklos Szeredi <miklos@szeredi.hu>,
-	German Maglione <gmaglione@redhat.com>,
-	Vivek Goyal <vgoyal@redhat.com>,
-	Stefan Hajnoczi <stefanha@redhat.com>
-Cc: =?UTF-8?q?Eugenio=20P=C3=A9rez?= <eperezma@redhat.com>,
-	"Michael S . Tsirkin" <mst@redhat.com>,
-	fuse-devel@lists.linux.dev,
-	virtualization@lists.linux.dev,
-	linux-fsdevel@vger.kernel.org,
-	virtio-fs@lists.linux.dev,
-	Li Wang <liwang@kylinos.cn>,
-	stable@vger.kernel.org
-Subject: [PATCH] virtiofs: fix potential unmount or device removal hang due to stuck FORGETs
-Date: Mon, 23 Nov 2026 17:54:55 +0800
-Message-Id: <20261123095455.88622-1-liwang@kylinos.cn>
-X-Mailer: git-send-email 2.34.1
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 3961E606A339
+	for <virtio-fs@lists.linux.dev>; Tue, 24 Nov 2026 10:55:54 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.2 smtp.subspace.kernel.org 3961E606A339
+Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=szeredi.hu
+Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=szeredi.hu
+Authentication-Results: smtp.subspace.kernel.org;
+	dkim=pass (1024-bit key) header.d=szeredi.hu header.i=@szeredi.hu header.a=rsa-sha256 header.s=google header.b=aHyUg010
+Received: by mail-qt1-f181.google.com with SMTP id d75a77b69052e-53639b8903bso53819381cf.0
+        for <virtio-fs@lists.linux.dev>; Tue, 24 Nov 2026 02:55:54 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1795517754; cv=none;
+        d=google.com; s=arc-20260327;
+        b=GbvukZ5uL1aKj40pdL7OQg2PPS+WW5W20T4K0HLqzipG+2A9fbF6vsR0OMS3OLinJg
+         rsiQ9DVEyK4y9Ocmcs3meTzye0S8fXvyS16nkTBM1wXBgYOB7SkqjUhp+EUzTuKdkx6E
+         nQTY78KyyBKbUkiWlhUXSGXCbisI9ocdmoNjgqPlY1LPMi1ElJBl28g1lJElkWFwUAfi
+         l4Dor9Ou9uit9W9GWw8z01A9zlz85fiQY/tJ/GY2GzwAxJG3frsUQsFqtjWfsd1aAYpz
+         mJzpNmsbEMoVrtXTpW0QwSKvde9wor3+t5oRQyTMhgq0SfCr2EzTbLPUJzmRTxldlpJw
+         +VYw==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=cc:to:subject:message-id:date:from:in-reply-to:references
+         :mime-version:dkim-signature;
+        bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
+        fh=nLRkLmLzIEAj6XRjs3BOnGs4z/faBiHXgQltyKz/ZpU=;
+        b=AP6xtRMPwsPE98vvrqAeF1V+UzOWgtbQvSwssXVLgyYJHhjE9HSJKTCQ6ruQUCWnXu
+         Pa7KVWAKMftXk7V2dR17OzCHTloADxOWxMKmGtxC2zTkbaOOJQ3kvFI8181PqTZLwm4+
+         C0/9F1EiHxYXR2rjbAzsCBAkuckWdAQdprx8GUhn7qPd10eov6rTByRaS2KkMdn1gYzB
+         VN3vIMQi8JNfoIUIpl86+NdYYX7qAt9Zx0Rw534RkOVrbmu2XYTcos/5mKJlqV1nO7ow
+         BJS8Bu/3gxatk4Ut/KvREIRQD0aGGMZ5sT0NmfW5z7vgtVjJ/z9X2Qo8Rxb4yf1fx6Dx
+         0a0g==;
+        darn=lists.linux.dev
+ARC-Authentication-Results: i=1; mx.google.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=szeredi.hu; s=google; t=1795517754; x=1796122554; darn=lists.linux.dev;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
+        b=aHyUg010Fpa30tqfBUn1Gih+DTOzaKalA8zN1XBuoXqQay7t9Nf0/FQfF7TKBld6Na
+         H+oZLrT9EDYL/2VEaZ6JqGj/vg4ixQZUUDwvM+f8N57hPXmm5vlgshvUvsJyk5JKHf6B
+         iEel12hsckPmiRCfJSNtL4IHY5Bc7QyOmEMdo=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20260707; t=1795517754; x=1796122554;
+        h=content-type:cc:to:subject:message-id:date:from:in-reply-to
+         :references:mime-version:x-gm-gg:x-gm-message-state:from:to:cc
+         :subject:date:message-id:reply-to:content-type;
+        bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
+        b=IZS+VFTUSqlWndyov4/MvicpDyA98UcX+PmqUE/1bXkyL9NQTt18iB0ZX8x+imr8GV
+         B2nfpTQS8ds7SSDleOQP+iGeJoGEq/k0OnbieACH10KGUpSpOGvH4T+lI7EhHfDi0jw/
+         4ma//B07GBUq7yW8wlPchcjoMVXlUBmsPnucBPd2BqPRmcO9NkZlm5hNOtTkdt0YF/ZA
+         XiwHV+rCsHD2RZV0+wfyW8bxfXFldjMUKrBLvqW8Qf5+9Gcvkij6jHwhCk41qg0QWN/I
+         t1oK8l8sVTIatU/zFxr8vswV5bk1eVURCw8Upij+R+OCdiEdlEQolMZbNSKv2KpyZHCn
+         A6AQ==
+X-Forwarded-Encrypted: i=1; AL+hErHIBHrkdE6j5p6YIMFDDPgxGPW4fWrZry1rBYlDh+hAanLB6U2IyF1LNduBUGmkAPubshcJCvM4Bds=@lists.linux.dev
+X-Gm-Message-State: APuU4Z8vBi6cYeCnC8CikLhjDQojelWtyXPkV80+z9RvdjfHjylpK07y
+	6wuEE2rlV7H7CVEBcK0U2naCR0wp6mNKtQL77WbQMGxsJTqnBG4r5WpRL+AS1i9R4VW34S0QWwk
+	0FhdTRABh2FiyqCgi10q5jNUpkaoMRZr8ph7AV4AoDw==
+X-Gm-Gg: AZFdTZcvkKjoOcVx6PooPJ2gZ9o8tqKy4RZ+6Qwrsed8S0/2m8EMUYvgykJ3j6sgev5
+	4ooUSk2Ty079qE5+r+NRYe1NHuvM8Qp1lC8DLSeCWE6oHrp2U9wquZBY90/Pr5WKztXgCj/W6LU
+	b+mf9xbbwyEYsbcFyEPw+EYmzB6lNTcZo/CKi6nkzZIZtVm2mfdukxvwBnWV18oEbUSefWF+3nS
+	xMDgHtC7I3Tq/a4C4pfQCA1VI4hEvji84QQj7aGRmtdbacShTuqooVtvdIyYmQMjZsot2mySe3X
+	QR/SRSWpbV6PfWdOnlQDKJyF+/QG08ZBLW8fdk2xmTKuODuczc5dN64HvUU6pi4dLSFVr3GV8J3
+	engZxk+45Xyos7zbLC6zlSwoi6eSHWAm8BS85/EVaS6wplUxkFrD/F5NUtQGVliNkJA==
+X-Received: by 2002:ac8:5d04:0:b0:54f:50e7:6d69 with SMTP id
+ d75a77b69052e-55d6fbfc728mr265521821cf.1.1795517753910; Tue, 24 Nov 2026
+ 02:55:53 -0800 (PST)
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Post: <mailto:virtio-fs@lists.linux.dev>
@@ -89,58 +100,29 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 List-Owner: <mailto:virtio-fs+owner@lists.linux.dev>
 Precedence: list
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+References: <6c6cea56-1af2-4a37-b081-83244d5e09cd@kylinos.cn> <20261123063609.82014-1-q.h.hack.winter@gmail.com>
+In-Reply-To: <20261123063609.82014-1-q.h.hack.winter@gmail.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Tue, 24 Nov 2026 11:55:42 +0100
+X-Gm-Features: Aa3M54r7eAE856Qdq3AsqWMUaoTcqR2q2T6lCT40Ts3802VL14VNSmjueVArc1E
+Message-ID: <CAJfpeguspTb0w7DK8-4ALHMcHbH0+Qs8nfh78mOJRwN3VQcAdg@mail.gmail.com>
+Subject: Re: [PATCH v5] fuse: virtio-fs: fix lost wakeup on a full virtqueue
+To: Qihang <q.h.hack.winter@gmail.com>
+Cc: Li Wang <liwang@kylinos.cn>, German Maglione <gmaglione@redhat.com>, 
+	Vivek Goyal <vgoyal@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, 
+	Eugenio Perez <eperezma@redhat.com>, virtualization@lists.linux.dev, 
+	linux-fsdevel@vger.kernel.org, fuse-devel@lists.linux.dev, 
+	linux-kernel@vger.kernel.org, virtio-fs@lists.linux.dev
+Content-Type: text/plain; charset="UTF-8"
 
-virtqueue_add_outbuf() returns -ENOSPC when the virtqueue is full.  On
-this path it can also return -ENOMEM, when a split-ring DMA mapping
-fails, or -EIO, when the virtqueue is broken or a packed-ring mapping
-fails.  send_forget_request() turns only -ENOSPC into 1, so
-virtio_fs_hiprio_dispatch_work() stops and waits for a completion.  Any
-other error frees that FORGET and drops its in_flight count, then
-returns the negative errno.  The worker treats every non-zero return as
-a reason to stop, so the rest of queued_reqs is left unexamined.
+On Mon, 23 Nov 2026 at 07:36, Qihang <q.h.hack.winter@gmail.com> wrote:
 
-hiprio dispatch_work is scheduled only from
-virtio_fs_hiprio_done_work(), which runs from that virtqueue interrupt.
-Once no descriptor is outstanding, the device raises no interrupt and
-nothing walks the list.  virtio_fs_send_forget() submits a new FORGET
-directly and does not schedule the worker.  The queued entries are
-reached again only if that new FORGET is placed on the virtqueue and
-the device completes it.  A new FORGET that itself gets -ENOSPC,
--ENOMEM or -EIO does not schedule dispatch_work.
+> On -ENOSPC, add the request to queued_reqs before releasing fsvq->lock,
+> as send_forget_request() does.  This prevents
+> virtio_fs_requests_done_work() from checking queued_reqs between the
+> failed submission and the insertion.  Both callers can then return
+> immediately on -ENOSPC.
 
--EIO stays -EIO for every later add.  New FORGETs never enter the ring,
-so they never produce the completion that would run the worker.
-Entries already queued still hold in_flight.  virtio_fs_drain_queue()
-waits for in_flight to reach zero before it flushes dispatch_work, and
-unmount or device removal hangs.  -ENOMEM can succeed on a later
-attempt, but with an empty ring the same entries wait until some later
-FORGET both enters the ring and completes.  Each such completion
-retries only the head of the list and stops again when that head fails.
+Applied, thanks.
 
-After the FORGET is dropped, return 0 so this same worker invocation
-continues with the rest of queued_reqs.  A full queue still returns 1.
-
-Fixes: a62a8ef9d97d ("virtio-fs: add virtiofs filesystem")
-Cc: stable@vger.kernel.org
-Signed-off-by: Li Wang <liwang@kylinos.cn>
----
- fs/fuse/virtio_fs.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index d247a02cdca9..d2d1e8fe3a91 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -655,6 +655,8 @@ static int send_forget_request(struct virtio_fs_vq *fsvq,
- 			kfree(forget);
- 			if (in_flight)
- 				dec_in_flight_req(fsvq);
-+			/* Dropped.  Let the worker keep going. */
-+			ret = 0;
- 		}
- 		goto out;
- 	}
--- 
-2.34.1
-
+Miklos

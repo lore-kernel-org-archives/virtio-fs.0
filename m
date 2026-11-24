@@ -1,96 +1,96 @@
-Authentication-Results: smtp.subspace.kernel.org; arc=pass header.oldest-pass=0 smtp.remote-ip=209.85.160.181
+Authentication-Results: smtp.subspace.kernel.org; arc=pass header.oldest-pass=0 smtp.remote-ip=209.85.222.179
 ARC-Seal: i=2; d=subspace.kernel.org; s=arc20261015; a=rsa-sha256; cv=pass;
-	t=1795517756;
-	b=DvVTJ0f8w4KNgGGiG/+LQUANIKMRFqSFu+uCpWT3kqM1Ug44ozy4CH2sL79YbBTXJLSf
-	 9IfIG01CZTZRJHd9GIpCVjPVcnr9UO4LFDGHEfSEYfYtm0MoEn5JOnzuPuxGySJ0eCqsX
-	 BGbVnqo/oNvhdPKz5qwi7WYXqyjtpYslYhqgFetCVvaJB8eREZ4j2sMTGuei/c136Ny5Q
-	 6kFf1aTWfLnGTKXK10qbg6WQJ4S75Ybp7XixCnPFNW+4WTyvgnj3KkuKv96bPzeokJTIN
-	 EOPoePzKhohjK8vrP0B9yqFMYhV1vqkC5qPquZJt9wwrNtaAlHbSz5CJ3hEUDTxu7og==
+	t=1795518852;
+	b=ax94AYLdzduQ1d5NvbrK8FPbcQO+nZKcDUdvLdDNQWdSTjmTff05IoPC/FxIhEuS+Zzj
+	 CTdQ1tzmH41AdD7K0R32t8ShCCLA+BmXYwcjtGwuuRJZk1YBXpfeyWgK5U4o5aqGsG6he
+	 hVWjco/zux5uls8kQzaPw6UFU9febcamsxWQk5lZg23dMRuOyqSUipKglz9jY1Xdu1lsv
+	 tUX2zln8viwsXhGjgIRQc8pib+v1as+VyD3JMHDdPnLVKWFUMvAU4huahPz0xdj461CV+
+	 a2FiH/KQC4OAZEYTF5IfvsfV1nRiCnPuxd4QnGcw3A4aCC9qbHCJhX85yq3uH5/JxTA==
 ARC-Message-Signature: i=2; d=subspace.kernel.org; s=arc20261015;
-	a=rsa-sha256; c=relaxed/relaxed; t=1795517756;
+	a=rsa-sha256; c=relaxed/relaxed; t=1795518852;
 	h=DMARC-Filter:Received:DKIM-Signature:X-Google-DKIM-Signature:
 	 X-Forwarded-Encrypted:X-Gm-Message-State:X-Gm-Gg:X-Received:
 	 MIME-Version:References:In-Reply-To:From:Date:X-Gm-Features:
 	 Message-ID:Subject:To:Cc:Content-Type;
-	bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
-	b=rZQkYegR5ANjBE91jDLcie8veGmdTsOo2wysOeIsKFBQNm7igNLoSHLNVH4UIBBygs1U
-	 5GoSiwLv+zM8plFa1uMlEqmu6LvIyYaz+SGHO2e0shQERDoEeVTrOSWj9u3JzQYLmIq6+
-	 S9lpk/meuadjh+zhdNATW4uUSccdTn+bXEkDSeBFicn0PyKsStfQTXpHkL1f31LuJVB94
-	 9O6PKgbkJKecqnM5PxcyRRgSVXBJzDbuNUifx2TH5qNDBKv/92mr427SAHasZIWb/Sda3
-	 z6g8VcY4YSMW+WwgvBc1qywg0Z28sbWwE8MBoVcAK38396TXX6HhL+0QUIN0KcCYfUQ==
+	bh=YxcSWKYnItj3yo5FCFqsfm26g9ItY5gHtNPYg7zw1LA=;
+	b=lgynoWios2A9zdFUbhkbeCPQatekpfW2I0mx9IuKyjYD3zhoNYinZ74jHxf3EF+kn5dB
+	 QDShSjWKLsbUrKkuBMAKjTiDx9AdU6DGfkW091V6A6AHxRL2nu7x6bZcTAw839wyi1zIn
+	 PYqpqM6xuySxZYhC4Xwhct9aU+orIiHiaKFEBWPSKaUKEnhhlT3uZuG7i8QtOiNU2QOWP
+	 JHbathzhu6VEyG3mDwSJzaslT0BSuNtwRm1Ztg+w5brRIzgUXEQvWCQwkTl+j/Uuv3yp0
+	 zoHZQZIYdNzOYEdds28bUosmlyXBY56TqWm9zLvcWRHpWPItTqkrZ8YR9AgkdjZTOcw==
 ARC-Authentication-Results: i=2; smtp.subspace.kernel.org; 
 	dmarc=pass header.from=szeredi.hu;
 	spf=pass smtp.mailfrom=szeredi.hu;
-	dkim=pass header.d=szeredi.hu header.i=@szeredi.hu header.a=rsa-sha256 header.s=google header.b=aHyUg010;
-	arc=pass header.oldest-pass=0 smtp.remote-ip=209.85.160.181
-Received: from mail-qt1-f181.google.com (mail-qt1-f181.google.com [209.85.160.181])
+	dkim=pass header.d=szeredi.hu header.i=@szeredi.hu header.a=rsa-sha256 header.s=google header.b=GMzzcfBv;
+	arc=pass header.oldest-pass=0 smtp.remote-ip=209.85.222.179
+Received: from mail-qk1-f179.google.com (mail-qk1-f179.google.com [209.85.222.179])
 	(using TLSv1.3 with cipher TLS_AES_128_GCM_SHA256 (128/128 bits)
 	 key-exchange X25519 server-signature ECDSA (prime256v1) server-digest SHA256)
 	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 3961E606A339
-	for <virtio-fs@lists.linux.dev>; Tue, 24 Nov 2026 10:55:54 +0000 (UTC)
-DMARC-Filter: OpenDMARC Filter v1.4.2 smtp.subspace.kernel.org 3961E606A339
+	by smtp.subspace.kernel.org (Postfix) with ESMTPS id 2AA81606A33E
+	for <virtio-fs@lists.linux.dev>; Tue, 24 Nov 2026 11:14:11 +0000 (UTC)
+DMARC-Filter: OpenDMARC Filter v1.4.2 smtp.subspace.kernel.org 2AA81606A33E
 Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=quarantine dis=none) header.from=szeredi.hu
 Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=szeredi.hu
 Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=szeredi.hu header.i=@szeredi.hu header.a=rsa-sha256 header.s=google header.b=aHyUg010
-Received: by mail-qt1-f181.google.com with SMTP id d75a77b69052e-53639b8903bso53819381cf.0
-        for <virtio-fs@lists.linux.dev>; Tue, 24 Nov 2026 02:55:54 -0800 (PST)
-ARC-Seal: i=1; a=rsa-sha256; t=1795517754; cv=none;
+	dkim=pass (1024-bit key) header.d=szeredi.hu header.i=@szeredi.hu header.a=rsa-sha256 header.s=google header.b=GMzzcfBv
+Received: by mail-qk1-f179.google.com with SMTP id af79cd13be357-9497a167a6aso648557385a.1
+        for <virtio-fs@lists.linux.dev>; Tue, 24 Nov 2026 03:14:11 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1795518851; cv=none;
         d=google.com; s=arc-20260327;
-        b=GbvukZ5uL1aKj40pdL7OQg2PPS+WW5W20T4K0HLqzipG+2A9fbF6vsR0OMS3OLinJg
-         rsiQ9DVEyK4y9Ocmcs3meTzye0S8fXvyS16nkTBM1wXBgYOB7SkqjUhp+EUzTuKdkx6E
-         nQTY78KyyBKbUkiWlhUXSGXCbisI9ocdmoNjgqPlY1LPMi1ElJBl28g1lJElkWFwUAfi
-         l4Dor9Ou9uit9W9GWw8z01A9zlz85fiQY/tJ/GY2GzwAxJG3frsUQsFqtjWfsd1aAYpz
-         mJzpNmsbEMoVrtXTpW0QwSKvde9wor3+t5oRQyTMhgq0SfCr2EzTbLPUJzmRTxldlpJw
-         +VYw==
+        b=nxq6SPLpkpwJzQMoHa6xyf+0ag2CK2cg6TunaV/lTfoP+NWS8CuaPN0UEX/yIz5CFo
+         ZWL26b+vUMceKKlpI5CbQ02pBeXxySKYyDKXkahu93T5v6eH48WvZxdPK+baUR0blu7Y
+         XF5Oe9Ojq0i/ZyvBXj1fasgqydDpcwceVbF7cVNzPZ6kYD2IyNpdU/njH7vxvRwvc/H9
+         ndd5MaJcm0NMp7K8FyO44RHuSou+V9cKgOhNcg7ZjkdQQj1f9gUySRIV7CHvGZ/C2l2P
+         Rxym4NMhFCSJyki3wVfEloGT+bU0IKFvy/vkqeF/JaT+E43l27XzvxwOuvx4VNwRNO3u
+         FEdw==
 ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
         h=cc:to:subject:message-id:date:from:in-reply-to:references
          :mime-version:dkim-signature;
-        bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
-        fh=nLRkLmLzIEAj6XRjs3BOnGs4z/faBiHXgQltyKz/ZpU=;
-        b=AP6xtRMPwsPE98vvrqAeF1V+UzOWgtbQvSwssXVLgyYJHhjE9HSJKTCQ6ruQUCWnXu
-         Pa7KVWAKMftXk7V2dR17OzCHTloADxOWxMKmGtxC2zTkbaOOJQ3kvFI8181PqTZLwm4+
-         C0/9F1EiHxYXR2rjbAzsCBAkuckWdAQdprx8GUhn7qPd10eov6rTByRaS2KkMdn1gYzB
-         VN3vIMQi8JNfoIUIpl86+NdYYX7qAt9Zx0Rw534RkOVrbmu2XYTcos/5mKJlqV1nO7ow
-         BJS8Bu/3gxatk4Ut/KvREIRQD0aGGMZ5sT0NmfW5z7vgtVjJ/z9X2Qo8Rxb4yf1fx6Dx
-         0a0g==;
+        bh=YxcSWKYnItj3yo5FCFqsfm26g9ItY5gHtNPYg7zw1LA=;
+        fh=DocpvWJh0SnNEGhMjTGzp3nuDJEzVzqMqhNfMIBZV3U=;
+        b=MtKNVm2DGlywFEkooX6Ao0u+RHF0PbVrn2z7GwzA4p+lQcFz2BXNnJuDFX89XSpl/L
+         MHohzn0CPBu0zeHYE0HHYCmO00mvBxkxIJaE+20/C2EpNnXEhbAm/QKTiW3NxuW9Rau2
+         s6+ULzPiIePT/zOucnQkx5uHrOJ+6SF2x+H7uF+vjg8HGYw2MaNTPRfsYccCALn2h2fj
+         8S6E+84MocU3v6qMPRhZrMBD7gdnuHyM2iIOBrqau+OQJlhj2YjocoaThHvHK8FBzgK0
+         m4bCpB/NW5G5UBKm9yRaFUMDYrPpl8PVuIJB1DkeTlx80lgUjx8Y8fX9zRfgcbzHBBRM
+         s77A==;
         darn=lists.linux.dev
 ARC-Authentication-Results: i=1; mx.google.com; arc=none
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=szeredi.hu; s=google; t=1795517754; x=1796122554; darn=lists.linux.dev;
+        d=szeredi.hu; s=google; t=1795518851; x=1796123651; darn=lists.linux.dev;
         h=content-type:cc:to:subject:message-id:date:from:in-reply-to
          :references:mime-version:from:to:cc:subject:date:message-id:reply-to
          :content-type;
-        bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
-        b=aHyUg010Fpa30tqfBUn1Gih+DTOzaKalA8zN1XBuoXqQay7t9Nf0/FQfF7TKBld6Na
-         H+oZLrT9EDYL/2VEaZ6JqGj/vg4ixQZUUDwvM+f8N57hPXmm5vlgshvUvsJyk5JKHf6B
-         iEel12hsckPmiRCfJSNtL4IHY5Bc7QyOmEMdo=
+        bh=YxcSWKYnItj3yo5FCFqsfm26g9ItY5gHtNPYg7zw1LA=;
+        b=GMzzcfBvw+aONBCpWkjfANJ6eTt7SCTdxcTNrqAbFsQlXUww+E75+oNRQxShLUNA/3
+         LihFRUw40zgScK/aVX9Ex3KN8pBKx+Htdt0R6r6WhHeHSAEgvOsZP79+JNtSiVABjTL2
+         tgwMkgP+cx/csM/Y5yW24w498WmHXnLlB7J5E=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20260707; t=1795517754; x=1796122554;
+        d=1e100.net; s=20260707; t=1795518851; x=1796123651;
         h=content-type:cc:to:subject:message-id:date:from:in-reply-to
          :references:mime-version:x-gm-gg:x-gm-message-state:from:to:cc
          :subject:date:message-id:reply-to:content-type;
-        bh=f7K+OWT5/zN97AWFOPBzuexi2dmP1ajwM95QsLerSkw=;
-        b=IZS+VFTUSqlWndyov4/MvicpDyA98UcX+PmqUE/1bXkyL9NQTt18iB0ZX8x+imr8GV
-         B2nfpTQS8ds7SSDleOQP+iGeJoGEq/k0OnbieACH10KGUpSpOGvH4T+lI7EhHfDi0jw/
-         4ma//B07GBUq7yW8wlPchcjoMVXlUBmsPnucBPd2BqPRmcO9NkZlm5hNOtTkdt0YF/ZA
-         XiwHV+rCsHD2RZV0+wfyW8bxfXFldjMUKrBLvqW8Qf5+9Gcvkij6jHwhCk41qg0QWN/I
-         t1oK8l8sVTIatU/zFxr8vswV5bk1eVURCw8Upij+R+OCdiEdlEQolMZbNSKv2KpyZHCn
-         A6AQ==
-X-Forwarded-Encrypted: i=1; AL+hErHIBHrkdE6j5p6YIMFDDPgxGPW4fWrZry1rBYlDh+hAanLB6U2IyF1LNduBUGmkAPubshcJCvM4Bds=@lists.linux.dev
-X-Gm-Message-State: APuU4Z8vBi6cYeCnC8CikLhjDQojelWtyXPkV80+z9RvdjfHjylpK07y
-	6wuEE2rlV7H7CVEBcK0U2naCR0wp6mNKtQL77WbQMGxsJTqnBG4r5WpRL+AS1i9R4VW34S0QWwk
-	0FhdTRABh2FiyqCgi10q5jNUpkaoMRZr8ph7AV4AoDw==
-X-Gm-Gg: AZFdTZcvkKjoOcVx6PooPJ2gZ9o8tqKy4RZ+6Qwrsed8S0/2m8EMUYvgykJ3j6sgev5
-	4ooUSk2Ty079qE5+r+NRYe1NHuvM8Qp1lC8DLSeCWE6oHrp2U9wquZBY90/Pr5WKztXgCj/W6LU
-	b+mf9xbbwyEYsbcFyEPw+EYmzB6lNTcZo/CKi6nkzZIZtVm2mfdukxvwBnWV18oEbUSefWF+3nS
-	xMDgHtC7I3Tq/a4C4pfQCA1VI4hEvji84QQj7aGRmtdbacShTuqooVtvdIyYmQMjZsot2mySe3X
-	QR/SRSWpbV6PfWdOnlQDKJyF+/QG08ZBLW8fdk2xmTKuODuczc5dN64HvUU6pi4dLSFVr3GV8J3
-	engZxk+45Xyos7zbLC6zlSwoi6eSHWAm8BS85/EVaS6wplUxkFrD/F5NUtQGVliNkJA==
-X-Received: by 2002:ac8:5d04:0:b0:54f:50e7:6d69 with SMTP id
- d75a77b69052e-55d6fbfc728mr265521821cf.1.1795517753910; Tue, 24 Nov 2026
- 02:55:53 -0800 (PST)
+        bh=YxcSWKYnItj3yo5FCFqsfm26g9ItY5gHtNPYg7zw1LA=;
+        b=E+/HeVIZR8sp3TfAGdWigQkYTgU+vFoef3IMGK4xGEP8iVupCQN/R7O3seKOWXfWgv
+         hl1HeZIxHOEtHy2tMRkqJo4NI1TEDwge99LHTW/nXeB2mDaPkqsbmK1VtUjc6s4M49hv
+         NH10qQ8GKCUl67iu+cGpyuWw6pPUL0XfloAQWQkkM8UEEbTbFe0SolCo9t5YYxeTS4Xw
+         ql4RcEmGyNgmCyUS5W37EOY8yzMewmgSuX2IMKcl8Dx+tt8KfugTigdJm8C2rIYo0oJK
+         eqwghngb4wkeFE/J4QuzzZkijWBwmJFczQv45Emv5nLnEQB5jmiy1zjoaRIBCgm1KkIG
+         cy5Q==
+X-Forwarded-Encrypted: i=1; AL+hErFCLPPMGD65fZZijXs5h4Fo2R2+pA3J39FyliYTm/JxxYvOd7mGRJUowrdRDzT0JMt1Y8UP3+I+DpQ=@lists.linux.dev
+X-Gm-Message-State: APuU4Z+DKuasuaFodmpuok3+esZqOK23VLVVGvdyZJ5IYGlgv29783O/
+	j6m/5YLBax31CowE4IJ/RAFiE4ftkhCrDo9+Degs9BgHq6icpYhn+PVjr3IP4lgLqXB8Y18woeD
+	oMMbQPCT/2HO1b2wtgJGHeXpBCkCA6rlSfL1N6bAJwQ==
+X-Gm-Gg: AZFdTZdogBKTJkxuc0V9H5qFrOiwZ3UqoPbTZkc7rCjGSkGvFkUzzrWgGXrQlX1WwWY
+	q6upGCSdnhysf/YseOpOWcyArm/bEUe4RmC9FsAK8HEhbQft+JdpQkaBuAzF8K7tirj/tUFn13w
+	9Qv2SsHKZNlHypj0rq2Ql9e3jk+PGXhSbVFpsam7TSzqVBLzoRjqVysayQJw/oowyDFuoT7SPJd
+	/VcBtHHWG0ppt0iXZtzjwReDNtGFZhGRdtAESRCLXLFUnFq0ORBrC2K3/xcME/Tby8HlUznMNip
+	mBTqTB7JNi2KuvkU847yRhcqBW5h7vJF9PPumUGQPjqXMz4ZOVmG6+f1P7gBiDIMI3BQ+7y7PV6
+	7kI15DRFAJo2Qv3RqGAyWh7wy5dMjBYDmw9G/c1WvQPM2uYpEg38uoC4Zg2sY411bBg==
+X-Received: by 2002:a05:620a:199a:b0:949:aceb:b77f with SMTP id
+ af79cd13be357-949b36034edmr2558799785a.30.1795518851115; Tue, 24 Nov 2026
+ 03:14:11 -0800 (PST)
 X-Mailing-List: virtio-fs@lists.linux.dev
 List-Id: <virtio-fs.lists.linux.dev>
 List-Post: <mailto:virtio-fs@lists.linux.dev>
@@ -100,28 +100,26 @@ List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
 List-Owner: <mailto:virtio-fs+owner@lists.linux.dev>
 Precedence: list
 MIME-Version: 1.0
-References: <6c6cea56-1af2-4a37-b081-83244d5e09cd@kylinos.cn> <20261123063609.82014-1-q.h.hack.winter@gmail.com>
-In-Reply-To: <20261123063609.82014-1-q.h.hack.winter@gmail.com>
+References: <20261123095455.88622-1-liwang@kylinos.cn>
+In-Reply-To: <20261123095455.88622-1-liwang@kylinos.cn>
 From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Tue, 24 Nov 2026 11:55:42 +0100
-X-Gm-Features: Aa3M54r7eAE856Qdq3AsqWMUaoTcqR2q2T6lCT40Ts3802VL14VNSmjueVArc1E
-Message-ID: <CAJfpeguspTb0w7DK8-4ALHMcHbH0+Qs8nfh78mOJRwN3VQcAdg@mail.gmail.com>
-Subject: Re: [PATCH v5] fuse: virtio-fs: fix lost wakeup on a full virtqueue
-To: Qihang <q.h.hack.winter@gmail.com>
-Cc: Li Wang <liwang@kylinos.cn>, German Maglione <gmaglione@redhat.com>, 
-	Vivek Goyal <vgoyal@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, 
-	Eugenio Perez <eperezma@redhat.com>, virtualization@lists.linux.dev, 
-	linux-fsdevel@vger.kernel.org, fuse-devel@lists.linux.dev, 
-	linux-kernel@vger.kernel.org, virtio-fs@lists.linux.dev
+Date: Tue, 24 Nov 2026 12:13:59 +0100
+X-Gm-Features: Aa3M54pbj8-6gfE1d-Xj-d2hBGWMonaIctmbDSe8aODDQN2gLU60G5Esc5wLwmc
+Message-ID: <CAJfpeguSMMaBuELCVtUpEvCZZCRZK-xvs_TMMD8r_KuuzzQoaQ@mail.gmail.com>
+Subject: Re: [PATCH] virtiofs: fix potential unmount or device removal hang
+ due to stuck FORGETs
+To: Li Wang <liwang@kylinos.cn>
+Cc: German Maglione <gmaglione@redhat.com>, Vivek Goyal <vgoyal@redhat.com>, 
+	Stefan Hajnoczi <stefanha@redhat.com>, =?UTF-8?Q?Eugenio_P=C3=A9rez?= <eperezma@redhat.com>, 
+	"Michael S . Tsirkin" <mst@redhat.com>, fuse-devel@lists.linux.dev, virtualization@lists.linux.dev, 
+	linux-fsdevel@vger.kernel.org, virtio-fs@lists.linux.dev, 
+	stable@vger.kernel.org
 Content-Type: text/plain; charset="UTF-8"
 
-On Mon, 23 Nov 2026 at 07:36, Qihang <q.h.hack.winter@gmail.com> wrote:
+On Mon, 23 Nov 2026 at 10:55, Li Wang <liwang@kylinos.cn> wrote:
 
-> On -ENOSPC, add the request to queued_reqs before releasing fsvq->lock,
-> as send_forget_request() does.  This prevents
-> virtio_fs_requests_done_work() from checking queued_reqs between the
-> failed submission and the insertion.  Both callers can then return
-> immediately on -ENOSPC.
+> After the FORGET is dropped, return 0 so this same worker invocation
+> continues with the rest of queued_reqs.  A full queue still returns 1.
 
 Applied, thanks.
 
